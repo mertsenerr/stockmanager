@@ -1,0 +1,46 @@
+:host { display: block; }
+
+.auto-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--color-surface-elevated);
+  border: 1.5px solid var(--color-ink);
+  border-radius: 12px;
+  box-shadow: 2px 2px 0 var(--color-ink);
+}
+.auto-pill-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+  flex-shrink: 0;
+  width: 100px;
+}
+.auto-pill-value {
+  flex: 1;
+  font-family: 'Bricolage Grotesque', Inter, sans-serif;
+  font-variation-settings: 'opsz' 18, 'wght' 700;
+  font-size: 14px;
+  color: var(--color-ink);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.auto-pill-source {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1.5px solid var(--color-ink);
+  background: var(--color-lime);
+  color: var(--color-ink);
+  flex-shrink: 0;
+}

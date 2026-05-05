@@ -1,0 +1,112 @@
+<app-page-header title="Sayım Oturumları" description="Excel yükleme ve canlı karşılaştırmanın merkezi.">
+  <div actions class="flex items-center gap-2">
+    <select [value]="firmaFilter()" (change)="firmaFilter.set(($any($event.target)).value)"
+            class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm">
+      <option value="">Tüm firmalar</option>
+      @for (f of firmalar(); track f.id) { <option [value]="f.id">{{ f.ad }}</option> }
+    </select>
+    <select [value]="durumFilter()" (change)="setDurumFilter(($any($event.target)).value)"
+            class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm">
+      @for (d of durumOptions; track d.value) { <option [value]="d.value">{{ d.label }}</option> }
+    </select>
+    <input type="search" [value]="query()" (input)="query.set(($any($event.target)).value)"
+           placeholder="Ara..."
+           class="focus-ring text-xs px-2.5 py-1.5 bg-surface-elevated border border-border rounded-sm w-44 placeholder:text-text-muted" />
+    @if (canCreate()) {
+      <button (click)="openCreate()"
+              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
+        Yeni oturum
+      </button>
+    }
+  </div>
+</app-page-header>
+
+<div class="card overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-surface-elevated">
+      <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
+        <th class="px-4 py-2.5 font-medium">Tarih</th>
+        <th class="px-4 py-2.5 font-medium">Firma · Mağaza</th>
+        <th class="px-4 py-2.5 font-medium">Durum</th>
+        <th class="px-4 py-2.5 font-medium">Özet</th>
+        <th class="px-4 py-2.5 font-medium">Katılımcılar</th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (loading()) {
+        <tr><td colspan="5" class="px-4 py-8 text-center text-xs text-text-muted">Yükleniyor...</td></tr>
+      } @else if (filtered().length === 0) {
+        <tr><td colspan="5" class="px-4 py-8 text-center text-xs text-text-muted">Oturum yok.</td></tr>
+      } @else {
+        @for (o of filtered(); track o.id) {
+          <tr (click)="open(o)" class="border-t border-border hover:bg-surface-elevated transition-colors duration-150 cursor-pointer">
+            <td class="px-4 py-2.5 font-mono text-xs">{{ formatDate(o.tarih) }}</td>
+            <td class="px-4 py-2.5">
+              <div class="text-text-primary">{{ o.firmaAdi }}</div>
+              <div class="text-text-muted text-xs">{{ o.magazaAdi }}</div>
+            </td>
+            <td class="px-4 py-2.5">
+              <span class="chip">
+                <span class="w-1.5 h-1.5 rounded-full" [class]="durumColor(o.durum)"></span>
+                {{ durumLabel(o.durum) }}
+              </span>
+            </td>
+            <td class="px-4 py-2.5 text-text-muted text-xs">
+              @if (o.ozetler.toplamUrun > 0) {
+                {{ o.ozetler.toplamUrun }} ürün ·
+                <span class="text-accent-info">{{ o.ozetler.beklemedeSayisi }} bekliyor</span> ·
+                <span class="text-accent-success">{{ o.ozetler.onaylanmis }} onay</span>
+              } @else {
+                <span class="text-text-muted">—</span>
+              }
+            </td>
+            <td class="px-4 py-2.5 text-text-muted text-xs">
+              @if (o.katilimcilar.length === 0) { — }
+              @else { {{ o.katilimcilar.length }} kişi }
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+</div>
+
+<app-modal [open]="modalOpen()" title="Yeni sayım oturumu" (closed)="closeModal()">
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4" novalidate>
+    <div>
+      <label class="block text-xs text-text-secondary mb-1.5">Mağaza</label>
+      <select formControlName="magazaId"
+              class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm">
+        <option value="">— Seçin —</option>
+        @for (m of magazalar(); track m.id) {
+          <option [value]="m.id">{{ m.firmaAdi }} · {{ m.ad }}</option>
+        }
+      </select>
+      @if (form.controls.magazaId.touched && form.controls.magazaId.errors?.['required']) {
+        <p class="text-xs text-accent-danger mt-1.5">Mağaza zorunludur.</p>
+      }
+    </div>
+    <div>
+      <label class="block text-xs text-text-secondary mb-1.5">Tarih</label>
+      <input type="date" formControlName="tarih"
+             class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm font-mono" />
+    </div>
+
+    @if (serverError()) {
+      <div class="text-xs text-accent-danger bg-accent-danger/10 border border-accent-danger/30 rounded-sm px-3 py-2">
+        {{ serverError() }}
+      </div>
+    }
+
+    <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+      <button type="button" (click)="closeModal()"
+              class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
+        Vazgeç
+      </button>
+      <button type="submit" [disabled]="saving()"
+              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg disabled:opacity-50 active:scale-[0.98] transition-all duration-150">
+        {{ saving() ? 'Oluşturuluyor...' : 'Oluştur' }}
+      </button>
+    </div>
+  </form>
+</app-modal>

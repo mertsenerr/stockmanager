@@ -1,0 +1,137 @@
+<app-page-header title="Firmalar" description="Müşteri firmalarını yönet (LC Waikiki, Levi's, BP vb.).">
+  <div actions class="flex items-center gap-2">
+    <label class="flex items-center gap-1.5 text-xs text-text-muted cursor-pointer">
+      <input type="checkbox" [checked]="includeInactive()" (change)="toggleInactive()"
+             class="w-3.5 h-3.5 bg-surface-elevated border border-border accent-text-primary" />
+      Pasifleri göster
+    </label>
+    <input
+      type="search"
+      [value]="query()"
+      (input)="query.set(($any($event.target)).value)"
+      placeholder="Ara..."
+      class="focus-ring text-xs px-2.5 py-1.5 bg-surface-elevated border border-border rounded-sm w-44 placeholder:text-text-muted"
+    />
+    <button
+      type="button"
+      (click)="openCreate()"
+      class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150 ease-soft"
+    >
+      Yeni firma
+    </button>
+  </div>
+</app-page-header>
+
+<div class="card overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-surface-elevated">
+      <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
+        <th class="px-4 py-2.5 font-medium">Ad</th>
+        <th class="px-4 py-2.5 font-medium">Tip</th>
+        <th class="px-4 py-2.5 font-medium">Durum</th>
+        <th class="px-4 py-2.5 font-medium text-right">İşlem</th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (loading()) {
+        <tr><td colspan="4" class="px-4 py-8 text-center text-xs text-text-muted">Yükleniyor...</td></tr>
+      } @else if (filtered().length === 0) {
+        <tr><td colspan="4" class="px-4 py-8 text-center text-xs text-text-muted">Kayıt yok.</td></tr>
+      } @else {
+        @for (f of filtered(); track f.id) {
+          <tr class="border-t border-border hover:bg-surface-elevated transition-colors duration-150">
+            <td class="px-4 py-2.5 text-text-primary">{{ f.ad }}</td>
+            <td class="px-4 py-2.5 text-text-secondary text-xs">{{ tipLabel(f.tip) }}</td>
+            <td class="px-4 py-2.5">
+              @if (f.aktifMi) {
+                <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-accent-success"></span>aktif</span>
+              } @else {
+                <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span>pasif</span>
+              }
+            </td>
+            <td class="px-4 py-2.5 text-right">
+              <button (click)="openEdit(f)" class="focus-ring text-xs text-text-secondary hover:text-text-primary transition-colors mr-3">Düzenle</button>
+              <button (click)="remove(f)" class="focus-ring text-xs text-accent-danger/80 hover:text-accent-danger transition-colors">Sil</button>
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+</div>
+
+<app-modal [open]="modalOpen()" [title]="editing() ? 'Firmayı düzenle' : 'Yeni firma'" (closed)="closeModal()">
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4" novalidate>
+    <div>
+      <label class="block text-xs text-text-secondary mb-1.5">Ad</label>
+      <input
+        type="text"
+        formControlName="ad"
+        class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm placeholder:text-text-muted"
+        placeholder="Firma adı"
+      />
+      @if (form.controls.ad.touched && form.controls.ad.errors?.['required']) {
+        <p class="text-xs text-accent-danger mt-1.5">Firma adı zorunludur.</p>
+      }
+    </div>
+
+    <div>
+      <label class="block text-xs text-text-secondary mb-1.5">Kısaltma <span class="text-text-muted">(çalışan kayıt anahtarı)</span></label>
+      <input
+        type="text"
+        formControlName="kisaltma"
+        maxlength="6"
+        class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm uppercase placeholder:text-text-muted"
+        placeholder="LCW"
+      />
+      @if (form.controls.kisaltma.touched && form.controls.kisaltma.errors?.['pattern']) {
+        <p class="text-xs text-accent-danger mt-1.5">3-6 karakter, sadece harf veya rakam.</p>
+      }
+    </div>
+
+    <div>
+      <label class="block text-xs text-text-secondary mb-1.5">Tip</label>
+      <select
+        formControlName="tip"
+        class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm"
+      >
+        @for (opt of tipOptions; track opt.value) {
+          <option [value]="opt.value">{{ opt.label }}</option>
+        }
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-xs text-text-secondary mb-1.5">Logo URL <span class="text-text-muted">(opsiyonel)</span></label>
+      <input
+        type="text"
+        formControlName="logoUrl"
+        class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm placeholder:text-text-muted"
+        placeholder="https://..."
+      />
+    </div>
+
+    <label class="flex items-center gap-2 text-xs text-text-secondary cursor-pointer select-none">
+      <input type="checkbox" formControlName="aktifMi"
+             class="w-3.5 h-3.5 bg-surface-elevated border border-border accent-text-primary" />
+      Aktif
+    </label>
+
+    @if (serverError()) {
+      <div class="text-xs text-accent-danger bg-accent-danger/10 border border-accent-danger/30 rounded-sm px-3 py-2">
+        {{ serverError() }}
+      </div>
+    }
+
+    <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+      <button type="button" (click)="closeModal()"
+              class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
+        Vazgeç
+      </button>
+      <button type="submit" [disabled]="saving()"
+              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg disabled:opacity-50 active:scale-[0.98] transition-all duration-150">
+        {{ saving() ? 'Kaydediliyor...' : (editing() ? 'Güncelle' : 'Oluştur') }}
+      </button>
+    </div>
+  </form>
+</app-modal>

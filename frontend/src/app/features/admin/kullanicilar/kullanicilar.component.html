@@ -1,0 +1,205 @@
+<app-page-header title="Kullanıcılar" description="Sistem kullanıcılarını ve rolleri yönet.">
+  <div actions class="flex items-center gap-2">
+    <label class="flex items-center gap-1.5 text-xs text-text-muted cursor-pointer">
+      <input type="checkbox" [checked]="includeInactive()" (change)="toggleInactive()"
+             class="w-3.5 h-3.5 bg-surface-elevated border border-border accent-text-primary" />
+      Pasifleri göster
+    </label>
+    <input
+      type="search"
+      [value]="query()"
+      (input)="query.set(($any($event.target)).value)"
+      placeholder="Ara..."
+      class="focus-ring text-xs px-2.5 py-1.5 bg-surface-elevated border border-border rounded-sm w-44 placeholder:text-text-muted"
+    />
+    <button (click)="openCreate()"
+            class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
+      Yeni kullanıcı
+    </button>
+  </div>
+</app-page-header>
+
+@if (pendingUsers().length > 0) {
+  <div class="card mb-4 border-[1.5px] border-accent-warning/60 bg-accent-warning/10 p-4">
+    <header class="flex items-center justify-between mb-3">
+      <h3 class="font-display font-bold text-sm">Onay Bekleyen Kayıtlar ({{ pendingUsers().length }})</h3>
+      <span class="text-[11px] font-mono uppercase tracking-wider text-text-muted">
+        Yeni kullanıcı kayıtları aşağıda — onaylayınca giriş yapabilir
+      </span>
+    </header>
+    <div class="space-y-2">
+      @for (p of pendingUsers(); track p.id) {
+        <div class="flex items-center justify-between gap-3 px-3 py-2 bg-bg rounded-sm border border-border">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-text-primary font-medium">{{ p.adSoyad }}</p>
+            <p class="text-xs text-text-secondary font-mono">{{ p.email }}</p>
+          </div>
+          <button (click)="approve(p)"
+                  class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-accent-success text-bg hover:opacity-90 transition-opacity">
+            Onayla
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<div class="card overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-surface-elevated">
+      <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
+        <th class="px-4 py-2.5 font-medium">Ad Soyad</th>
+        <th class="px-4 py-2.5 font-medium">Email</th>
+        <th class="px-4 py-2.5 font-medium">Rol</th>
+        <th class="px-4 py-2.5 font-medium">Mağaza/Firma</th>
+        <th class="px-4 py-2.5 font-medium">Durum</th>
+        <th class="px-4 py-2.5 font-medium text-right">İşlem</th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (loading()) {
+        <tr><td colspan="6" class="px-4 py-8 text-center text-xs text-text-muted">Yükleniyor...</td></tr>
+      } @else if (filtered().length === 0) {
+        <tr><td colspan="6" class="px-4 py-8 text-center text-xs text-text-muted">Kayıt yok.</td></tr>
+      } @else {
+        @for (u of filtered(); track u.id) {
+          <tr class="border-t border-border hover:bg-surface-elevated transition-colors duration-150">
+            <td class="px-4 py-2.5 text-text-primary">{{ u.adSoyad }}</td>
+            <td class="px-4 py-2.5 text-text-secondary text-xs font-mono">{{ u.email }}</td>
+            <td class="px-4 py-2.5 text-text-secondary text-xs">{{ roleLabel(u.rol) }}</td>
+            <td class="px-4 py-2.5 text-text-muted text-xs">
+              {{ u.magazaIds.length }} mağaza · {{ u.firmaIds.length }} firma
+            </td>
+            <td class="px-4 py-2.5">
+              @if (u.aktifMi) {
+                <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-accent-success"></span>aktif</span>
+              } @else {
+                <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span>pasif</span>
+              }
+            </td>
+            <td class="px-4 py-2.5 text-right">
+              <button (click)="openEdit(u)" class="focus-ring text-xs text-text-secondary hover:text-text-primary transition-colors mr-3">Düzenle</button>
+              <button (click)="remove(u)" class="focus-ring text-xs text-accent-danger/80 hover:text-accent-danger transition-colors">Sil</button>
+            </td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+</div>
+
+<app-modal [open]="modalOpen()" [title]="editing() ? 'Kullanıcıyı düzenle' : 'Yeni kullanıcı'" (closed)="closeModal()" size="lg">
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4" novalidate>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs text-text-secondary mb-1.5">Email</label>
+        <input type="email" formControlName="email"
+               class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm font-mono placeholder:text-text-muted disabled:opacity-50"
+               placeholder="kullanici@firma.com" />
+        @if (form.controls.email.touched && form.controls.email.errors) {
+          <p class="text-xs text-accent-danger mt-1.5">
+            @if (form.controls.email.errors['required']) { Email zorunludur. }
+            @else if (form.controls.email.errors['email']) { Geçerli bir email giriniz. }
+          </p>
+        }
+      </div>
+
+      <div>
+        <label class="block text-xs text-text-secondary mb-1.5">Ad Soyad</label>
+        <input type="text" formControlName="adSoyad"
+               class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs text-text-secondary mb-1.5">Rol</label>
+        <select formControlName="rol"
+                class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm">
+          @for (opt of roleOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="flex items-end">
+        <label class="flex items-center gap-2 text-xs text-text-secondary cursor-pointer pb-2">
+          <input type="checkbox" formControlName="aktifMi"
+                 class="w-3.5 h-3.5 bg-surface-elevated border border-border accent-text-primary" />
+          Aktif
+        </label>
+      </div>
+    </div>
+
+    @if (!editing()) {
+      <div>
+        <label class="block text-xs text-text-secondary mb-1.5">Parola (en az 8 karakter, harf + rakam)</label>
+        <input type="password" formControlName="password"
+               class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm" />
+      </div>
+    } @else {
+      <div>
+        <label class="block text-xs text-text-secondary mb-1.5">Yeni parola <span class="text-text-muted">(boş bırak: değiştirme)</span></label>
+        <input type="password" formControlName="newPassword"
+               class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm" />
+      </div>
+    }
+
+    <div>
+      <div class="text-xs text-text-secondary mb-1.5">Firmalar</div>
+      <div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto border border-border rounded-sm bg-surface-elevated p-2">
+        @if (firmalar().length === 0) {
+          <span class="text-xs text-text-muted">Henüz firma yok.</span>
+        }
+        @for (f of firmalar(); track f.id) {
+          <button type="button" (click)="toggleId('firmaIds', f.id)"
+                  class="text-xs px-2 py-1 rounded-sm border transition-colors"
+                  [class.bg-text-primary]="isChecked('firmaIds', f.id)"
+                  [class.text-bg]="isChecked('firmaIds', f.id)"
+                  [class.border-text-primary]="isChecked('firmaIds', f.id)"
+                  [class.text-text-secondary]="!isChecked('firmaIds', f.id)"
+                  [class.border-border]="!isChecked('firmaIds', f.id)">
+            {{ f.ad }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <div>
+      <div class="text-xs text-text-secondary mb-1.5">Mağazalar</div>
+      <div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto border border-border rounded-sm bg-surface-elevated p-2">
+        @if (magazalar().length === 0) {
+          <span class="text-xs text-text-muted">Henüz mağaza yok.</span>
+        }
+        @for (m of magazalar(); track m.id) {
+          <button type="button" (click)="toggleId('magazaIds', m.id)"
+                  class="text-xs px-2 py-1 rounded-sm border transition-colors"
+                  [class.bg-text-primary]="isChecked('magazaIds', m.id)"
+                  [class.text-bg]="isChecked('magazaIds', m.id)"
+                  [class.border-text-primary]="isChecked('magazaIds', m.id)"
+                  [class.text-text-secondary]="!isChecked('magazaIds', m.id)"
+                  [class.border-border]="!isChecked('magazaIds', m.id)">
+            {{ m.firmaAdi }} · {{ m.ad }}
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (serverError()) {
+      <div class="text-xs text-accent-danger bg-accent-danger/10 border border-accent-danger/30 rounded-sm px-3 py-2">
+        {{ serverError() }}
+      </div>
+    }
+
+    <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+      <button type="button" (click)="closeModal()"
+              class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
+        Vazgeç
+      </button>
+      <button type="submit" [disabled]="saving()"
+              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg disabled:opacity-50 active:scale-[0.98] transition-all duration-150">
+        {{ saving() ? 'Kaydediliyor...' : (editing() ? 'Güncelle' : 'Oluştur') }}
+      </button>
+    </div>
+  </form>
+</app-modal>

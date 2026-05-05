@@ -1,0 +1,78 @@
+<main class="auth-page relative">
+  <!-- Top bar: sticker brand + help -->
+  <div class="absolute top-7 left-7 right-7 sm:top-10 sm:left-10 sm:right-10 flex items-center justify-between z-20">
+    <a routerLink="/login" class="auth-sticker">
+      <svg width="14" height="14" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M7 11c2.4-3.6 7.2-3.6 9.6 0" stroke="#1a1814" stroke-width="2" stroke-linecap="round"/>
+        <path d="M15.4 21c2.4 3.6 7.2 3.6 9.6 0" stroke="#1a1814" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="11.8" cy="16" r="1.4" fill="#1a1814"/>
+        <circle cx="20.2" cy="16" r="1.4" fill="#1a1814"/>
+      </svg>
+      <span>SayımLink · v0.1</span>
+    </a>
+    <a routerLink="/forgot-password" class="auth-help-link">Yardım?</a>
+  </div>
+
+  <!-- Main grid: hero + card -->
+  <div class="relative z-10 mx-auto max-w-[1280px] grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] items-center gap-10 lg:gap-16 px-6 sm:px-10 lg:px-14 pt-28 pb-20 lg:pt-24 min-h-screen">
+
+    <!-- HERO SIDE -->
+    <div class="space-y-8 lg:space-y-10">
+      @switch (variant) {
+        @case ('login') {
+          <h1 class="auth-display">
+            Sayım,<br/>
+            elinde <em>olsun</em><span class="dot"></span>
+          </h1>
+          <p class="auth-tagline">Tek link. Birlikte say. Anlık karşılaştır — kahve henüz soğumadan.</p>
+          <ul class="auth-checklist mt-4">
+            <li class="done"><span class="check"></span>Sayım oturumu aç</li>
+            <li class="done"><span class="check"></span>Linki paylaş, birlikte say</li>
+            <li><span class="check"></span>Sapmayı gör, raporla</li>
+          </ul>
+        }
+        @case ('forgot') {
+          <h1 class="auth-display">
+            Bağlantı,<br/>
+            <em>geliyor</em><span class="dot"></span>
+          </h1>
+          <p class="auth-tagline">Email adresine sıfırlama bağlantısı gönderiyoruz. Bir kahvenin yarısı kadar sürer.</p>
+        }
+        @case ('reset') {
+          <h1 class="auth-display">
+            Yeni parola,<br/>
+            <em>hazırlan</em><span class="dot"></span>
+          </h1>
+          <p class="auth-tagline">Hesabını koruyacak güçlü bir şifre seç. En az 8 karakter, harf ve rakam karışık.</p>
+        }
+        @case ('register') {
+          <h1 class="auth-display">
+            Ekibini<br/>
+            <em>topla</em><span class="dot"></span>
+          </h1>
+          <p class="auth-tagline">Sayım Başkanıysan firmanı aç ve ekibini davet et — kullanıcıysan başkanından aldığın anahtar ile dakikalar içinde içeride ol.</p>
+          <ul class="auth-checklist mt-4">
+            <li class="done"><span class="check"></span>Sayım Başkanı: yeni firma + kısaltma anahtarı</li>
+            <li class="done"><span class="check"></span>Kullanıcı: kısaltma ile firmaya katıl</li>
+            <li><span class="check"></span>Onay sonrası live sayıma katıl</li>
+          </ul>
+        }
+      }
+    </div>
+
+    <!-- CARD SIDE -->
+    <div class="relative w-full max-w-[440px] lg:justify-self-end">
+      <!-- decorative lime + sign behind card -->
+      <span aria-hidden="true"
+            class="hidden lg:block absolute -top-6 -right-6 w-12 h-12 rounded-full bg-[#c7e84d] border-[1.5px] border-[#1a1814]"
+            style="box-shadow: 4px 4px 0 #1a1814;"></span>
+      <span aria-hidden="true"
+            class="hidden lg:block absolute -bottom-5 -left-5 font-display text-[#1a1814] text-[44px] leading-none rotate-[-12deg] select-none"
+            style="font-variation-settings: 'opsz' 96, 'wght' 800;">+</span>
+
+      <div class="auth-card">
+        <ng-content></ng-content>
+      </div>
+    </div>
+  </div>
+</main>

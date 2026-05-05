@@ -1,0 +1,118 @@
+<div class="min-h-screen flex">
+  <!-- Mobile backdrop -->
+  @if (mobileNavOpen()) {
+    <div class="fixed inset-0 z-30 bg-ink/40 backdrop-blur-sm md:hidden" (click)="closeMobileNav()"></div>
+  }
+
+  <aside
+    class="sl-sidebar bg-surface flex flex-col z-40
+           fixed inset-y-0 left-0 w-64 transform transition-transform duration-200 ease-soft
+           md:static md:transform-none md:shrink-0"
+    [class.-translate-x-full]="!mobileNavOpen()"
+    [class.translate-x-0]="mobileNavOpen()"
+    [class.md:translate-x-0]="true"
+  >
+    <!-- Brand block -->
+    <div class="sl-brand">
+      <a routerLink="/" class="sl-brand-row" aria-label="SayımLink anasayfa">
+        <span class="sl-brand-mark" aria-hidden="true">
+          <span class="sl-brand-mark-dot"></span>
+          SL
+        </span>
+        <span class="sl-brand-text">
+          <span class="sl-brand-name">Sayım<em>Link</em></span>
+          <span class="sl-brand-tag">v0.1.0 · BETA</span>
+        </span>
+      </a>
+      <button
+        (click)="closeMobileNav()"
+        class="md:hidden focus-ring text-ink-muted hover:text-coral text-2xl leading-none ml-auto"
+        aria-label="Menüyü kapat"
+      >×</button>
+    </div>
+
+    <!-- Nav -->
+    <nav class="sl-nav">
+      @for (item of navItems(); track item.path) {
+        <a
+          [routerLink]="item.path"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+          class="sl-nav-item"
+        >
+          <span class="sl-nav-row">
+            <span class="sl-nav-icon" aria-hidden="true">{{ item.icon }}</span>
+            <span class="sl-nav-label">{{ item.label }}</span>
+            <span class="sl-nav-arrow" aria-hidden="true">→</span>
+          </span>
+
+          <!-- Inline hover preview (pushes items below down) -->
+          <span class="sl-nav-preview" aria-hidden="true">
+            <span class="sl-nav-preview-card" [style.background-color]="item.color">
+              <span class="sl-nav-preview-bg" [style.background-image]="'url(' + item.image + ')'"></span>
+              <span class="sl-nav-preview-overlay"></span>
+              <span class="sl-nav-preview-text">
+                <span class="sl-nav-preview-title">{{ item.preview.title }}</span>
+                <span class="sl-nav-preview-desc">{{ item.preview.desc }}</span>
+              </span>
+            </span>
+          </span>
+        </a>
+      }
+    </nav>
+
+    <!-- User / footer -->
+    <div class="sl-foot">
+      @if (user(); as u) {
+        <div class="sl-foot-user">
+          <span class="sl-avatar" aria-hidden="true">{{ initials() }}</span>
+          <span class="min-w-0">
+            <span class="block text-[14px] font-semibold text-ink truncate">{{ u.adSoyad }}</span>
+            <span class="block font-mono text-[10px] text-ink-muted uppercase tracking-wider truncate">{{ roleLabel() }}</span>
+          </span>
+        </div>
+        <button
+          type="button"
+          (click)="logout()"
+          class="sl-logout"
+        >
+          <span>Çıkış yap</span>
+          <span aria-hidden="true">→</span>
+        </button>
+      }
+    </div>
+  </aside>
+
+  <main class="flex-1 overflow-auto min-w-0">
+    <header class="sticky top-0 z-10 bg-bg/85 backdrop-blur border-b-[1.5px] border-ink px-4 md:px-7 py-3 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-3 min-w-0">
+        <button
+          (click)="toggleMobileNav()"
+          class="md:hidden focus-ring p-1.5 rounded-md border-[1.5px] border-ink hover:bg-surface-elevated transition-colors"
+          aria-label="Menü"
+        >
+          <span class="block w-4 h-0.5 bg-ink mb-1"></span>
+          <span class="block w-4 h-0.5 bg-ink mb-1"></span>
+          <span class="block w-4 h-0.5 bg-ink"></span>
+        </button>
+        <div class="font-mono text-[11px] text-ink-muted uppercase tracking-wider truncate">
+          @if (user(); as u) {
+            {{ u.email }}
+          }
+        </div>
+      </div>
+      <span class="sticker sticker-lime whitespace-nowrap" style="transform: rotate(1.5deg);">
+        <span class="hidden sm:inline">Faz 7 — Polish</span>
+        <span class="sm:hidden">v0.1</span>
+      </span>
+    </header>
+
+    <div class="px-4 md:px-7 py-5 md:py-7">
+      <router-outlet />
+    </div>
+  </main>
+
+  <app-toast-host />
+  <app-confirm-host />
+  <app-incoming-call-host />
+</div>

@@ -1,0 +1,85 @@
+# ─── OS ──────────────────────────────────────────────────────────────────────
+**/.DS_Store
+**/Thumbs.db
+**/desktop.ini
+
+# ─── IDEs / Editors ──────────────────────────────────────────────────────────
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+**/*~
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+**/*.log
+**/logs/
+
+# ─── Secrets / local configs ─────────────────────────────────────────────────
+**/.env
+**/.env.*
+**/appsettings.Development.json
+**/appsettings.Production.json
+**/appsettings.*.local.json
+**/secrets.json
+
+# ─── .NET build / publish output ─────────────────────────────────────────────
+**/bin/
+**/obj/
+**/out/
+**/publish/
+**/[Dd]ebug/
+**/[Dd]ebugPublic/
+**/[Rr]elease/
+**/[Rr]eleases/
+**/x64/
+**/x86/
+**/[Bb]uild/
+**/[Pp]ublish/
+**/TestResults/
+**/*.user
+**/*.suo
+**/*.userprefs
+**/*.pidb
+**/*.dbmdl
+**/*.dbproj.schemaview
+**/*.publishsettings
+**/PublishProfiles/
+
+# ─── Node / Angular (in case backend is built from repo root) ────────────────
+**/node_modules/
+**/.angular/
+**/dist/
+**/tmp/
+**/out-tsc/
+**/*.tsbuildinfo
+**/.npm/
+**/.eslintcache
+**/coverage/
+
+# Anything in a sibling frontend folder shouldn't ship in the backend image.
+frontend/
+
+# ─── MongoDB local data ──────────────────────────────────────────────────────
+**/data/db/
+**/mongo-data/
+
+# ─── Git / GitHub / CI ───────────────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# ─── Tooling / agents ────────────────────────────────────────────────────────
+**/.claude/
+
+# ─── Docker meta (don't copy into the image) ─────────────────────────────────
+Dockerfile
+Dockerfile.*
+.dockerignore
+docker-compose*.yml
+
+# ─── Misc backups ────────────────────────────────────────────────────────────
+**/*.bak
+**/*.orig
+**/*.rej

@@ -1,0 +1,125 @@
+@import 'ag-grid-community/styles/ag-grid.css';
+@import 'ag-grid-community/styles/ag-theme-quartz.css';
+
+/* ─── Excel-like sabit hizalama ──────────────────────────────────────────── */
+/* Header ve cell padding'leri tam eşit. Menu/filter icon kapalı ki başlık
+   metni hücre değeri ile aynı X-koordinatında bitsin. */
+.ag-theme-sayimlink .ag-header-cell,
+.ag-theme-sayimlink .ag-cell {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+.ag-theme-sayimlink .ag-cell {
+  display: flex;
+  align-items: center;
+}
+.ag-theme-sayimlink .ag-header-cell-label {
+  width: 100%;
+  flex: 1 1 auto;
+  justify-content: flex-start;
+}
+.ag-theme-sayimlink .ag-right-aligned-header .ag-header-cell-label {
+  justify-content: flex-end !important;
+  flex-direction: row !important;
+}
+.ag-theme-sayimlink .ag-right-aligned-cell {
+  justify-content: flex-end !important;
+  text-align: right !important;
+}
+.ag-theme-sayimlink .ag-header-cell-text {
+  white-space: nowrap;
+}
+/* Header'da AG Grid'in eklediği menu/filter button'unu kapat ki sağa yaslı
+   başlık metni hücre sağ kenarına denk gelsin. */
+.ag-theme-sayimlink .ag-header-cell-menu-button,
+.ag-theme-sayimlink .ag-header-icon.ag-header-cell-menu-button,
+.ag-theme-sayimlink .ag-header-cell-filter-button,
+.ag-theme-sayimlink .ag-floating-filter-button {
+  display: none !important;
+}
+
+/* ─── Filter tab cards ───────────────────────────────────────────────────── */
+.filter-tab {
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-ink);
+  border-radius: 14px;
+  transition:
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms,
+    background 150ms;
+  cursor: pointer;
+}
+.filter-tab:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--color-ink);
+  background: var(--color-surface-elevated);
+}
+.filter-tab.active {
+  background: var(--color-lime);
+  box-shadow: 4px 4px 0 var(--color-ink);
+  transform: translate(-2px, -2px);
+}
+.filter-tab.active:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 5px 5px 0 var(--color-ink);
+}
+
+/* ─── Editable cell affordance (subtle) ──────────────────────────────────── */
+.ag-theme-sayimlink .editable-cell {
+  background-image: linear-gradient(135deg,
+    transparent 0,
+    transparent calc(100% - 8px),
+    rgba(255, 93, 58, 0.45) calc(100% - 8px),
+    rgba(255, 93, 58, 0.45) 100%);
+  background-size: 8px 8px;
+  background-repeat: no-repeat;
+  background-position: bottom right;
+  cursor: pointer;
+}
+.ag-theme-sayimlink .editable-cell:hover {
+  background-color: rgba(255, 214, 110, 0.35);
+  outline: 1.5px dashed var(--color-coral);
+  outline-offset: -2px;
+}
+
+/* ─── Pending change-request cell badge ──────────────────────────────────── */
+/* Sadece arka plan + sol şerit; AG Grid'in cell layout'unu bozmamak için
+   pseudo-element / position rule kullanmıyoruz. */
+.ag-theme-sayimlink .cell-pending {
+  background-color: rgba(255, 214, 110, 0.55) !important;
+  border-left: 3px solid var(--color-coral, #ff5d3a) !important;
+  padding-left: 9px !important; /* 12 - 3 ile içerik aynı X'te kalsın */
+}
+
+/* ─── Row action buttons ─────────────────────────────────────────────────── */
+.ag-theme-sayimlink .row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+.ag-theme-sayimlink .row-action-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink);
+  background: var(--color-surface-elevated);
+  border: 1.5px solid var(--color-ink);
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: transform 150ms, box-shadow 150ms, background 120ms;
+}
+.ag-theme-sayimlink .row-action-btn:hover {
+  background: var(--color-butter);
+  transform: translate(-1px, -1px);
+  box-shadow: 2px 2px 0 var(--color-ink);
+}
+.ag-theme-sayimlink .row-action-danger:hover {
+  background: var(--color-coral);
+  color: #fff;
+}

@@ -1,0 +1,83 @@
+<app-page-header title="Audit Log" description="Kim ne zaman ne yaptı — son 180 gün.">
+  <div actions class="flex items-center gap-2">
+    <input type="date" [(ngModel)]="filterFrom"
+           class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm font-mono" />
+    <span class="text-text-muted text-xs">→</span>
+    <input type="date" [(ngModel)]="filterTo"
+           class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm font-mono" />
+    <select [(ngModel)]="filterAksiyon"
+            class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm">
+      @for (a of aksiyonOptions; track a.value) {
+        <option [value]="a.value">{{ a.label }}</option>
+      }
+    </select>
+    <button (click)="applyFilters()"
+            class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
+      Filtrele
+    </button>
+  </div>
+</app-page-header>
+
+<div class="card overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-surface-elevated">
+      <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
+        <th class="px-3 py-2 font-medium">Tarih</th>
+        <th class="px-3 py-2 font-medium">Kullanıcı</th>
+        <th class="px-3 py-2 font-medium">Aksiyon</th>
+        <th class="px-3 py-2 font-medium">Hedef</th>
+        <th class="px-3 py-2 font-medium">Detay</th>
+        <th class="px-3 py-2 font-medium">IP</th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (loading()) {
+        <tr><td colspan="6" class="px-4 py-8 text-center text-xs text-text-muted">Yükleniyor...</td></tr>
+      } @else if (items().length === 0) {
+        <tr><td colspan="6" class="px-4 py-8 text-center text-xs text-text-muted">Kayıt yok.</td></tr>
+      } @else {
+        @for (item of items(); track item.id) {
+          <tr class="border-t border-border">
+            <td class="px-3 py-2 font-mono text-[11px] text-text-secondary whitespace-nowrap">{{ formatDateTime(item.tarih) }}</td>
+            <td class="px-3 py-2">
+              <div class="text-text-primary text-xs">{{ item.kullaniciAdi }}</div>
+              <div class="text-[10px] text-text-muted">{{ item.kullaniciRol }}</div>
+            </td>
+            <td class="px-3 py-2">
+              <span class="chip">
+                <span class="w-1.5 h-1.5 rounded-full" [class]="severityClass(item)"></span>
+                {{ aksiyonLabel(item.aksiyon) }}
+              </span>
+            </td>
+            <td class="px-3 py-2 text-text-muted text-xs font-mono break-all max-w-[200px]">
+              {{ item.hedef }}{{ item.hedefId ? ':' + item.hedefId.slice(-6) : '' }}
+            </td>
+            <td class="px-3 py-2 text-text-secondary text-xs">
+              @if (item.eskiDeger || item.yeniDeger) {
+                <span class="text-text-muted">{{ item.eskiDeger ?? '—' }}</span>
+                <span class="text-text-muted"> → </span>
+                <span>{{ item.yeniDeger ?? '—' }}</span>
+              } @else {
+                —
+              }
+            </td>
+            <td class="px-3 py-2 text-text-muted text-[11px] font-mono">{{ item.ipAdres ?? '—' }}</td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+  <footer class="px-4 py-2 border-t border-border bg-surface-elevated flex items-center justify-between text-xs text-text-muted">
+    <span>{{ skip() + 1 }}–{{ skip() + items().length }} / {{ total() }}</span>
+    <div class="flex items-center gap-2">
+      <button (click)="prev()" [disabled]="!hasPrev()"
+              class="focus-ring px-2 py-1 rounded-sm border border-border hover:bg-bg disabled:opacity-50 transition-colors">
+        ← Önceki
+      </button>
+      <button (click)="next()" [disabled]="!hasNext()"
+              class="focus-ring px-2 py-1 rounded-sm border border-border hover:bg-bg disabled:opacity-50 transition-colors">
+        Sonraki →
+      </button>
+    </div>
+  </footer>
+</div>

@@ -1,0 +1,137 @@
+@let o = oturum();
+
+@if (loading()) {
+  <div class="text-xs text-text-muted py-12 text-center">Yükleniyor...</div>
+} @else if (o) {
+  <app-page-header [title]="o.firmaAdi + ' · ' + o.magazaAdi" [description]="'Sayım tarihi: ' + o.tarih.slice(0, 10)">
+    <div actions class="flex items-center gap-2">
+      <a routerLink="/oturumlar" class="focus-ring text-xs text-text-muted hover:text-text-primary transition-colors">← Tüm oturumlar</a>
+      @if (canLockUnlock()) {
+        @if (o.durum === 'aktif') {
+          <button (click)="lock()"
+                  class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
+            Kilitle
+          </button>
+          <button (click)="complete()"
+                  class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
+            Tamamla
+          </button>
+        } @else if (o.durum === 'kilitli') {
+          <button (click)="unlock()"
+                  class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
+            Kilidi aç
+          </button>
+          <button (click)="complete()"
+                  class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
+            Tamamla
+          </button>
+        }
+      }
+    </div>
+  </app-page-header>
+
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+    <div class="card p-4">
+      <p class="text-[11px] uppercase tracking-wide text-text-muted mb-1">Durum</p>
+      <span class="chip">
+        <span class="w-1.5 h-1.5 rounded-full" [class]="durumColor(o.durum)"></span>
+        {{ durumLabel(o.durum) }}
+      </span>
+    </div>
+    <div class="card p-4">
+      <p class="text-[11px] uppercase tracking-wide text-text-muted mb-1">Toplam ürün</p>
+      <p class="text-xl font-semibold font-mono">{{ o.ozetler.toplamUrun }}</p>
+    </div>
+    <div class="card p-4">
+      <p class="text-[11px] uppercase tracking-wide text-text-muted mb-1">Beklemede / Tekrar say</p>
+      <p class="text-xl font-semibold font-mono">
+        <span class="text-accent-info">{{ o.ozetler.beklemedeSayisi }}</span>
+        <span class="text-text-muted"> / </span>
+        <span class="text-accent-danger">{{ o.ozetler.tekrarSayilan }}</span>
+      </p>
+    </div>
+    <div class="card p-4">
+      <p class="text-[11px] uppercase tracking-wide text-text-muted mb-1">Onay</p>
+      <p class="text-xl font-semibold font-mono text-accent-success">{{ o.ozetler.onaylanmis }}</p>
+    </div>
+  </div>
+
+  @if (o.urunler.length === 0) {
+    @if (canUpload()) {
+      <app-excel-upload
+        [uploading]="uploading()"
+        [firmaTip]="o.firmaTip"
+        (importReady)="onImport($event)" />
+    } @else {
+      <div class="card p-8 text-center">
+        <p class="text-sm text-text-secondary">Bu oturuma henüz Excel yüklenmedi.</p>
+        <p class="text-xs text-text-muted mt-1">Sayım yöneticisi yüklediğinde burada görünecek.</p>
+      </div>
+    }
+  } @else {
+    <div class="card p-4 mb-4 flex items-center justify-between">
+      <div>
+        <p class="text-sm text-text-primary">Canlı karşılaştırma ekranı hazır.</p>
+        <p class="text-xs text-text-muted">{{ o.urunler.length }} ürün, {{ o.ozetler.beklemedeSayisi }} beklemede.</p>
+      </div>
+      <button type="button" (click)="openLive()"
+              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
+        Canlı ekrana geç →
+      </button>
+    </div>
+    <div class="card overflow-hidden">
+      <div class="px-4 py-2 border-b border-border bg-surface-elevated text-[11px] uppercase tracking-wide text-text-muted flex items-center justify-between">
+        <span>Ürünler ({{ o.urunler.length }})</span>
+        <span>Faz 5'te canlı tablo + AG Grid + SignalR ile değiştirilecek.</span>
+      </div>
+      <div class="overflow-x-auto max-h-[55vh]">
+        <table class="w-full text-sm">
+          <thead class="bg-surface sticky top-0">
+            <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
+              <th class="px-4 py-2 font-medium">Barkod</th>
+              <th class="px-4 py-2 font-medium">Ürün adı</th>
+              <th class="px-4 py-2 font-medium text-right">Sistem</th>
+              <th class="px-4 py-2 font-medium text-right">Sayılan</th>
+              <th class="px-4 py-2 font-medium text-right">Fark</th>
+              <th class="px-4 py-2 font-medium">Durum</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of o.urunler; track u.id) {
+              <tr class="border-t border-border">
+                <td class="px-4 py-2 font-mono text-xs">{{ u.barkod }}</td>
+                <td class="px-4 py-2 text-text-secondary text-xs">{{ u.urunAdi }}</td>
+                <td class="px-4 py-2 font-mono text-right">{{ u.sistemStok }}</td>
+                <td class="px-4 py-2 font-mono text-right">{{ u.sayilanStok }}</td>
+                <td class="px-4 py-2 font-mono text-right"
+                    [class.text-accent-success]="u.fark > 0"
+                    [class.text-accent-danger]="u.fark < 0"
+                    [class.text-text-muted]="u.fark === 0">
+                  {{ u.fark > 0 ? '+' : '' }}{{ u.fark }}
+                </td>
+                <td class="px-4 py-2 text-xs">
+                  <span class="chip">
+                    <span class="w-1.5 h-1.5 rounded-full"
+                          [class.bg-accent-info]="u.durum === 'beklemede'"
+                          [class.bg-accent-danger]="u.durum === 'tekrar_sayiliyor'"
+                          [class.bg-accent-success]="u.durum === 'onaylandi'"
+                          [class.bg-text-muted]="u.durum === 'iptal'"
+                          [class.bg-accent-warning]="u.durum === 'incele'"></span>
+                    {{ urunDurumLabel(u.durum) }}
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+  @if (liveOpen()) {
+    <app-modal [open]="true" size="full" [title]="o.firmaAdi + ' · ' + o.magazaAdi" (closed)="closeLive()">
+      <app-oturum-live [oturumIdInput]="o.id" [embedded]="true" [autoCallMode]="pendingCallMode()" />
+    </app-modal>
+  }
+} @else {
+  <div class="text-xs text-text-muted py-12 text-center">Oturum bulunamadı.</div>
+}

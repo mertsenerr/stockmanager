@@ -1,0 +1,71 @@
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── IDEs / Editors ──────────────────────────────────────────────────────────
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Secrets / local config ──────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+backend/appsettings.Development.json
+backend/appsettings.Production.json
+backend/.env
+
+# ─── .NET ────────────────────────────────────────────────────────────────────
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+*.pidb
+*.dbmdl
+*.dbproj.schemaview
+TestResults/
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Bb]uild/
+[Pp]ublish/
+*.publishsettings
+PublishProfiles/
+
+# ─── Node / Angular ──────────────────────────────────────────────────────────
+node_modules/
+.angular/
+dist/
+tmp/
+out-tsc/
+*.tsbuildinfo
+.npm/
+.eslintcache
+coverage/
+
+# ─── MongoDB local data ──────────────────────────────────────────────────────
+data/db/
+mongo-data/
+
+# ─── Tooling / agents ────────────────────────────────────────────────────────
+.claude/
+
+# ─── Misc ────────────────────────────────────────────────────────────────────
+*.bak
+*.orig
+*.rej

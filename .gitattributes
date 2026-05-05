@@ -1,0 +1,25 @@
+# Default: Git auto-detects text vs. binary and normalizes to LF in the repo.
+* text=auto eol=lf
+
+# Files that MUST remain LF (Linux containers, shell scripts, etc.).
+Dockerfile      text eol=lf
+*.sh            text eol=lf
+*.dockerignore  text eol=lf
+.dockerignore   text eol=lf
+
+# Windows-only batch / PS scripts keep CRLF.
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+*.ps1           text eol=crlf
+
+# Common binaries — never convert.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
+*.zip    binary
+*.gz     binary
+*.xlsx   binary
+*.xls    binary

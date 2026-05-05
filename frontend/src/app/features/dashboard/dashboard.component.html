@@ -1,0 +1,118 @@
+<section class="max-w-4xl">
+  <div class="mb-7">
+    <h2 class="font-display font-bold text-[28px] tracking-tight leading-tight">
+      @if (user(); as u) {
+        Hoş geldin, <span class="font-serif italic font-medium text-coral">{{ u.adSoyad }}</span>.
+      }
+    </h2>
+    @if (user(); as u) {
+      @if (u.firmaAdi) {
+        <p class="text-sm text-ink-secondary mt-2">
+          {{ u.firmaAdi }}
+          @if (u.firmaKisaltmasi) { <span class="font-mono text-xs text-ink-muted ml-1">[{{ u.firmaKisaltmasi }}]</span> }
+        </p>
+      }
+    }
+  </div>
+
+  @if (canManageUsers() && pendingUsers().length > 0) {
+    <div class="card mb-5 border-[1.5px] border-accent-warning/60 bg-accent-warning/10 p-5">
+      <header class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="font-display font-bold text-base">Onay Bekleyen Kayıtlar</h3>
+          <p class="text-xs text-text-secondary mt-0.5">
+            Firmana katılmak isteyen {{ pendingUsers().length }} kullanıcı var. Onayladıktan sonra giriş yapabilirler.
+          </p>
+        </div>
+        <span class="font-mono text-xs uppercase tracking-wider text-accent-warning font-bold">
+          {{ pendingUsers().length }}
+        </span>
+      </header>
+      <div class="space-y-2">
+        @for (p of pendingUsers(); track p.id) {
+          <div class="flex items-center justify-between gap-3 px-3 py-2.5 bg-bg rounded-sm border border-border">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm text-text-primary font-medium">{{ p.adSoyad }}</p>
+              <p class="text-xs text-text-secondary font-mono">{{ p.email }}</p>
+            </div>
+            <button (click)="approve(p)" [disabled]="approvingId() === p.id"
+                    class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-accent-success text-bg hover:opacity-90 transition-opacity disabled:opacity-50">
+              {{ approvingId() === p.id ? 'Onaylanıyor...' : 'Onayla' }}
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div class="card p-5">
+      <h3 class="font-mono text-[11px] text-ink-secondary uppercase tracking-[0.14em] mb-4">Hesap</h3>
+      @if (user(); as u) {
+        <dl class="space-y-3 text-sm">
+          <div class="flex justify-between gap-4 items-baseline">
+            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Email</dt>
+            <dd class="font-mono text-xs truncate">{{ u.email }}</dd>
+          </div>
+          <div class="flex justify-between gap-4 items-baseline">
+            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Rol</dt>
+            <dd class="text-sm font-semibold">{{ u.rol }}</dd>
+          </div>
+          @if (u.firmaAdi) {
+            <div class="flex justify-between gap-4 items-baseline">
+              <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Firma</dt>
+              <dd class="text-sm font-semibold">{{ u.firmaAdi }}</dd>
+            </div>
+          }
+          @if (u.firmaKisaltmasi) {
+            <div class="flex justify-between gap-4 items-baseline">
+              <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Katılım anahtarı</dt>
+              <dd class="font-mono text-sm font-semibold">{{ u.firmaKisaltmasi }}</dd>
+            </div>
+          }
+          <div class="flex justify-between gap-4 items-baseline">
+            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Mağaza sayısı</dt>
+            <dd class="font-mono text-sm font-semibold">{{ u.magazaIds.length }}</dd>
+          </div>
+        </dl>
+      }
+    </div>
+
+    <div class="card p-5">
+      <h3 class="font-mono text-[11px] text-ink-secondary uppercase tracking-[0.14em] mb-4">Sistem</h3>
+      @if (healthState(); as h) {
+        <dl class="space-y-3 text-sm">
+          <div class="flex justify-between gap-4 items-baseline">
+            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">API</dt>
+            <dd>
+              @if (h.status === 'healthy') {
+                <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-mint"></span>healthy</span>
+              } @else if (h.status === 'degraded') {
+                <span class="chip" style="background: var(--color-butter);"><span class="w-1.5 h-1.5 rounded-full bg-ink"></span>degraded</span>
+              } @else {
+                <span class="chip" style="background: var(--color-coral); color: #fff;"><span class="w-1.5 h-1.5 rounded-full bg-white"></span>kapalı</span>
+              }
+            </dd>
+          </div>
+          <div class="flex justify-between gap-4 items-baseline">
+            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">MongoDB</dt>
+            <dd>
+              <span class="chip">
+                <span class="w-1.5 h-1.5 rounded-full"
+                      [class.bg-mint]="h.checks?.mongo === 'up'"
+                      [class.bg-coral]="h.checks?.mongo !== 'up'"></span>
+                {{ h.checks?.mongo ?? '—' }}
+              </span>
+            </dd>
+          </div>
+          <div class="flex justify-between gap-4 items-baseline">
+            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Versiyon</dt>
+            <dd class="font-mono text-sm font-semibold">{{ h.version ?? '—' }}</dd>
+          </div>
+        </dl>
+      } @else {
+        <p class="text-xs text-ink-muted">Sistem durumu yükleniyor...</p>
+      }
+    </div>
+  </div>
+</section>

@@ -1,0 +1,199 @@
+<app-page-header title="Takvim" description="Sayım atamalarını planla, takip et, sürükle-bırak ile gün taşı.">
+  <div actions class="flex items-center gap-2">
+    <select [value]="firmaFilter()" (change)="setFirmaFilter(($any($event.target)).value)"
+            class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm">
+      <option value="">Tüm firmalar</option>
+      @for (f of firmalar(); track f.id) { <option [value]="f.id">{{ f.ad }}</option> }
+    </select>
+    <label class="flex items-center gap-1.5 text-xs text-text-muted cursor-pointer">
+      <input type="checkbox" [checked]="onlyMine()" (change)="toggleMine()"
+             class="w-3.5 h-3.5 bg-surface-elevated border border-border accent-text-primary" />
+      Sadece bana atananlar
+    </label>
+    @if (isAdmin()) {
+      <button (click)="openCreate()"
+              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
+        Yeni atama
+      </button>
+    }
+  </div>
+</app-page-header>
+
+<div class="grid gap-4" [class.grid-cols-1]="!selected()" [class.grid-cols-[1fr_320px]]="selected()">
+  <div class="card p-3">
+    <div #calEl class="text-xs"></div>
+  </div>
+
+  @if (selected(); as a) {
+    <aside class="card p-4 self-start">
+      <div class="flex items-start justify-between gap-2 mb-4">
+        <div>
+          <h3 class="text-sm font-semibold tracking-tight">{{ a.firmaAdi }}</h3>
+          <p class="text-xs text-text-muted">{{ a.magazaAdi }}</p>
+        </div>
+        <button (click)="closeDetail()" class="focus-ring text-text-muted hover:text-text-primary text-lg leading-none" aria-label="Kapat">×</button>
+      </div>
+
+      <dl class="space-y-2.5 text-xs">
+        <div class="flex justify-between gap-3">
+          <dt class="text-text-muted">Tarih</dt>
+          <dd class="font-mono">{{ formatDate(a.tarih) }}</dd>
+        </div>
+        @if (a.baslangicSaati) {
+          <div class="flex justify-between gap-3">
+            <dt class="text-text-muted">Saat</dt>
+            <dd class="font-mono">{{ a.baslangicSaati }}@if (a.bitisSaati) { –{{ a.bitisSaati }} }</dd>
+          </div>
+        }
+        <div class="flex justify-between gap-3">
+          <dt class="text-text-muted">Durum</dt>
+          <dd>
+            @switch (a.durum) {
+              @case ('planlandi') { <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-accent-info"></span>Planlandı</span> }
+              @case ('tamamlandi') { <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-accent-success"></span>Tamamlandı</span> }
+              @case ('iptal') { <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-accent-danger"></span>İptal</span> }
+            }
+          </dd>
+        </div>
+        <div class="flex justify-between gap-3">
+          <dt class="text-text-muted">Yönetici</dt>
+          <dd class="text-text-primary">{{ a.yoneticiAdi }}</dd>
+        </div>
+        <div>
+          <dt class="text-text-muted mb-1">Saymanlar</dt>
+          <dd class="flex flex-wrap gap-1">
+            @if (a.saymanAdlari.length === 0) { <span class="text-text-muted">—</span> }
+            @for (n of a.saymanAdlari; track n) { <span class="chip">{{ n }}</span> }
+          </dd>
+        </div>
+        @if (a.notlar) {
+          <div>
+            <dt class="text-text-muted mb-1">Notlar</dt>
+            <dd class="text-text-secondary leading-relaxed">{{ a.notlar }}</dd>
+          </div>
+        }
+      </dl>
+
+      @if (isAdmin()) {
+        <div class="flex items-center gap-2 mt-5 pt-4 border-t border-border">
+          <button (click)="openEditFromSelected()"
+                  class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
+            Düzenle
+          </button>
+          <button (click)="removeSelected()"
+                  class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-accent-danger/40 text-accent-danger hover:bg-accent-danger/10 transition-colors">
+            Sil
+          </button>
+        </div>
+      }
+    </aside>
+  }
+</div>
+
+<app-modal [open]="modalOpen()" [title]="editing() ? 'Atamayı düzenle' : 'Yeni atama'" (closed)="closeModal()" size="lg">
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4" novalidate>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs text-text-secondary mb-1.5">Mağaza</label>
+        <select formControlName="magazaId"
+                class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm">
+          <option value="">— Seçin —</option>
+          @for (m of magazalar(); track m.id) {
+            <option [value]="m.id">{{ m.firmaAdi }} · {{ m.ad }}</option>
+          }
+        </select>
+        @if (form.controls.magazaId.touched && form.controls.magazaId.errors?.['required']) {
+          <p class="text-xs text-accent-danger mt-1.5">Mağaza zorunludur.</p>
+        }
+      </div>
+      <div>
+        <label class="block text-xs text-text-secondary mb-1.5">Tarih</label>
+        <input type="date" formControlName="tarih"
+               class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm font-mono" />
+        @if (form.controls.tarih.touched && form.controls.tarih.errors?.['required']) {
+          <p class="text-xs text-accent-danger mt-1.5">Tarih zorunludur.</p>
+        }
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-3">
+      <div>
+        <label class="block text-xs text-text-secondary mb-1.5">Başlangıç <span class="text-text-muted">(ops.)</span></label>
+        <input type="time" formControlName="baslangicSaati"
+               class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm font-mono" />
+      </div>
+      <div>
+        <label class="block text-xs text-text-secondary mb-1.5">Bitiş <span class="text-text-muted">(ops.)</span></label>
+        <input type="time" formControlName="bitisSaati"
+               class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm font-mono" />
+      </div>
+      <div>
+        <label class="block text-xs text-text-secondary mb-1.5">Durum</label>
+        <select formControlName="durum"
+                class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm">
+          @for (opt of durumOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs text-text-secondary mb-1.5">Sayım Yöneticisi</label>
+      <select formControlName="yoneticiKullaniciId"
+              class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm">
+        <option value="">— Seçin —</option>
+        @for (u of yoneticiAdaylari(); track u.id) {
+          <option [value]="u.id">{{ u.adSoyad }} ({{ u.email }})</option>
+        }
+      </select>
+      @if (form.controls.yoneticiKullaniciId.touched && form.controls.yoneticiKullaniciId.errors?.['required']) {
+        <p class="text-xs text-accent-danger mt-1.5">Yönetici zorunludur.</p>
+      }
+    </div>
+
+    <div>
+      <div class="text-xs text-text-secondary mb-1.5">Saymanlar</div>
+      <div class="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto border border-border rounded-sm bg-surface-elevated p-2">
+        @if (saymanAdaylari().length === 0) {
+          <span class="text-xs text-text-muted">Henüz sayman/yönetici tanımlı değil.</span>
+        }
+        @for (u of saymanAdaylari(); track u.id) {
+          <button type="button" (click)="toggleSayman(u.id)"
+                  class="text-xs px-2 py-1 rounded-sm border transition-colors"
+                  [class.bg-text-primary]="isSaymanChecked(u.id)"
+                  [class.text-bg]="isSaymanChecked(u.id)"
+                  [class.border-text-primary]="isSaymanChecked(u.id)"
+                  [class.text-text-secondary]="!isSaymanChecked(u.id)"
+                  [class.border-border]="!isSaymanChecked(u.id)">
+            {{ u.adSoyad }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs text-text-secondary mb-1.5">Notlar <span class="text-text-muted">(ops.)</span></label>
+      <textarea formControlName="notlar" rows="2"
+                class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm placeholder:text-text-muted resize-none"
+                placeholder="USD nakit, gece sayımı, vb."></textarea>
+    </div>
+
+    @if (serverError()) {
+      <div class="text-xs text-accent-danger bg-accent-danger/10 border border-accent-danger/30 rounded-sm px-3 py-2">
+        {{ serverError() }}
+      </div>
+    }
+
+    <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+      <button type="button" (click)="closeModal()"
+              class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
+        Vazgeç
+      </button>
+      <button type="submit" [disabled]="saving()"
+              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg disabled:opacity-50 active:scale-[0.98] transition-all duration-150">
+        {{ saving() ? 'Kaydediliyor...' : (editing() ? 'Güncelle' : 'Oluştur') }}
+      </button>
+    </div>
+  </form>
+</app-modal>

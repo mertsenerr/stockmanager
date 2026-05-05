@@ -1,0 +1,81 @@
+<app-auth-shell variant="login">
+  <header class="mb-7">
+    <h2 class="auth-card-heading">Giriş Yap</h2>
+    <p class="auth-card-subheading">E-posta ve parolanla devam et.</p>
+  </header>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-5" novalidate>
+    <div>
+      <label for="email" class="auth-label">E-posta</label>
+      <input
+        id="email"
+        type="email"
+        formControlName="email"
+        autocomplete="email"
+        spellcheck="false"
+        class="auth-input"
+        [class.is-invalid]="(form.controls.email.touched && form.controls.email.invalid) || !!fieldErrors()['Email']"
+        placeholder="ornek@firma.com"
+      />
+      @if (form.controls.email.touched && form.controls.email.errors) {
+        <p class="auth-error">
+          @if (form.controls.email.errors['required']) { Email zorunludur. }
+          @else if (form.controls.email.errors['email']) { Geçerli bir email giriniz. }
+        </p>
+      }
+      @for (msg of fieldErrors()['Email']; track msg) {
+        <p class="auth-error">{{ msg }}</p>
+      }
+    </div>
+
+    <div>
+      <div class="flex items-center justify-between mb-1.5">
+        <label for="password" class="auth-label !mb-0">Parola</label>
+        <a routerLink="/forgot-password" class="auth-link">Unuttun mu?</a>
+      </div>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        autocomplete="current-password"
+        class="auth-input"
+        [class.is-invalid]="(form.controls.password.touched && form.controls.password.invalid) || !!fieldErrors()['Password']"
+        placeholder="••••••••"
+      />
+      @if (form.controls.password.touched && form.controls.password.errors) {
+        <p class="auth-error">
+          @if (form.controls.password.errors['required']) { Parola zorunludur. }
+          @else if (form.controls.password.errors['minlength']) { Parola en az 6 karakter olmalıdır. }
+        </p>
+      }
+      @for (msg of fieldErrors()['Password']; track msg) {
+        <p class="auth-error">{{ msg }}</p>
+      }
+    </div>
+
+    <label class="flex items-center gap-2.5 text-[13px] text-[#1a1814] font-medium cursor-pointer select-none">
+      <input type="checkbox" formControlName="rememberMe" class="auth-checkbox" />
+      Beni 30 gün hatırla
+    </label>
+
+    @if (serverError()) {
+      <div class="auth-server-error">{{ serverError() }}</div>
+    }
+
+    <button type="submit" [disabled]="submitting()" class="auth-cta">
+      @if (submitting()) {
+        <span class="auth-spinner"></span>
+        <span>Giriş yapılıyor</span>
+      } @else {
+        <span>Hadi başlayalım</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12h14M13 6l6 6-6 6"/>
+        </svg>
+      }
+    </button>
+  </form>
+
+  <p class="text-center text-xs text-ink-secondary mt-6">
+    Hesabın yok mu? <a routerLink="/register" class="auth-link">Hesap aç</a>
+  </p>
+</app-auth-shell>

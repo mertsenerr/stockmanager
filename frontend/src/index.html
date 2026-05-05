@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>SayımLink</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Canlı, çok kullanıcılı sayım karşılaştırma platformu.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@24..144,700..800&family=Fraunces:ital,opsz,wght@1,24..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600&display=swap">
+
+  <script>
+    // Match the post-bootstrap theme background to avoid a flash before Angular renders.
+    (function () {
+      var p = location.pathname;
+      var isAuth = /^\/(login|register|forgot-password|reset-password)\b/.test(p);
+      document.documentElement.style.backgroundColor = isAuth ? '#faf5e8' : '#0a0a0a';
+    })();
+  </script>
+</head>
+<body class="bg-bg text-text-primary">
+  <app-root></app-root>
+</body>
+</html>

@@ -1,0 +1,372 @@
+@let o = oturum();
+
+@if (loading()) {
+  <div class="text-sm text-ink-muted py-12 text-center">Yükleniyor...</div>
+} @else if (o) {
+  @if (!embedded) {
+    <app-page-header [title]="o.firmaAdi + ' · ' + o.magazaAdi" [description]="'Sayım tarihi: ' + o.tarih.slice(0, 10)">
+      <div actions class="flex items-center gap-2 flex-wrap">
+        <a routerLink="/oturumlar" class="link-dotted text-xs">← Tüm oturumlar</a>
+        @if (canReuploadExcel()) {
+          <button type="button" (click)="openExcelReupload()" class="btn btn-sm btn-ghost" title="Tüm satırları yeni Excel ile değiştir">
+            ⟳ Excel'i değiştir
+          </button>
+        }
+        <span class="chip">
+          <span class="w-1.5 h-1.5 rounded-full" [class]="durumColor(o.durum)"></span>
+          {{ durumLabel(o.durum) }}
+        </span>
+      </div>
+    </app-page-header>
+  } @else {
+    <div class="mb-3 flex items-center gap-2 flex-wrap">
+      @if (canReuploadExcel()) {
+        <button type="button" (click)="openExcelReupload()" class="btn btn-sm btn-ghost" title="Tüm satırları yeni Excel ile değiştir">
+          ⟳ Excel'i değiştir
+        </button>
+      }
+      <span class="chip">
+        <span class="w-1.5 h-1.5 rounded-full" [class]="durumColor(o.durum)"></span>
+        {{ durumLabel(o.durum) }}
+      </span>
+    </div>
+  }
+
+  <!-- Dışa aktar — büyük buton şeridi -->
+  <div class="flex items-center gap-3 flex-wrap mb-4">
+    <button type="button" (click)="exportExcel()" class="btn btn-primary"
+            title="Karşılaştırma tablosunu Excel olarak indir">
+      ⬇ Excel'e aktar
+    </button>
+    <button type="button" (click)="exportTxt()" class="btn btn-ghost"
+            title="Barkod;Fiili formatında TXT olarak indir">
+      ⬇ TXT aktar
+    </button>
+    <span class="text-xs text-ink-muted">{{ o.urunler.length }} satır · en güncel hâliyle indirilir</span>
+  </div>
+
+  <!-- Presence avatars -->
+  <div class="flex items-center gap-2 mb-4">
+    <span class="font-mono text-[10px] uppercase tracking-wider text-ink-muted mr-1">Online ({{ presence().length }})</span>
+    @for (p of presence(); track p.kullaniciId) {
+      <div class="w-7 h-7 rounded-lg border-[1.5px] border-ink bg-mint/40 flex items-center justify-center text-[10px] font-bold font-mono"
+           [title]="p.kullaniciAdi + ' (' + p.rol + ')'">
+        {{ p.kullaniciAdi.slice(0, 2).toUpperCase() }}
+      </div>
+    } @empty {
+      <span class="text-xs text-ink-muted italic">Sadece sen.</span>
+    }
+  </div>
+
+  <!-- Görüntülü / sesli arama paneli (mesh WebRTC, SignalR sinyalleşme) -->
+  <app-call-panel [oturumId]="o.id" />
+
+
+  <!-- Filter tab cards -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+    <button (click)="setFilter('all')" class="filter-tab" [class.active]="filterTab() === 'all'">
+      <p class="font-mono text-[10px] uppercase tracking-wider text-ink-muted">Toplam</p>
+      <p class="text-2xl font-display font-bold font-mono mt-1">{{ o.ozetler.toplamUrun }}</p>
+    </button>
+    <button (click)="setFilter('beklemede')" class="filter-tab" [class.active]="filterTab() === 'beklemede'">
+      <p class="font-mono text-[10px] uppercase tracking-wider text-ink-muted">Beklemede</p>
+      <p class="text-2xl font-display font-bold font-mono mt-1" style="color: var(--color-cobalt);">{{ o.ozetler.beklemedeSayisi }}</p>
+    </button>
+    <button (click)="setFilter('tekrar')" class="filter-tab" [class.active]="filterTab() === 'tekrar'">
+      <p class="font-mono text-[10px] uppercase tracking-wider text-ink-muted">Tekrar say</p>
+      <p class="text-2xl font-display font-bold font-mono mt-1 text-coral">{{ o.ozetler.tekrarSayilan }}</p>
+    </button>
+    <button (click)="setFilter('onay')" class="filter-tab" [class.active]="filterTab() === 'onay'">
+      <p class="font-mono text-[10px] uppercase tracking-wider text-ink-muted">Onaylı</p>
+      <p class="text-2xl font-display font-bold font-mono mt-1 text-mint">{{ o.ozetler.onaylanmis }}</p>
+    </button>
+  </div>
+
+  <!-- Edit hint banner -->
+  @if (isAdmin()) {
+    <div class="mb-3 px-4 py-2.5 rounded-lg border-[1.5px] border-ink flex items-center gap-3 text-xs"
+         style="background: var(--color-butter);">
+      <span class="font-mono font-bold uppercase tracking-wider">İpucu</span>
+      <span class="font-medium">"Sayılan" veya "Durum" hücresine <strong>çift tıkla</strong> hızlı düzenle. Tüm satırı değiştirmek için sağdaki <strong>Düzenle</strong> butonu, kaldırmak için <strong>Sil</strong>.</span>
+    </div>
+  } @else {
+    <div class="mb-3 px-4 py-2 rounded-lg border-[1.5px] border-dashed border-ink/40 text-xs text-ink-secondary">
+      <span class="font-mono uppercase tracking-wider mr-2">İpucu</span>
+      "Fiili" hücresine çift tıkla, yeni değeri gir — değişiklik <strong>sayım başkanının onayına</strong> gönderilir.
+    </div>
+  }
+
+  <div class="grid gap-4" [class.grid-cols-1]="!selectedUrun()" [class.grid-cols-[1fr_320px]]="selectedUrun()">
+    <!-- Main grid + activity -->
+    <div class="grid gap-4 min-w-0"
+         [style.gridTemplateColumns]="embedded ? '1fr 480px' : '1fr 240px'">
+      <div class="card-flat overflow-hidden flex flex-col min-w-0">
+        <div class="px-3 py-2.5 border-b-[1.5px] border-ink flex items-center gap-2"
+             style="background: var(--color-surface-elevated);">
+          <input type="search"
+                 [value]="searchQuery()"
+                 (input)="searchQuery.set(($any($event.target)).value)"
+                 placeholder="Barkod veya ürün ara..."
+                 class="field-input flex-1" style="padding: 7px 12px; font-size: 12.5px;" />
+          <span class="font-mono text-[11px] text-ink-muted">{{ filteredUrunler().length }} satır</span>
+        </div>
+        <div class="ag-theme-sayimlink" style="border: none; border-radius: 0;"
+             [style.height.vh]="embedded ? 78 : 60">
+          <ag-grid-angular
+            [rowData]="filteredUrunler()"
+            [columnDefs]="columnDefs()"
+            [rowClassRules]="rowClassRules"
+            [getRowId]="getRowId"
+            [stopEditingWhenCellsLoseFocus]="true"
+            [suppressRowHoverHighlight]="false"
+            (gridReady)="onGridReady($event)"
+            (cellEditingStarted)="onCellEditingStarted($event)"
+            (cellEditingStopped)="onCellEditingStopped($event)"
+            class="w-full h-full"
+          />
+        </div>
+      </div>
+
+      <!-- Activity feed -->
+      <aside class="card-flat overflow-hidden flex flex-col min-w-0"
+             [style.height.vh]="embedded ? 80 : 64">
+        <header class="px-3 py-2.5 border-b-[1.5px] border-ink font-mono text-[10px] uppercase tracking-wider text-ink-secondary shrink-0"
+                style="background: var(--color-surface-elevated);">
+          Aktivite
+        </header>
+
+        @if (embedded) {
+          <!-- Embedded: kategori filtreleri + 2-kolonlu talep grid + diğer log -->
+          <div class="px-3 py-2 border-b-[1.5px] border-ink/30 flex gap-2 shrink-0">
+            <select class="field-input flex-1" style="padding: 6px 8px; font-size: 11.5px;"
+                    [value]="talepKategoriFilter()"
+                    (change)="setTalepKategori(($any($event.target)).value)">
+              <option value="">Tüm kategoriler</option>
+              @for (k of availableTalepKategoriler(); track k) {
+                <option [value]="k">{{ k }}</option>
+              }
+            </select>
+            <select class="field-input flex-1" style="padding: 6px 8px; font-size: 11.5px;"
+                    [value]="talepAltKategoriFilter()"
+                    (change)="setTalepAltKategori(($any($event.target)).value)">
+              <option value="">Tüm alt kategoriler</option>
+              @for (ak of availableTalepAltKategoriler(); track ak) {
+                <option [value]="ak">{{ ak }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="flex-1 overflow-y-auto px-3 py-2">
+            <div class="grid grid-cols-2 gap-2">
+              @for (a of filteredTalepActivities(); track a.id) {
+                <div class="rounded-lg border-[1.5px] border-ink p-2 text-xs leading-snug"
+                     style="background: var(--color-butter);">
+                  <div class="flex items-baseline gap-2 mb-1">
+                    <span class="font-mono text-[10px] uppercase tracking-wider font-bold">Talep</span>
+                    <span class="font-mono text-[10px] text-ink-muted">{{ formatTime(a.time) }}</span>
+                  </div>
+                  @if (a.talep) {
+                    <p class="break-words">{{ a.talep.kullaniciAdi }}: {{ getTalepUrunBarkod(a.talep.urunId) }}</p>
+                    <p class="break-words mb-2">{{ a.talep.alan === 'sayilanStok' ? 'Fiili' : a.talep.alan }} {{ a.talep.eskiDeger ?? '' }} → {{ a.talep.yeniDeger ?? '' }}</p>
+                  }
+                  @if (a.talep?.gerekce) {
+                    <p class="text-ink-secondary italic mb-2 break-words">"{{ a.talep!.gerekce }}"</p>
+                  }
+                  @if (isAdmin()) {
+                    <div class="flex gap-1.5">
+                      <button type="button" (click)="onayaGonder(a)" class="btn btn-xs btn-primary flex-1">Onayla</button>
+                      <button type="button" (click)="redde(a)" class="btn btn-xs btn-ghost flex-1">Reddet</button>
+                    </div>
+                  } @else {
+                    <p class="text-[10px] text-ink-muted italic">Başkan onayı bekleniyor…</p>
+                  }
+                </div>
+              } @empty {
+                <p class="text-xs text-ink-muted italic col-span-2 py-4 text-center">Bekleyen talep yok.</p>
+              }
+            </div>
+
+            @if (otherActivities().length > 0) {
+              <div class="mt-3 pt-2 border-t-[1.5px] border-dashed border-ink/30 space-y-1.5">
+                <p class="font-mono text-[10px] uppercase tracking-wider text-ink-muted mb-1">Diğer hareketler</p>
+                @for (a of otherActivities(); track a.id) {
+                  <div class="text-xs leading-snug">
+                    <div class="flex items-baseline gap-2">
+                      <span class="w-1.5 h-1.5 rounded-full mt-1 shrink-0"
+                            [class.bg-mint]="a.kind === 'join' || a.kind === 'talep-onay'"
+                            [class.bg-ink-muted]="a.kind === 'leave'"
+                            [class.bg-cobalt]="a.kind === 'update'"
+                            [class.bg-butter]="a.kind === 'comment'"
+                            [class.bg-coral]="a.kind === 'talep-red'"></span>
+                      <span class="font-mono text-[10px] text-ink-muted">{{ formatTime(a.time) }}</span>
+                    </div>
+                    <p class="text-ink-secondary pl-4 break-words">{{ a.text }}</p>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        } @else {
+          <!-- Normal mod: tek kolon, eski yapı -->
+          <div class="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+            @for (a of activity().slice().reverse(); track a.id) {
+              @if (a.kind === 'talep') {
+                <div class="rounded-lg border-[1.5px] border-ink p-2.5 text-xs leading-snug"
+                     style="background: var(--color-butter);">
+                  <div class="flex items-baseline gap-2 mb-1">
+                    <span class="font-mono text-[10px] uppercase tracking-wider font-bold">Talep</span>
+                    <span class="font-mono text-[10px] text-ink-muted">{{ formatTime(a.time) }}</span>
+                  </div>
+                  @if (a.talep) {
+                    <p class="break-words">{{ a.talep.kullaniciAdi }}: {{ getTalepUrunBarkod(a.talep.urunId) }}</p>
+                    <p class="break-words mb-2">{{ a.talep.alan === 'sayilanStok' ? 'Fiili' : a.talep.alan }} {{ a.talep.eskiDeger ?? '' }} → {{ a.talep.yeniDeger ?? '' }}</p>
+                  } @else {
+                    <p class="break-words mb-2">{{ a.text }}</p>
+                  }
+                  @if (a.talep?.gerekce) {
+                    <p class="text-ink-secondary italic mb-2 break-words">"{{ a.talep!.gerekce }}"</p>
+                  }
+                  @if (isAdmin()) {
+                    <div class="flex gap-2">
+                      <button type="button" (click)="onayaGonder(a)" class="btn btn-xs btn-primary flex-1">Onayla</button>
+                      <button type="button" (click)="redde(a)" class="btn btn-xs btn-ghost flex-1">Reddet</button>
+                    </div>
+                  } @else {
+                    <p class="text-[10px] text-ink-muted italic">Başkan onayı bekleniyor…</p>
+                  }
+                </div>
+              } @else {
+                <div class="text-xs leading-snug">
+                  <div class="flex items-baseline gap-2">
+                    <span class="w-1.5 h-1.5 rounded-full mt-1 shrink-0"
+                          [class.bg-mint]="a.kind === 'join' || a.kind === 'talep-onay'"
+                          [class.bg-ink-muted]="a.kind === 'leave'"
+                          [class.bg-cobalt]="a.kind === 'update'"
+                          [class.bg-butter]="a.kind === 'comment'"
+                          [class.bg-coral]="a.kind === 'talep-red'"></span>
+                    <span class="font-mono text-[10px] text-ink-muted">{{ formatTime(a.time) }}</span>
+                  </div>
+                  <p class="text-ink-secondary pl-4 break-words">{{ a.text }}</p>
+                </div>
+              }
+            } @empty {
+              <p class="text-xs text-ink-muted italic">Henüz hareket yok.</p>
+            }
+          </div>
+        }
+      </aside>
+    </div>
+
+    <!-- Comment side panel -->
+    @if (selectedUrun(); as u) {
+      <aside class="card p-4 self-start max-h-[80vh] overflow-y-auto">
+        <header class="flex items-start justify-between gap-2 mb-4">
+          <div>
+            <h3 class="font-display font-bold text-base tracking-tight">{{ u.barkod }}</h3>
+            <p class="text-xs text-ink-muted truncate max-w-[240px]">{{ u.urunAdi }}</p>
+          </div>
+          <button (click)="closeComments()" class="focus-ring text-ink-muted hover:text-coral text-xl leading-none" aria-label="Kapat">×</button>
+        </header>
+
+        <dl class="space-y-2 text-xs mb-4">
+          <div class="flex justify-between"><dt class="text-ink-muted">Sistem</dt><dd class="font-mono font-semibold">{{ u.sistemStok }}</dd></div>
+          <div class="flex justify-between"><dt class="text-ink-muted">Sayılan</dt><dd class="font-mono font-semibold">{{ u.sayilanStok }}</dd></div>
+          <div class="flex justify-between"><dt class="text-ink-muted">Fark</dt>
+            <dd class="font-mono font-semibold"
+                [class.text-mint]="u.fark > 0"
+                [class.text-coral]="u.fark < 0"
+                [class.text-ink-muted]="u.fark === 0">{{ u.fark > 0 ? '+' : '' }}{{ u.fark }}</dd>
+          </div>
+          <div class="flex justify-between"><dt class="text-ink-muted">Durum</dt><dd>{{ urunDurumLabel(u.durum) }}</dd></div>
+          <div class="flex justify-between"><dt class="text-ink-muted">Yorum</dt><dd class="font-mono">{{ u.yorumSayisi }}</dd></div>
+        </dl>
+
+        <div class="border-t-[1.5px] border-dashed border-ink/30 pt-3">
+          <p class="field-label">Yeni yorum</p>
+          <textarea
+            [value]="newComment()"
+            (input)="newComment.set(($any($event.target)).value)"
+            rows="3"
+            placeholder="Yorum ekle..."
+            class="field-input resize-none"
+          ></textarea>
+          <button (click)="submitComment()" [disabled]="!newComment().trim()"
+                  class="btn btn-sm btn-primary w-full mt-2 disabled:opacity-50">
+            Yorum gönder
+          </button>
+        </div>
+      </aside>
+    }
+  </div>
+
+  <!-- Row edit modal (admin) -->
+  @if (editingRow(); as u) {
+    <app-modal [open]="true" title="Satırı düzenle" size="md" (closed)="closeRowEdit()">
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Barkod</label>
+            <input type="text" class="field-input" [ngModel]="editForm().barkod"
+                   (ngModelChange)="updateEditForm('barkod', $event)" />
+          </div>
+          <div>
+            <label class="field-label">Ürün adı</label>
+            <input type="text" class="field-input" [ngModel]="editForm().urunAdi"
+                   (ngModelChange)="updateEditForm('urunAdi', $event)" />
+          </div>
+          <div>
+            <label class="field-label">Sistem stok</label>
+            <input type="number" step="0.01" class="field-input" [ngModel]="editForm().sistemStok"
+                   (ngModelChange)="updateEditForm('sistemStok', $event)" />
+          </div>
+          <div>
+            <label class="field-label">Sayılan stok</label>
+            <input type="number" step="0.01" class="field-input" [ngModel]="editForm().sayilanStok"
+                   (ngModelChange)="updateEditForm('sayilanStok', $event)" />
+          </div>
+          <div class="col-span-2">
+            <label class="field-label">Durum</label>
+            <select class="field-input" [ngModel]="editForm().durum"
+                    (ngModelChange)="updateEditForm('durum', $event)">
+              @for (d of urunDurumOptions; track d) {
+                <option [value]="d">{{ urunDurumLabel(d) }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <div class="text-xs text-ink-secondary border-t-[1.5px] border-dashed border-ink/30 pt-3">
+          <span class="font-mono uppercase tracking-wider mr-2">Mevcut</span>
+          <span class="font-mono">{{ u.barkod }}</span> ·
+          <span>{{ u.urunAdi }}</span> ·
+          <span class="font-mono">sistem {{ u.sistemStok }}, sayılan {{ u.sayilanStok }}, {{ urunDurumLabel(u.durum) }}</span>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button type="button" (click)="closeRowEdit()" class="btn btn-sm btn-ghost" [disabled]="editSaving()">Vazgeç</button>
+          <button type="button" (click)="submitRowEdit()" class="btn btn-sm btn-primary" [disabled]="editSaving()">
+            {{ editSaving() ? 'Kaydediliyor...' : 'Kaydet' }}
+          </button>
+        </div>
+      </div>
+    </app-modal>
+  }
+
+  <!-- Excel re-upload modal -->
+  @if (excelReuploadOpen()) {
+    <app-modal [open]="true" title="Excel'i yeniden yükle" size="lg" (closed)="closeExcelReupload()">
+      <div class="space-y-3">
+        <div class="px-3 py-2.5 rounded-lg border-[1.5px] border-ink text-xs" style="background: var(--color-coral); color: #fff;">
+          <strong class="font-bold">Dikkat:</strong> Yeni Excel yüklenince mevcut tüm satırlar (manuel düzenlemeler ve yorumlar dahil) silinir ve dosyadakilerle değiştirilir.
+        </div>
+        <app-excel-upload
+          [uploading]="excelUploading()"
+          [firmaTip]="oturum()?.firmaTip"
+          (importReady)="onExcelReimport($event)" />
+      </div>
+    </app-modal>
+  }
+
+} @else {
+  <div class="text-sm text-ink-muted py-12 text-center italic">Oturum bulunamadı.</div>
+}

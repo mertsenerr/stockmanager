@@ -1,0 +1,151 @@
+<app-page-header title="Raporlar" description="Sayım geçmişi, mağaza sapma istatistikleri ve sayman performansı.">
+  <div actions class="inline-flex border border-border rounded-sm overflow-hidden">
+    <button (click)="setTab('oturum')" class="text-xs px-3 py-1.5"
+            [class.bg-surface-elevated]="tab() === 'oturum'"
+            [class.text-text-primary]="tab() === 'oturum'"
+            [class.text-text-muted]="tab() !== 'oturum'">Oturum geçmişi</button>
+    @if (canSeeReports()) {
+      <button (click)="setTab('sapma')" class="text-xs px-3 py-1.5 border-l border-border"
+              [class.bg-surface-elevated]="tab() === 'sapma'"
+              [class.text-text-primary]="tab() === 'sapma'"
+              [class.text-text-muted]="tab() !== 'sapma'">Mağaza sapma</button>
+      <button (click)="setTab('sayman')" class="text-xs px-3 py-1.5 border-l border-border"
+              [class.bg-surface-elevated]="tab() === 'sayman'"
+              [class.text-text-primary]="tab() === 'sayman'"
+              [class.text-text-muted]="tab() !== 'sayman'">Sayman performansı</button>
+    }
+  </div>
+</app-page-header>
+
+@if (tab() === 'oturum') {
+  <div class="card overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-surface-elevated">
+        <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
+          <th class="px-4 py-2.5 font-medium">Tarih</th>
+          <th class="px-4 py-2.5 font-medium">Firma · Mağaza</th>
+          <th class="px-4 py-2.5 font-medium">Durum</th>
+          <th class="px-4 py-2.5 font-medium">Özet</th>
+          <th class="px-4 py-2.5 font-medium text-right">İşlem</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading()) {
+          <tr><td colspan="5" class="px-4 py-8 text-center text-xs text-text-muted">Yükleniyor...</td></tr>
+        } @else if (oturumlar().length === 0) {
+          <tr><td colspan="5" class="px-4 py-8 text-center text-xs text-text-muted">Kayıt yok.</td></tr>
+        } @else {
+          @for (o of oturumlar(); track o.id) {
+            <tr class="border-t border-border hover:bg-surface-elevated transition-colors duration-150">
+              <td class="px-4 py-2.5 font-mono text-xs">{{ formatDate(o.tarih) }}</td>
+              <td class="px-4 py-2.5">
+                <div class="text-text-primary">{{ o.firmaAdi }}</div>
+                <div class="text-text-muted text-xs">{{ o.magazaAdi }}</div>
+              </td>
+              <td class="px-4 py-2.5">
+                <span class="chip">
+                  <span class="w-1.5 h-1.5 rounded-full" [class]="durumColor(o.durum)"></span>
+                  {{ durumLabel(o.durum) }}
+                </span>
+              </td>
+              <td class="px-4 py-2.5 text-text-muted text-xs">
+                {{ o.ozetler.toplamUrun }} ürün · onay {{ o.ozetler.onaylanmis }}
+              </td>
+              <td class="px-4 py-2.5 text-right">
+                <button (click)="open(o)" class="focus-ring text-xs text-text-secondary hover:text-text-primary transition-colors mr-3">Aç</button>
+                <button (click)="downloadExcel(o)" [disabled]="downloading() === o.id"
+                        class="focus-ring text-xs font-medium px-2.5 py-1 rounded-sm border border-border hover:bg-surface-elevated transition-colors disabled:opacity-50">
+                  {{ downloading() === o.id ? 'İndiriliyor...' : 'Excel indir' }}
+                </button>
+                @if (canDelete()) {
+                  <button (click)="cancelOturum(o)"
+                          class="focus-ring text-xs text-accent-danger/80 hover:text-accent-danger transition-colors ml-3">
+                    Sil
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (tab() === 'sapma') {
+  <div class="card overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-surface-elevated">
+        <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
+          <th class="px-4 py-2.5 font-medium">Mağaza</th>
+          <th class="px-4 py-2.5 font-medium text-right">Oturum</th>
+          <th class="px-4 py-2.5 font-medium text-right">Toplam ürün</th>
+          <th class="px-4 py-2.5 font-medium text-right">Farklı</th>
+          <th class="px-4 py-2.5 font-medium text-right">Pozitif</th>
+          <th class="px-4 py-2.5 font-medium text-right">Negatif</th>
+          <th class="px-4 py-2.5 font-medium text-right">Sapma %</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading()) {
+          <tr><td colspan="7" class="px-4 py-8 text-center text-xs text-text-muted">Yükleniyor...</td></tr>
+        } @else if (sapma().length === 0) {
+          <tr><td colspan="7" class="px-4 py-8 text-center text-xs text-text-muted">Veri yok.</td></tr>
+        } @else {
+          @for (s of sapma(); track s.magazaId) {
+            <tr class="border-t border-border">
+              <td class="px-4 py-2.5">
+                <div class="text-text-primary">{{ s.magazaAdi }}</div>
+                <div class="text-text-muted text-xs">{{ s.firmaAdi }}</div>
+              </td>
+              <td class="px-4 py-2.5 text-right font-mono">{{ s.oturumSayisi }}</td>
+              <td class="px-4 py-2.5 text-right font-mono">{{ s.toplamUrun }}</td>
+              <td class="px-4 py-2.5 text-right font-mono">{{ s.toplamFarkliUrun }}</td>
+              <td class="px-4 py-2.5 text-right font-mono text-accent-success">+{{ s.toplamFarkPozitif }}</td>
+              <td class="px-4 py-2.5 text-right font-mono text-accent-danger">{{ s.toplamFarkNegatif }}</td>
+              <td class="px-4 py-2.5 text-right font-mono"
+                  [class.text-accent-danger]="s.sapmaYuzdesi > 25"
+                  [class.text-accent-warning]="s.sapmaYuzdesi > 5 && s.sapmaYuzdesi <= 25"
+                  [class.text-accent-success]="s.sapmaYuzdesi <= 5">
+                {{ s.sapmaYuzdesi }}%
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (tab() === 'sayman') {
+  <div class="card overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-surface-elevated">
+        <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
+          <th class="px-4 py-2.5 font-medium">Kullanıcı</th>
+          <th class="px-4 py-2.5 font-medium text-right">Oturum</th>
+          <th class="px-4 py-2.5 font-medium text-right">Güncelleme</th>
+          <th class="px-4 py-2.5 font-medium text-right">Yorum</th>
+          <th class="px-4 py-2.5 font-medium">Son aktivite</th>
+        </tr>
+      </thead>
+      <tbody>
+        @if (loading()) {
+          <tr><td colspan="5" class="px-4 py-8 text-center text-xs text-text-muted">Yükleniyor...</td></tr>
+        } @else if (perf().length === 0) {
+          <tr><td colspan="5" class="px-4 py-8 text-center text-xs text-text-muted">Veri yok.</td></tr>
+        } @else {
+          @for (p of perf(); track p.kullaniciId) {
+            <tr class="border-t border-border">
+              <td class="px-4 py-2.5 text-text-primary">{{ p.adSoyad }}</td>
+              <td class="px-4 py-2.5 text-right font-mono">{{ p.oturumSayisi }}</td>
+              <td class="px-4 py-2.5 text-right font-mono">{{ p.toplamGuncelleme }}</td>
+              <td class="px-4 py-2.5 text-right font-mono">{{ p.toplamYorum }}</td>
+              <td class="px-4 py-2.5 text-text-muted text-xs">{{ formatDateTime(p.sonAktivite) }}</td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+}

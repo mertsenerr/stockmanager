@@ -1,4 +1,4 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, Input, OnDestroy, ViewChild, computed, inject, signal } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, HostListener, Input, OnDestroy, ViewChild, computed, inject, signal } from '@angular/core';
 import { CallService } from './call.service';
 import { SrcObjectDirective } from './src-object.directive';
 import { SayimHubService } from './sayim-hub.service';
@@ -107,9 +107,11 @@ import { RouterLink } from '@angular/router';
              [style.gridTemplateColumns]="gridCols()"
              [style.maxWidth]="gridMaxWidth()">
           <!-- Kendi önizleme — ekran paylaşımı varken kart 16:9 yerine geniş ve object-contain (kırpma yok). -->
-          <div class="relative rounded-lg border-[1.5px] border-ink overflow-hidden"
+          <div class="relative rounded-lg border-[1.5px] border-ink overflow-hidden cursor-zoom-in transition-transform hover:scale-[1.01]"
                [style.aspect-ratio]="call.screenSharing() ? '16/10' : '16/9'"
-               style="background: #0d0d0d;">
+               style="background: #0d0d0d;"
+               (click)="openSpotlight('self')"
+               title="Büyütmek için tıkla">
             @if (call.mode() === 'video' && !call.camOff()) {
               <video
                 [appSrcObject]="call.localStreamSig()"
@@ -133,8 +135,10 @@ import { RouterLink } from '@angular/router';
 
           <!-- Uzak katılımcılar -->
           @for (r of call.remotes(); track r.connectionId) {
-            <div class="relative rounded-lg border-[1.5px] border-ink overflow-hidden"
-                 style="background: #0d0d0d; aspect-ratio: 16/9;">
+            <div class="relative rounded-lg border-[1.5px] border-ink overflow-hidden cursor-zoom-in transition-transform hover:scale-[1.01]"
+                 style="background: #0d0d0d; aspect-ratio: 16/9;"
+                 (click)="openSpotlight(r.connectionId)"
+                 title="Büyütmek için tıkla">
               <video
                 [appSrcObject]="r.stream"
                 autoplay playsinline
@@ -284,6 +288,33 @@ import { RouterLink } from '@angular/router';
         </div>
       </div>
     }
+
+    @if (spotlight() && spotlightStream()) {
+      <div class="fixed inset-0 z-[90] flex items-center justify-center p-4 sm:p-6"
+           style="background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px);"
+           (click)="closeSpotlight()">
+        <div class="relative w-full h-full flex items-center justify-center"
+             (click)="$event.stopPropagation()">
+          <video [appSrcObject]="spotlightStream()"
+                 autoplay playsinline
+                 [muted]="spotlight() === 'self'"
+                 class="max-w-full max-h-full object-contain rounded-xl border-[1.5px] border-ink"
+                 style="background: #0d0d0d; box-shadow: 0 24px 64px rgba(0,0,0,0.6);"></video>
+          <span class="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 font-mono text-xs sm:text-sm px-3 py-1.5 rounded-lg pointer-events-none"
+                style="background: rgba(0,0,0,0.7); color: #fff;">
+            {{ spotlightLabel() }}
+          </span>
+          <button type="button" (click)="closeSpotlight()"
+                  class="absolute top-4 right-4 sm:top-6 sm:right-6 w-11 h-11 rounded-full flex items-center justify-center text-2xl leading-none hover:scale-110 transition-transform focus-ring"
+                  style="background: rgba(0,0,0,0.7); color: #fff;"
+                  aria-label="Kapat">×</button>
+          <span class="absolute top-4 left-4 sm:top-6 sm:left-6 font-mono text-[10px] sm:text-xs uppercase tracking-wider px-2 py-1 rounded pointer-events-none"
+                style="background: rgba(0,0,0,0.55); color: #fff;">
+            ESC ile kapat
+          </span>
+        </div>
+      </div>
+    }
   `,
 })
 export class CallPanelComponent implements AfterViewInit, OnDestroy {
@@ -322,6 +353,25 @@ export class CallPanelComponent implements AfterViewInit, OnDestroy {
   protected readonly invited = signal<Set<string>>(new Set());
   protected readonly inviting = signal<string | null>(null);
 
+  /** Spotlight modal — `'self'` veya remote connectionId; null ise kapalı. */
+  protected readonly spotlight = signal<string | null>(null);
+
+  protected readonly spotlightStream = computed<MediaStream | null>(() => {
+    const id = this.spotlight();
+    if (!id) return null;
+    if (id === 'self') return this.call.localStreamSig();
+    return this.call.remotes().find((r) => r.connectionId === id)?.stream ?? null;
+  });
+
+  protected readonly spotlightLabel = computed(() => {
+    const id = this.spotlight();
+    if (!id) return '';
+    if (id === 'self') {
+      return this.call.screenSharing() ? 'Ekran paylaşımın' : 'Sen';
+    }
+    return this.call.remotes().find((r) => r.connectionId === id)?.kullaniciAdi ?? '';
+  });
+
   // Davet butonu kullanıcılara da görünsün — herkes arkadaşını çağırabilir.
   protected readonly canInvite = computed(() => true);
 
@@ -348,6 +398,23 @@ export class CallPanelComponent implements AfterViewInit, OnDestroy {
       f.adSoyad.toLowerCase().includes(q) || f.email.toLowerCase().includes(q),
     );
   });
+
+  openSpotlight(id: string): void {
+    this.spotlight.set(id);
+  }
+
+  closeSpotlight(): void {
+    this.spotlight.set(null);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.spotlight()) {
+      this.closeSpotlight();
+      return;
+    }
+    if (this.inviteOpen()) this.closeInviteModal();
+  }
 
   openInviteModal(): void {
     this.inviteOpen.set(true);

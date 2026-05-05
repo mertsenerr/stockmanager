@@ -19,7 +19,6 @@ import { RouterLink } from '@angular/router';
     }
     .floating-pip {
       position: fixed !important;
-      width: 360px;
       max-width: 90vw;
       z-index: 80;
       box-shadow: 0 14px 32px rgba(0,0,0,0.32);
@@ -41,6 +40,7 @@ import { RouterLink } from '@angular/router';
     <div #panelRoot class="card-flat p-3 mb-4 call-panel-host"
          [class.floating-pip]="floating()"
          [class.dragging]="dragging()"
+         [style.width.px]="floating() ? floatingWidthPx() : null"
          [style.left.px]="floating() && pipPos() ? pipPos()!.left : null"
          [style.top.px]="floating() && pipPos() ? pipPos()!.top : null"
          [style.right.px]="floating() && !pipPos() ? 16 : null"
@@ -106,14 +106,17 @@ import { RouterLink } from '@angular/router';
         <div class="grid gap-2"
              [style.gridTemplateColumns]="gridCols()"
              [style.maxWidth]="gridMaxWidth()">
-          <!-- Kendi önizleme -->
+          <!-- Kendi önizleme — ekran paylaşımı varken kart 16:9 yerine geniş ve object-contain (kırpma yok). -->
           <div class="relative rounded-lg border-[1.5px] border-ink overflow-hidden"
-               style="background: #0d0d0d; aspect-ratio: 16/9;">
+               [style.aspect-ratio]="call.screenSharing() ? '16/10' : '16/9'"
+               style="background: #0d0d0d;">
             @if (call.mode() === 'video' && !call.camOff()) {
               <video
                 [appSrcObject]="call.localStreamSig()"
                 autoplay playsinline muted
-                class="w-full h-full object-cover"></video>
+                class="w-full h-full"
+                [class.object-cover]="!call.screenSharing()"
+                [class.object-contain]="call.screenSharing()"></video>
             } @else {
               <div class="absolute inset-0 flex items-center justify-center text-center" style="color: #888;">
                 <div>
@@ -494,18 +497,32 @@ export class CallPanelComponent implements AfterViewInit, OnDestroy {
 
   protected readonly gridCols = computed(() => {
     const total = this.call.remotes().length + 1;
+    // Ekran paylaşımı aktifse paylaşım kartı önemli — tek kolona zorla, full genişlik kazansın.
+    if (this.call.screenSharing()) return '1fr';
     if (total <= 1) return '1fr';
     if (total === 2) return 'repeat(2, 1fr)';
     if (total <= 4) return 'repeat(2, 1fr)';
     return 'repeat(3, 1fr)';
   });
 
-  /** Compact'ta grid max-width: 1 kişi → 320px, 2+ → 480px. Floating PiP'te daha küçük. */
+  /** Compact ↔ büyütülmüş ↔ floating ↔ ekran paylaşımı kombinasyonlarına göre grid genişliği. */
   protected readonly gridMaxWidth = computed(() => {
     const total = this.call.remotes().length + 1;
-    if (this.floating()) return total === 1 ? '300px' : '320px';
-    if (!this.compact()) return '100%';
+    const isFloat = this.floating();
+    const isCompact = this.compact();
+    const sharing = this.call.screenSharing();
+    // Ekran paylaşımı her durumda paneldeki tüm alanı kullansın.
+    if (sharing) return '100%';
+    if (isFloat && isCompact) return total === 1 ? '300px' : '320px';
+    if (isFloat && !isCompact) return '100%';
+    if (!isCompact) return '100%';
     return total === 1 ? '320px' : '480px';
+  });
+
+  /** Floating PiP genişliği: compact 360px, büyütülmüş 720px (ekranı aşmasın diye 90vw cap zaten CSS'te). */
+  protected readonly floatingWidthPx = computed(() => {
+    if (this.compact() && !this.call.screenSharing()) return 360;
+    return 720;
   });
 
   start(mode: 'audio' | 'video'): void {

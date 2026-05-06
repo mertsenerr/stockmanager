@@ -30,4 +30,11 @@ public sealed class User
 
     public string? PasswordResetTokenHash { get; set; }
     public DateTime? PasswordResetTokenExpiresAt { get; set; }
+
+    // Defaults to true so docs written before the H-3 field existed deserialize as
+    // verified; the register flow explicitly sets false for new sign-ups, and the
+    // Phase2 migration sets true on every existing record as a belt-and-suspenders.
+    public bool IsEmailVerified { get; set; } = true;
+    public string? EmailVerificationTokenHash { get; set; }
+    public DateTime? EmailVerificationTokenExpiresAt { get; set; }
 }

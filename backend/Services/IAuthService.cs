@@ -17,6 +17,16 @@ public interface IAuthService
     Task<UserDto?> GetCurrentUserAsync(string userId, CancellationToken ct = default);
     Task<RegisterResult> RegisterSayimBaskaniAsync(RegisterSayimBaskaniRequest request, CancellationToken ct = default);
     Task<RegisterResult> RegisterKullaniciAsync(RegisterKullaniciRequest request, CancellationToken ct = default);
+    Task<bool> VerifyEmailAsync(string tokenPlaintext, CancellationToken ct = default);
+    Task RequestEmailVerificationAsync(string email, CancellationToken ct = default);
+}
+
+public static class AuthFailureCodes
+{
+    public const string InvalidCredentials = "INVALID_CREDENTIALS";
+    public const string EmailNotVerified  = "EMAIL_NOT_VERIFIED";
+    public const string NotApproved       = "NOT_APPROVED";
+    public const string RefreshInvalid    = "REFRESH_INVALID";
 }
 
 public sealed record RegisterResult(
@@ -27,6 +37,7 @@ public sealed record RegisterResult(
 public sealed record AuthResult(
     bool Success,
     string? FailureReason,
+    string? FailureCode,
     AuthResponse? Response,
     string? RefreshTokenPlaintext,
     DateTime? RefreshTokenExpiresAt,
@@ -44,6 +55,7 @@ public sealed class AuthService : IAuthService
     private readonly ILogger<AuthService> _logger;
 
     private static readonly TimeSpan PasswordResetTtl = TimeSpan.FromMinutes(30);
+    private static readonly TimeSpan EmailVerificationTtl = TimeSpan.FromHours(24);
 
     public AuthService(
         IUserRepository users,
@@ -73,10 +85,13 @@ public sealed class AuthService : IAuthService
     {
         var user = await _users.FindByEmailAsync(request.Email, ct);
         if (user is null || !user.AktifMi || !_hasher.Verify(request.Password, user.PasswordHash))
-            return new AuthResult(false, "Email veya parola hatalı.", null, null, null, false);
+            return new AuthResult(false, "Email veya parola hatalı.", AuthFailureCodes.InvalidCredentials, null, null, null, false);
+
+        if (!user.IsEmailVerified)
+            return new AuthResult(false, "Lütfen önce e-posta adresinizi doğrulayın.", AuthFailureCodes.EmailNotVerified, null, null, null, false);
 
         if (!user.Onayli)
-            return new AuthResult(false, "Hesabınız Sayım Başkanı tarafından onay bekliyor.", null, null, null, false);
+            return new AuthResult(false, "Sayım Başkanınızın onayını bekliyorsunuz.", AuthFailureCodes.NotApproved, null, null, null, false);
 
         user.SonGirisTarihi = DateTime.UtcNow;
         await _users.ReplaceAsync(user, ct);
@@ -121,9 +136,17 @@ public sealed class AuthService : IAuthService
             AktifMi = true,
             Onayli = true,
         };
+        // H-3: register flow now requires email verification — set token, send mail.
+        user.IsEmailVerified = false;
+        var rawToken = GenerateOpaqueToken();
+        user.EmailVerificationTokenHash = _jwt.HashRefreshToken(rawToken);
+        user.EmailVerificationTokenExpiresAt = DateTime.UtcNow.Add(EmailVerificationTtl);
+
         firma.OlusturanKullaniciId = user.Id;
         await _firmalar.ReplaceAsync(firma, ct);
         await _users.InsertAsync(user, ct);
+
+        await SendVerificationEmailSafelyAsync(user, rawToken, ct);
 
         _logger.LogInformation(
             "New SayimBaskani registered: {Email} for firma {FirmaAd} ({Kisaltma})",
@@ -145,6 +168,7 @@ public sealed class AuthService : IAuthService
         if (firma is null)
             return new RegisterResult(false, "Firma kısaltması bulunamadı. Sayım Başkanından doğru anahtarı isteyin.", null);
 
+        var rawToken = GenerateOpaqueToken();
         var user = new User
         {
             Email = email,
@@ -155,8 +179,13 @@ public sealed class AuthService : IAuthService
             FirmaIds = [firma.Id],
             AktifMi = true,
             Onayli = false, // Sayım Başkanı onayı bekleyecek
+            IsEmailVerified = false,
+            EmailVerificationTokenHash = _jwt.HashRefreshToken(rawToken),
+            EmailVerificationTokenExpiresAt = DateTime.UtcNow.Add(EmailVerificationTtl),
         };
         await _users.InsertAsync(user, ct);
+
+        await SendVerificationEmailSafelyAsync(user, rawToken, ct);
 
         _logger.LogInformation(
             "New Kullanici registered (pending approval): {Email} for firma {Kisaltma}",
@@ -172,13 +201,13 @@ public sealed class AuthService : IAuthService
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(refreshTokenPlaintext))
-            return new AuthResult(false, "Refresh token bulunamadı.", null, null, null, false);
+            return new AuthResult(false, "Refresh token bulunamadı.", AuthFailureCodes.RefreshInvalid, null, null, null, false);
 
         var hash = _jwt.HashRefreshToken(refreshTokenPlaintext);
         var existing = await _refreshTokens.FindByHashAsync(hash, ct);
 
         if (existing is null)
-            return new AuthResult(false, "Refresh token geçersiz.", null, null, null, false);
+            return new AuthResult(false, "Refresh token geçersiz.", AuthFailureCodes.RefreshInvalid, null, null, null, false);
 
         if (!existing.IsActive)
         {
@@ -188,12 +217,12 @@ public sealed class AuthService : IAuthService
                 _logger.LogWarning("Refresh token reuse detected for user {UserId}", existing.UserId);
                 await _refreshTokens.RevokeAllForUserAsync(existing.UserId, "reuse_detected", ct);
             }
-            return new AuthResult(false, "Refresh token süresi dolmuş.", null, null, null, false);
+            return new AuthResult(false, "Refresh token süresi dolmuş.", AuthFailureCodes.RefreshInvalid, null, null, null, false);
         }
 
         var user = await _users.FindByIdAsync(existing.UserId, ct);
         if (user is null || !user.AktifMi)
-            return new AuthResult(false, "Kullanıcı bulunamadı.", null, null, null, false);
+            return new AuthResult(false, "Kullanıcı bulunamadı.", AuthFailureCodes.RefreshInvalid, null, null, null, false);
 
         // Rotate.
         var rememberMe = (existing.ExpiresAt - existing.CreatedAt).TotalDays > 1;
@@ -237,6 +266,56 @@ public sealed class AuthService : IAuthService
 
         var resetUrl = _resendSettings.PasswordResetUrlTemplate.Replace("{token}", rawToken);
         await _email.SendPasswordResetAsync(user.Email, user.AdSoyad, resetUrl, ct);
+    }
+
+    public async Task<bool> VerifyEmailAsync(string tokenPlaintext, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(tokenPlaintext)) return false;
+
+        var hash = _jwt.HashRefreshToken(tokenPlaintext);
+        var user = await _users.FindByEmailVerificationHashAsync(hash, ct);
+        if (user is null
+            || user.EmailVerificationTokenExpiresAt is null
+            || user.EmailVerificationTokenExpiresAt < DateTime.UtcNow)
+            return false;
+
+        user.IsEmailVerified = true;
+        user.EmailVerificationTokenHash = null;
+        user.EmailVerificationTokenExpiresAt = null;
+        await _users.ReplaceAsync(user, ct);
+        return true;
+    }
+
+    public async Task RequestEmailVerificationAsync(string email, CancellationToken ct = default)
+    {
+        var user = await _users.FindByEmailAsync(email, ct);
+        if (user is null || !user.AktifMi || user.IsEmailVerified)
+        {
+            // Do not reveal account existence or verification state.
+            return;
+        }
+
+        var rawToken = GenerateOpaqueToken();
+        user.EmailVerificationTokenHash = _jwt.HashRefreshToken(rawToken);
+        user.EmailVerificationTokenExpiresAt = DateTime.UtcNow.Add(EmailVerificationTtl);
+        await _users.ReplaceAsync(user, ct);
+
+        await SendVerificationEmailSafelyAsync(user, rawToken, ct);
+    }
+
+    private async Task SendVerificationEmailSafelyAsync(User user, string rawToken, CancellationToken ct)
+    {
+        var template = _resendSettings.EmailVerificationUrlTemplate;
+        if (string.IsNullOrWhiteSpace(template) || !template.Contains("{token}"))
+        {
+            _logger.LogWarning(
+                "EmailVerificationUrlTemplate not configured — skipping send for {Email}",
+                user.Email);
+            return;
+        }
+
+        var verifyUrl = template.Replace("{token}", rawToken);
+        await _email.SendEmailVerificationAsync(user.Email, user.AdSoyad, verifyUrl, ct);
     }
 
     public async Task<bool> ResetPasswordAsync(string tokenPlaintext, string newPassword, CancellationToken ct = default)
@@ -287,6 +366,7 @@ public sealed class AuthService : IAuthService
         return new AuthResult(
             Success: true,
             FailureReason: null,
+            FailureCode: null,
             Response: new AuthResponse
             {
                 AccessToken = access,

@@ -9,6 +9,7 @@ public interface IUserRepository
     Task<User?> FindByEmailAsync(string email, CancellationToken ct = default);
     Task<User?> FindByIdAsync(string id, CancellationToken ct = default);
     Task<User?> FindByPasswordResetHashAsync(string hash, CancellationToken ct = default);
+    Task<User?> FindByEmailVerificationHashAsync(string hash, CancellationToken ct = default);
     Task<bool> AnyAdminAsync(CancellationToken ct = default);
     Task<int> CountActiveAdminsAsync(CancellationToken ct = default);
     Task<IReadOnlyList<User>> ListAsync(bool includeInactive, CancellationToken ct = default);
@@ -56,6 +57,9 @@ public sealed class UserRepository : IUserRepository
 
     public Task<User?> FindByPasswordResetHashAsync(string hash, CancellationToken ct = default) =>
         _users.Find(u => u.PasswordResetTokenHash == hash).FirstOrDefaultAsync(ct)!;
+
+    public Task<User?> FindByEmailVerificationHashAsync(string hash, CancellationToken ct = default) =>
+        _users.Find(u => u.EmailVerificationTokenHash == hash).FirstOrDefaultAsync(ct)!;
 
     public async Task<bool> AnyAdminAsync(CancellationToken ct = default) =>
         await _users.Find(u => u.Rol == Roles.Admin).AnyAsync(ct);

@@ -1,0 +1,48 @@
+<app-auth-shell variant="reset">
+  <header class="mb-7">
+    <h2 class="auth-card-heading">E-posta Doğrulama</h2>
+    <p class="auth-card-subheading">Hesabını aktif etmek için e-posta adresini doğruluyoruz.</p>
+  </header>
+
+  @switch (state()) {
+    @case ('pending') {
+      <div class="auth-success">
+        <span class="mt-1 w-2.5 h-2.5 rounded-full bg-[#1a1814] shrink-0"></span>
+        <div>
+          <p class="text-sm font-semibold">Doğrulanıyor…</p>
+          <p class="text-xs text-[#5c5852] mt-1.5 leading-relaxed">Lütfen bekle.</p>
+        </div>
+      </div>
+    }
+    @case ('success') {
+      <div class="auth-success">
+        <span class="mt-1 w-2.5 h-2.5 rounded-full bg-[#1a1814] shrink-0"></span>
+        <div>
+          <p class="text-sm font-semibold">E-posta doğrulandı.</p>
+          <p class="text-xs text-[#5c5852] mt-1.5 leading-relaxed">
+            Artık giriş yapabilirsin.
+          </p>
+        </div>
+      </div>
+      <a routerLink="/login" class="block text-center auth-link mx-auto w-fit pt-5">
+        Girişe git →
+      </a>
+    }
+    @case ('failure') {
+      <div class="auth-server-error">
+        {{ errorMessage() ?? 'Doğrulama bağlantısı geçersiz veya süresi dolmuş.' }}
+      </div>
+      <a routerLink="/login" class="block text-center auth-link mx-auto w-fit pt-5">
+        ← Girişe dön
+      </a>
+    }
+    @case ('missing') {
+      <div class="auth-server-error">
+        Doğrulama bağlantısı eksik. Lütfen e-postandaki bağlantıyı tekrar kullan.
+      </div>
+      <a routerLink="/login" class="block text-center auth-link mx-auto w-fit pt-5">
+        ← Girişe dön
+      </a>
+    }
+  }
+</app-auth-shell>

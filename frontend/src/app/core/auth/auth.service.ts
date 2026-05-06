@@ -10,7 +10,9 @@ import {
   RegisterKullaniciRequest,
   RegisterResponse,
   RegisterSayimBaskaniRequest,
+  ResendVerificationRequest,
   ResetPasswordRequest,
+  VerifyEmailRequest,
 } from './auth.models';
 
 @Injectable({ providedIn: 'root' })
@@ -103,6 +105,14 @@ export class AuthService {
     return this.http
       .post<RegisterResponse>(`${this.base}/register/kullanici`, req)
       .pipe(timeout({ each: 30000 }));
+  }
+
+  verifyEmail(req: VerifyEmailRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.base}/verify-email`, req);
+  }
+
+  resendVerification(req: ResendVerificationRequest): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.base}/resend-verification`, req);
   }
 
   hasRole(...roles: CurrentUser['rol'][]): boolean {

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SayimLink.Api.Common;
 using SayimLink.Api.Dtos.Admin;
 using SayimLink.Api.Models;
 using SayimLink.Api.Repositories;
@@ -40,14 +41,16 @@ public sealed class MagazalarController : ControllerBase
         [FromQuery] bool includeInactive,
         CancellationToken ct)
     {
-        // Admin-level → all; Kullanici → only assigned magazas (DB'den oku, JWT claim güvenilmez).
+        // C-1: Only Sistem sees all magazas. Everyone else (incl. SayimBaskani) is scoped to
+        // magazas in their MagazaIds plus magazas they created (so a SayimBaskani who creates
+        // a store for someone else's management doesn't lose visibility of it).
         var all = await _magazalar.ListAsync(firmaId, includeInactive, ct);
-        if (!Roles.IsAdminLevel(User))
+        if (!User.IsSistem())
         {
             var uid = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var dbUser = uid is null ? null : await _users.FindByIdAsync(uid, ct);
             var allowedIds = (dbUser?.MagazaIds ?? new List<string>()).ToHashSet();
-            all = all.Where(m => allowedIds.Contains(m.Id)).ToList();
+            all = all.Where(m => allowedIds.Contains(m.Id) || m.OlusturanKullaniciId == uid).ToList();
         }
 
         var firmaIds = all.Select(m => m.FirmaId).Distinct().ToList();
@@ -66,11 +69,14 @@ public sealed class MagazalarController : ControllerBase
         var magaza = await _magazalar.FindByIdAsync(id, ct);
         if (magaza is null) return NotFound();
 
-        if (!Roles.IsAdminLevel(User))
+        // C-1: same scope as List — Sistem sees all; others must be in MagazaIds or be the creator.
+        if (!User.IsSistem())
         {
             var uid = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var dbUser = uid is null ? null : await _users.FindByIdAsync(uid, ct);
-            if (dbUser is null || !dbUser.MagazaIds.Contains(id)) return Forbid();
+            var canSee = dbUser is not null
+                && (dbUser.MagazaIds.Contains(id) || magaza.OlusturanKullaniciId == uid);
+            if (!canSee) return Forbid();
         }
 
         var firma = await _firmalar.FindByIdAsync(magaza.FirmaId, ct);

@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using SayimLink.Api.Common;
 using SayimLink.Api.Dtos.Admin;
 using SayimLink.Api.Models;
 using SayimLink.Api.Repositories;
@@ -37,14 +38,33 @@ public sealed class KullanicilarController : AdminControllerBase
     public async Task<IActionResult> List([FromQuery] bool includeInactive, CancellationToken ct)
     {
         var users = await _users.ListAsync(includeInactive, ct);
-        return Ok(users.Select(ToListDto));
+        // C-1: SayimBaskani only sees users with the same FirmaId; Sistem sees all.
+        var scoped = ScopeToCallerFirma(users);
+        return Ok(scoped.Select(ToListDto));
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> Get(string id, CancellationToken ct)
     {
         var user = await _users.FindByIdAsync(id, ct);
-        return user is null ? NotFound() : Ok(ToListDto(user));
+        if (user is null) return NotFound();
+        // C-1: SayimBaskani may only fetch users in the same FirmaId.
+        if (!User.IsSistem())
+        {
+            var firmaId = User.GetFirmaId();
+            if (string.IsNullOrEmpty(firmaId) || user.FirmaId != firmaId) return Forbid();
+        }
+        return Ok(ToListDto(user));
+    }
+
+    // C-1 helper: returns the original list for Sistem, otherwise filters to users
+    // in the caller's firma (via primary FirmaId or legacy FirmaIds list).
+    private IEnumerable<User> ScopeToCallerFirma(IEnumerable<User> users)
+    {
+        if (User.IsSistem()) return users;
+        var firmaId = User.GetFirmaId();
+        if (string.IsNullOrEmpty(firmaId)) return Array.Empty<User>();
+        return users.Where(u => u.FirmaId == firmaId || u.FirmaIds.Contains(firmaId));
     }
 
     [HttpPost]
@@ -119,15 +139,14 @@ public sealed class KullanicilarController : AdminControllerBase
     [HttpGet("pending")]
     public async Task<IActionResult> ListPending(CancellationToken ct)
     {
-        // Sistem (süper admin) tüm pending'leri görür; SayimBaskani sadece kendi firmasının onay bekleyenlerini.
-        if (User.IsInRole(Roles.Sistem))
+        // C-1: same scope rule as List — Sistem sees everyone, SayimBaskani sees only their firma.
+        if (User.IsSistem())
         {
             var all = await _users.ListAsync(includeInactive: false, ct);
             return Ok(all.Where(u => !u.Onayli).Select(ToListDto));
         }
 
-        var firmaId = User.FindFirst("firmaId")?.Value
-                      ?? User.FindFirst("firmaIds")?.Value?.Split(',', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        var firmaId = User.GetFirmaId();
         if (string.IsNullOrEmpty(firmaId))
             return Ok(Array.Empty<KullaniciListDto>());
         var pending = await _users.ListPendingForFirmaAsync(firmaId, ct);

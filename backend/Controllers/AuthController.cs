@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using SayimLink.Api.Dtos.Auth;
 using SayimLink.Api.Models;
 using SayimLink.Api.Services;
@@ -41,6 +42,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("register/sayim-baskani")]
+    [EnableRateLimiting("auth-strict")]
     public async Task<IActionResult> RegisterSayimBaskani(
         [FromBody] RegisterSayimBaskaniRequest request, CancellationToken ct)
     {
@@ -60,6 +62,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("register/kullanici")]
+    [EnableRateLimiting("auth-strict")]
     public async Task<IActionResult> RegisterKullanici(
         [FromBody] RegisterKullaniciRequest request, CancellationToken ct)
     {
@@ -83,6 +86,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("auth-strict")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         var validation = await _loginValidator.ValidateAsync(request, ct);
@@ -160,6 +164,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("forgot-password")]
+    [EnableRateLimiting("auth-strict")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken ct)
     {
         var validation = await _forgotValidator.ValidateAsync(request, ct);
@@ -171,6 +176,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("reset-password")]
+    [EnableRateLimiting("auth-strict")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken ct)
     {
         var validation = await _resetValidator.ValidateAsync(request, ct);

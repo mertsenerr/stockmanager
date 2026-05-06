@@ -1,7 +1,9 @@
 using System.Reflection;
 using System.Text;
+using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using SayimLink.Api.Configuration;
@@ -58,6 +60,36 @@ builder.Services.AddHostedService<AuditWriterService>();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
+
+// ─── Rate limiting ───────────────────────────────────────────────────────────
+// `auth-strict`   → login / register / forgot / reset (credential-stuffing surface)
+// `auth-moderate` → general authenticated endpoints if we ever opt in
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("auth-strict", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }));
+
+    options.AddPolicy("auth-moderate", ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            }));
+});
 
 // ─── Swagger / OpenAPI UI ────────────────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
@@ -241,6 +273,7 @@ app.UseRouting();
 app.UseCors(CorsSettings.PolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 app.MapHub<SayimHub>("/hubs/sayim");
 

@@ -14,15 +14,18 @@ public sealed class ResendEmailService : IEmailService
 {
     private readonly ResendSettings _settings;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHostEnvironment _environment;
     private readonly ILogger<ResendEmailService> _logger;
 
     public ResendEmailService(
         IOptions<ResendSettings> options,
         IHttpClientFactory httpClientFactory,
+        IHostEnvironment environment,
         ILogger<ResendEmailService> logger)
     {
         _settings = options.Value;
         _httpClientFactory = httpClientFactory;
+        _environment = environment;
         _logger = logger;
     }
 
@@ -34,10 +37,21 @@ public sealed class ResendEmailService : IEmailService
     {
         if (string.IsNullOrWhiteSpace(_settings.ApiKey))
         {
-            _logger.LogWarning(
-                "Resend API key not configured — password reset email skipped. Reset URL for {Email}: {Url}",
-                toEmail, resetUrl);
-            return;
+            if (_environment.IsDevelopment())
+            {
+                // Dev convenience: surface the link so a developer can finish the flow
+                // without a real Resend key. Never reached in Production.
+                _logger.LogWarning(
+                    "Resend API key not configured — password reset email skipped. Reset URL for {Email}: {Url}",
+                    toEmail, resetUrl);
+                return;
+            }
+
+            _logger.LogError(
+                "Resend API key not configured — password reset email NOT sent for {Email}.",
+                toEmail);
+            throw new InvalidOperationException(
+                "Email service is not configured. Set Resend__ApiKey on the host.");
         }
 
         var client = _httpClientFactory.CreateClient();

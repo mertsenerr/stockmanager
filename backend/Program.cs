@@ -163,24 +163,22 @@ var corsSettings = builder.Configuration
     .GetSection(CorsSettings.SectionName)
     .Get<CorsSettings>() ?? new CorsSettings();
 
+if (corsSettings.AllowedOrigins.Length == 0)
+{
+    throw new InvalidOperationException(
+        "Cors:AllowedOrigins is empty. Set Cors__AllowedOrigins__0 (and __1, __2 …) " +
+        "to the explicit list of permitted frontend origins. " +
+        "Refusing to start with an open CORS policy.");
+}
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(CorsSettings.PolicyName, policy =>
     {
-        if (corsSettings.AllowedOrigins.Length > 0)
-        {
-            policy.WithOrigins(corsSettings.AllowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials();
-        }
-        else
-        {
-            policy.SetIsOriginAllowed(_ => true)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials();
-        }
+        policy.WithOrigins(corsSettings.AllowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 

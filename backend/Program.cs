@@ -116,6 +116,14 @@ var jwtSettings = builder.Configuration
     .GetSection(JwtSettings.SectionName)
     .Get<JwtSettings>() ?? new JwtSettings();
 
+if (string.IsNullOrWhiteSpace(jwtSettings.Secret) || jwtSettings.Secret.Length < 32)
+{
+    throw new InvalidOperationException(
+        "Jwt:Secret is missing or shorter than 32 characters. " +
+        "Set the Jwt__Secret environment variable to a high-entropy value " +
+        "(e.g. `openssl rand -base64 48`). Refusing to start.");
+}
+
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -131,10 +139,7 @@ builder.Services
             ClockSkew = TimeSpan.FromSeconds(30),
             ValidIssuer = jwtSettings.Issuer,
             ValidAudience = jwtSettings.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(string.IsNullOrWhiteSpace(jwtSettings.Secret)
-                    ? new string('x', 32)
-                    : jwtSettings.Secret)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
         };
         // Allow JWT to come via the access_token query string for SignalR
         // (browser EventSource/WebSocket clients can't set Authorization headers).

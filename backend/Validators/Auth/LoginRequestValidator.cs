@@ -12,7 +12,6 @@ public sealed class LoginRequestValidator : AbstractValidator<LoginRequest>
             .EmailAddress().WithMessage("Geçerli bir email adresi giriniz.");
 
         RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Parola zorunludur.")
-            .MinimumLength(6).WithMessage("Parola en az 6 karakter olmalıdır.");
+            .NotEmpty().WithMessage("Parola zorunludur.");
     }
 }

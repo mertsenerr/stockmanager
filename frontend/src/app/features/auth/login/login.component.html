@@ -42,11 +42,8 @@
         [class.is-invalid]="(form.controls.password.touched && form.controls.password.invalid) || !!fieldErrors()['Password']"
         placeholder="••••••••"
       />
-      @if (form.controls.password.touched && form.controls.password.errors) {
-        <p class="auth-error">
-          @if (form.controls.password.errors['required']) { Parola zorunludur. }
-          @else if (form.controls.password.errors['minlength']) { Parola en az 6 karakter olmalıdır. }
-        </p>
+      @if (form.controls.password.touched && form.controls.password.errors?.['required']) {
+        <p class="auth-error">Parola zorunludur.</p>
       }
       @for (msg of fieldErrors()['Password']; track msg) {
         <p class="auth-error">{{ msg }}</p>

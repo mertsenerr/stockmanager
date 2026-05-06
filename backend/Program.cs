@@ -54,6 +54,7 @@ builder.Services.AddHttpClient();
 
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddHostedService<AdminSeederHostedService>();
+builder.Services.AddHostedService<Phase2MigrationHostedService>();
 builder.Services.AddHostedService<CellLockSweeperService>();
 builder.Services.AddHostedService<AuditWriterService>();
 
@@ -179,6 +180,13 @@ if (!builder.Environment.IsDevelopment())
             "Resend:PasswordResetUrlTemplate must include the literal '{token}' placeholder " +
             "(e.g. https://syncompare.com/reset-password?token={token}). " +
             "Set Resend__PasswordResetUrlTemplate env var. Refusing to start.");
+
+    if (string.IsNullOrWhiteSpace(resendSettings.EmailVerificationUrlTemplate)
+        || !resendSettings.EmailVerificationUrlTemplate.Contains("{token}"))
+        throw new InvalidOperationException(
+            "Resend:EmailVerificationUrlTemplate must include the literal '{token}' placeholder " +
+            "(e.g. https://syncompare.com/verify-email?token={token}). " +
+            "Set Resend__EmailVerificationUrlTemplate env var. Refusing to start.");
 }
 
 builder.Services
@@ -200,6 +208,9 @@ builder.Services
         };
         // Allow JWT to come via the access_token query string for SignalR
         // (browser EventSource/WebSocket clients can't set Authorization headers).
+        // OnTokenValidated rejects tokens missing the `firmaId` claim (issued by code
+        // before the Phase 2 final deploy) — the frontend's 401 path then redirects
+        // to login, where the user gets a fresh token with the new shape.
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = ctx =>
@@ -208,6 +219,19 @@ builder.Services
                 var path = ctx.HttpContext.Request.Path;
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
                     ctx.Token = accessToken;
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = ctx =>
+            {
+                var firmaId = ctx.Principal?.FindFirst("firmaId")?.Value;
+                var role = ctx.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+                // Sistem (platform super-admin, seeded with no firma) may have an empty firmaId.
+                // Every other role must carry one — pre-Phase-2 tokens lacked the claim, so an
+                // empty value here means a stale token and the user must re-login.
+                if (string.IsNullOrEmpty(firmaId) && role != SayimLink.Api.Models.Roles.Sistem)
+                {
+                    ctx.Fail("Token missing firmaId claim — re-login required.");
+                }
                 return Task.CompletedTask;
             },
         };

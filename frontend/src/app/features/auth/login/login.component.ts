@@ -3,7 +3,11 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
-import { ApiValidationProblem } from '../../../core/auth/auth.models';
+import {
+  ApiValidationProblem,
+  AuthFailureBody,
+  AuthFailureCode,
+} from '../../../core/auth/auth.models';
 import { AuthShellComponent } from '../auth-shell/auth-shell.component';
 
 @Component({
@@ -26,11 +30,16 @@ export class LoginComponent {
 
   readonly submitting = signal(false);
   readonly serverError = signal<string | null>(null);
+  readonly errorCode = signal<AuthFailureCode | null>(null);
   readonly fieldErrors = signal<Record<string, string[]>>({});
+  readonly resendSubmitting = signal(false);
+  readonly resendDone = signal(false);
 
   submit(): void {
     if (this.submitting()) return;
     this.serverError.set(null);
+    this.errorCode.set(null);
+    this.resendDone.set(false);
     this.fieldErrors.set({});
 
     if (this.form.invalid) {
@@ -52,9 +61,27 @@ export class LoginComponent {
           this.fieldErrors.set(problem.errors ?? {});
           return;
         }
-        this.serverError.set(
-          err.error?.message ?? 'Giriş başarısız. Lütfen tekrar dene.',
-        );
+        const body = err.error as AuthFailureBody | undefined;
+        this.errorCode.set(body?.code ?? null);
+        this.serverError.set(body?.message ?? 'Giriş başarısız. Lütfen tekrar dene.');
+      },
+    });
+  }
+
+  resendVerification(): void {
+    if (this.resendSubmitting()) return;
+    const email = this.form.controls.email.value?.trim();
+    if (!email) return;
+    this.resendSubmitting.set(true);
+    this.auth.resendVerification({ email }).subscribe({
+      next: () => {
+        this.resendSubmitting.set(false);
+        this.resendDone.set(true);
+      },
+      error: () => {
+        // Match backend's "always 200" semantics on the UI side — never reveal failure.
+        this.resendSubmitting.set(false);
+        this.resendDone.set(true);
       },
     });
   }

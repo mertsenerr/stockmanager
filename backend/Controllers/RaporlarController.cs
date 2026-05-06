@@ -2,6 +2,7 @@ using System.Globalization;
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SayimLink.Api.Common;
 using SayimLink.Api.Dtos.Rapor;
 using SayimLink.Api.Models;
 using SayimLink.Api.Repositories;
@@ -39,7 +40,9 @@ public sealed class RaporlarController : ControllerBase
     {
         var fromUtc = TryParseDate(from);
         var toUtc = TryParseDate(to);
-        var oturumlar = await _oturumlar.ListAsync(null, null, fromUtc, toUtc, ct);
+        // C-1: SayimBaskani only sees stats for oturums they're a participant of, manage
+        // a magaza for, or are invited to via email. Sistem keeps the cross-firma view.
+        var oturumlar = await ListVisibleOturumlarAsync(fromUtc, toUtc, ct);
 
         var magazaIds = oturumlar.Select(o => o.MagazaId).Distinct();
         var magazaMap = (await _magazalar.ListByIdsAsync(magazaIds, ct))
@@ -92,7 +95,8 @@ public sealed class RaporlarController : ControllerBase
     {
         var fromUtc = TryParseDate(from);
         var toUtc = TryParseDate(to);
-        var oturumlar = await _oturumlar.ListAsync(null, null, fromUtc, toUtc, ct);
+        // C-1: scoped to caller-visible oturums (see MagazaSapma).
+        var oturumlar = await ListVisibleOturumlarAsync(fromUtc, toUtc, ct);
 
         // We need full docs (Urunler) for change history aggregation; refetch detail per oturum.
         var perUser = new Dictionary<string, SaymanPerformansDto>();
@@ -150,6 +154,9 @@ public sealed class RaporlarController : ControllerBase
     {
         var oturum = await _oturumlar.FindByIdAsync(id, ct);
         if (oturum is null) return NotFound();
+        // C-1: same access rule as the report list — Sistem unrestricted, others must be
+        // a participant or own the magaza.
+        if (!await IsCallerAllowedToReadOturumAsync(oturum, ct)) return Forbid();
 
         var magaza = await _magazalar.FindByIdAsync(oturum.MagazaId, ct);
         var firma = await _firmalar.FindByIdAsync(oturum.FirmaId, ct);
@@ -209,5 +216,61 @@ public sealed class RaporlarController : ControllerBase
             DateTimeStyles.None, out var d)
             ? DateTime.SpecifyKind(d, DateTimeKind.Utc)
             : null;
+    }
+
+    // C-1 scoping helper: returns oturums visible to the caller in the given date range.
+    // Sistem sees everything; SayimBaskani sees the union of (Katilimci + MagazaIds + DavetliMailler).
+    // Mirrors OturumlarController.List's per-user scoping logic.
+    private async Task<IReadOnlyList<SayimOturumu>> ListVisibleOturumlarAsync(
+        DateTime? fromUtc, DateTime? toUtc, CancellationToken ct)
+    {
+        if (User.IsSistem())
+            return await _oturumlar.ListAsync(null, null, fromUtc, toUtc, ct);
+
+        var uid = User.GetUserId();
+        if (uid is null) return Array.Empty<SayimOturumu>();
+
+        var dbUser = await _users.FindByIdAsync(uid, ct);
+        var myEmail = dbUser?.Email?.ToLowerInvariant();
+        var myMagazaIds = dbUser?.MagazaIds ?? new List<string>();
+
+        var participating = (await _oturumlar.ListWhereUserParticipatesAsync(uid, ct)).ToList();
+
+        if (myMagazaIds.Count > 0)
+        {
+            var byMagaza = await _oturumlar.ListByMagazaIdsAsync(myMagazaIds, ct);
+            participating = participating.Concat(byMagaza)
+                .GroupBy(o => o.Id).Select(g => g.First()).ToList();
+        }
+
+        if (!string.IsNullOrEmpty(myEmail))
+        {
+            var all = await _oturumlar.ListAsync(null, null, fromUtc, toUtc, ct);
+            var davetli = all.Where(o => o.DavetliMailler.Any(m =>
+                string.Equals(m, myEmail, StringComparison.OrdinalIgnoreCase)));
+            participating = participating.Concat(davetli)
+                .GroupBy(o => o.Id).Select(g => g.First()).ToList();
+        }
+
+        return participating
+            .Where(o => !fromUtc.HasValue || o.Tarih >= fromUtc.Value)
+            .Where(o => !toUtc.HasValue || o.Tarih < toUtc.Value)
+            .ToList();
+    }
+
+    private async Task<bool> IsCallerAllowedToReadOturumAsync(SayimOturumu oturum, CancellationToken ct)
+    {
+        if (User.IsSistem()) return true;
+        var uid = User.GetUserId();
+        if (uid is null) return false;
+        if (oturum.Katilimcilar.Any(k => k.KullaniciId == uid)) return true;
+        var dbUser = await _users.FindByIdAsync(uid, ct);
+        if (dbUser is null) return false;
+        if (dbUser.MagazaIds.Contains(oturum.MagazaId)) return true;
+        var myEmail = dbUser.Email?.ToLowerInvariant();
+        if (!string.IsNullOrEmpty(myEmail) && oturum.DavetliMailler.Any(m =>
+                string.Equals(m, myEmail, StringComparison.OrdinalIgnoreCase)))
+            return true;
+        return false;
     }
 }

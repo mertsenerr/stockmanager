@@ -4,6 +4,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
+using SayimLink.Api.Common;
 using SayimLink.Api.Dtos.Sayim;
 using SayimLink.Api.Models;
 using SayimLink.Api.Repositories;
@@ -71,8 +72,12 @@ public sealed class OturumlarController : ControllerBase
         DateTime? fromUtc = TryParseDate(from);
         DateTime? toUtc = TryParseDate(to);
 
+        // C-1: Only Sistem (platform super-admin) sees everything. SayimBaskani falls through
+        // to the per-participant filter — they see oturums where they're a Katilimci, an
+        // assigned Magaza member, or a DavetliMail target. Creators are auto-added as
+        // Katilimci on Create, so SayimBaskani retains visibility for sessions they own.
         IReadOnlyList<SayimOturumu> oturumlar;
-        if (Roles.IsAdminLevel(User))
+        if (User.IsSistem())
         {
             oturumlar = await _oturumlar.ListAsync(magazaId, durum, fromUtc, toUtc, ct);
         }
@@ -405,7 +410,34 @@ public sealed class OturumlarController : ControllerBase
         urun.GuncellenmeTarihi = DateTime.UtcNow;
 
         oturum.Ozetler = SayimOturumu.ComputeOzet(oturum.Urunler);
-        await _oturumlar.ReplaceAsync(oturum, ct);
+
+        // H-6: positional update — only push the changed scalar fields + appended history /
+        // comment entries instead of rewriting the entire SayimOturumu document.
+        var ub = Builders<SayimOturumu>.Update;
+        var ops = new List<UpdateDefinition<SayimOturumu>>
+        {
+            ub.Set(o => o.Urunler[-1].SonGuncelleyenId, urun.SonGuncelleyenId),
+            ub.Set(o => o.Urunler[-1].GuncellenmeTarihi, urun.GuncellenmeTarihi),
+            ub.Set(o => o.Ozetler, oturum.Ozetler),
+        };
+        foreach (var c in changes)
+        {
+            switch (c.Alan)
+            {
+                case "barkod":         ops.Add(ub.Set(o => o.Urunler[-1].Barkod,         urun.Barkod));         break;
+                case "urunAdi":        ops.Add(ub.Set(o => o.Urunler[-1].UrunAdi,        urun.UrunAdi));        break;
+                case "sistemStok":     ops.Add(ub.Set(o => o.Urunler[-1].SistemStok,     urun.SistemStok));     break;
+                case "sayilanStok":    ops.Add(ub.Set(o => o.Urunler[-1].SayilanStok,    urun.SayilanStok));    break;
+                case "durum":          ops.Add(ub.Set(o => o.Urunler[-1].Durum,          urun.Durum));          break;
+                case "atananSayman":   ops.Add(ub.Set(o => o.Urunler[-1].AtananSaymanId, urun.AtananSaymanId)); break;
+            }
+        }
+        if (changes.Count > 0)
+            ops.Add(ub.PushEach(o => o.Urunler[-1].DegisiklikGecmisi, changes));
+        if (!string.IsNullOrWhiteSpace(request.YorumEkle))
+            ops.Add(ub.Push(o => o.Urunler[-1].Yorumlar, urun.Yorumlar[^1]));
+
+        await _oturumlar.UpdateUrunAsync(oturumId, urunId, ub.Combine(ops), ct);
         Audit(AuditAksiyonlari.UrunUpdate, $"{oturumId}/{urunId}",
             yeni: string.Join(", ", changes.Select(c => $"{c.Alan}:{c.YeniDeger}")));
 
@@ -479,7 +511,9 @@ public sealed class OturumlarController : ControllerBase
 
     private async Task<bool> CanReadAsync(SayimOturumu oturum, CancellationToken ct)
     {
-        if (Roles.IsAdminLevel(User)) return true;
+        // C-1: Only Sistem bypasses participation checks. SayimBaskani must be a Katilimci /
+        // assigned to the Magaza / on DavetliMailler — same scope as List filtering.
+        if (User.IsSistem()) return true;
         var uid = CurrentUserId();
         if (uid is null) return false;
         if (oturum.Katilimcilar.Any(k => k.KullaniciId == uid)) return true;

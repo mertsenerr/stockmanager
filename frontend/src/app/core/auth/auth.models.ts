@@ -66,3 +66,22 @@ export interface RegisterResponse {
   message: string;
   user: CurrentUser;
 }
+
+export type AuthFailureCode =
+  | 'INVALID_CREDENTIALS'
+  | 'EMAIL_NOT_VERIFIED'
+  | 'NOT_APPROVED'
+  | 'REFRESH_INVALID';
+
+export interface AuthFailureBody {
+  message: string;
+  code?: AuthFailureCode;
+}
+
+export interface VerifyEmailRequest {
+  token: string;
+}
+
+export interface ResendVerificationRequest {
+  email: string;
+}

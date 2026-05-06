@@ -56,7 +56,23 @@
     </label>
 
     @if (serverError()) {
-      <div class="auth-server-error">{{ serverError() }}</div>
+      <div class="auth-server-error">
+        {{ serverError() }}
+        @if (errorCode() === 'EMAIL_NOT_VERIFIED') {
+          <div class="mt-2 text-xs">
+            @if (resendDone()) {
+              Yeni bağlantı yolda. E-postanı kontrol et.
+            } @else {
+              <button type="button"
+                      class="auth-link"
+                      [disabled]="resendSubmitting()"
+                      (click)="resendVerification()">
+                Doğrulama e-postasını yeniden gönder
+              </button>
+            }
+          </div>
+        }
+      </div>
     }
 
     <button type="submit" [disabled]="submitting()" class="auth-cta">

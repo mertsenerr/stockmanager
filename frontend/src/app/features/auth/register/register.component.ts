@@ -62,8 +62,9 @@ export class RegisterComponent {
       this.auth.registerSayimBaskani(this.baskaniForm.getRawValue()).subscribe({
         next: () => {
           this.submitting.set(false);
-          this.successMessage.set('Kayıt tamamlandı. Giriş sayfasına yönlendiriliyorsun…');
-          setTimeout(() => this.router.navigateByUrl('/login'), 1500);
+          this.successMessage.set(
+            'Kayıt alındı. Doğrulama bağlantısını e-posta adresine gönderdik — giriş yapmadan önce e-postanı doğrulaman gerekiyor.',
+          );
         },
         error: (err: HttpErrorResponse) => this.handleError(err),
       });
@@ -76,7 +77,9 @@ export class RegisterComponent {
       this.auth.registerKullanici(this.kullaniciForm.getRawValue()).subscribe({
         next: () => {
           this.submitting.set(false);
-          this.successMessage.set('Kayıt alındı. Sayım Başkanı onayından sonra giriş yapabilirsin.');
+          this.successMessage.set(
+            'Kayıt alındı. Doğrulama bağlantısını e-postana gönderdik. Sayım Başkanının onayından sonra giriş yapabilirsin.',
+          );
         },
         error: (err: HttpErrorResponse) => this.handleError(err),
       });

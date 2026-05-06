@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using MongoDB.Driver;
 using SayimLink.Api.Controllers;
 using SayimLink.Api.Dtos.Sayim;
 using SayimLink.Api.Models;
@@ -155,7 +156,29 @@ public sealed class SayimHub : Hub<ISayimHubClient>
         urun.SonGuncelleyenId = UserId;
         urun.GuncellenmeTarihi = DateTime.UtcNow;
         oturum.Ozetler = SayimOturumu.ComputeOzet(oturum.Urunler);
-        await _oturumlar.ReplaceAsync(oturum, Context.ConnectionAborted);
+
+        // H-6: positional update — write only the changed Urun fields + Ozetler instead of
+        // ReplaceAsync(oturum), which would rewrite the entire (potentially multi-MB) doc.
+        // The ElemMatch in UpdateUrunAsync's filter binds the `$` to the matched product.
+        var ub = Builders<SayimOturumu>.Update;
+        var ops = new List<UpdateDefinition<SayimOturumu>>
+        {
+            ub.Set(o => o.Urunler[-1].SonGuncelleyenId, urun.SonGuncelleyenId),
+            ub.Set(o => o.Urunler[-1].GuncellenmeTarihi, urun.GuncellenmeTarihi),
+            ub.Set(o => o.Ozetler, oturum.Ozetler),
+        };
+        if (sayilanStok.HasValue)
+            ops.Add(ub.Set(o => o.Urunler[-1].SayilanStok, urun.SayilanStok));
+        if (!string.IsNullOrEmpty(durum))
+            ops.Add(ub.Set(o => o.Urunler[-1].Durum, urun.Durum));
+        if (atananSaymanId is not null)
+            ops.Add(ub.Set(o => o.Urunler[-1].AtananSaymanId, urun.AtananSaymanId));
+        if (changes.Count > 0)
+            ops.Add(ub.PushEach(o => o.Urunler[-1].DegisiklikGecmisi, changes));
+        if (yorumEklenen is not null)
+            ops.Add(ub.Push(o => o.Urunler[-1].Yorumlar, yorumEklenen));
+
+        await _oturumlar.UpdateUrunAsync(oturumId, urunId, ub.Combine(ops), Context.ConnectionAborted);
 
         // Release any held cell lock for this user/urun (best-effort).
         if (sayilanStok.HasValue) _locks.Release(oturumId, urunId, "sayilanStok", UserId);
@@ -222,8 +245,12 @@ public sealed class SayimHub : Hub<ISayimHubClient>
             YeniDeger = yeniDeger.ToString(CultureInfo.InvariantCulture),
             Gerekce = string.IsNullOrWhiteSpace(gerekce) ? null : gerekce.Trim(),
         };
+
+        // H-6: positional Push instead of ReplaceAsync — append the new request without
+        // rewriting the whole oturum document.
+        var pushTalep = Builders<SayimOturumu>.Update.Push(o => o.Urunler[-1].Talepler, talep);
+        await _oturumlar.UpdateUrunAsync(oturumId, urunId, pushTalep, Context.ConnectionAborted);
         urun.Talepler.Add(talep);
-        await _oturumlar.ReplaceAsync(oturum, Context.ConnectionAborted);
 
         _audit.Enqueue(_audit.Build(
             AuditAksiyonlari.TalepCreate, UserId, UserAd, UserRol,

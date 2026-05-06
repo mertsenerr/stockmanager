@@ -22,6 +22,8 @@ public sealed class AuthController : ControllerBase
     private readonly IValidator<ResetPasswordRequest> _resetValidator;
     private readonly IValidator<RegisterSayimBaskaniRequest> _registerBaskaniValidator;
     private readonly IValidator<RegisterKullaniciRequest> _registerKullaniciValidator;
+    private readonly IValidator<VerifyEmailRequest> _verifyEmailValidator;
+    private readonly IValidator<ResendVerificationRequest> _resendVerificationValidator;
 
     public AuthController(
         IAuthService auth,
@@ -30,7 +32,9 @@ public sealed class AuthController : ControllerBase
         IValidator<ForgotPasswordRequest> forgotValidator,
         IValidator<ResetPasswordRequest> resetValidator,
         IValidator<RegisterSayimBaskaniRequest> registerBaskaniValidator,
-        IValidator<RegisterKullaniciRequest> registerKullaniciValidator)
+        IValidator<RegisterKullaniciRequest> registerKullaniciValidator,
+        IValidator<VerifyEmailRequest> verifyEmailValidator,
+        IValidator<ResendVerificationRequest> resendVerificationValidator)
     {
         _auth = auth;
         _audit = audit;
@@ -39,6 +43,8 @@ public sealed class AuthController : ControllerBase
         _resetValidator = resetValidator;
         _registerBaskaniValidator = registerBaskaniValidator;
         _registerKullaniciValidator = registerKullaniciValidator;
+        _verifyEmailValidator = verifyEmailValidator;
+        _resendVerificationValidator = resendVerificationValidator;
     }
 
     [HttpPost("register/sayim-baskani")]
@@ -100,7 +106,18 @@ public sealed class AuthController : ControllerBase
                 AuditAksiyonlari.LoginFail,
                 kullaniciId: null, kullaniciAdi: request.Email, rol: null,
                 hedef: "auth", ip: GetIp(), userAgent: GetUserAgent(), basarili: false));
-            return Unauthorized(new { message = result.FailureReason ?? "Giriş başarısız." });
+
+            var body = new
+            {
+                message = result.FailureReason ?? "Giriş başarısız.",
+                code = result.FailureCode ?? AuthFailureCodes.InvalidCredentials,
+            };
+            // EMAIL_NOT_VERIFIED and NOT_APPROVED are state-of-account problems, not auth
+            // failures — return 403 so the frontend can branch on a state UI ("verify
+            // your email", "waiting for approval") rather than the generic 401 path.
+            return result.FailureCode is AuthFailureCodes.EmailNotVerified or AuthFailureCodes.NotApproved
+                ? StatusCode(StatusCodes.Status403Forbidden, body)
+                : Unauthorized(body);
         }
 
         SetRefreshCookie(result.RefreshTokenPlaintext, result.RefreshTokenExpiresAt!.Value);
@@ -173,6 +190,34 @@ public sealed class AuthController : ControllerBase
 
         await _auth.RequestPasswordResetAsync(request.Email, ct);
         return Ok(new { message = "Eğer adres kayıtlıysa sıfırlama linki gönderildi." });
+    }
+
+    [HttpPost("verify-email")]
+    [EnableRateLimiting("auth-strict")]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request, CancellationToken ct)
+    {
+        var validation = await _verifyEmailValidator.ValidateAsync(request, ct);
+        if (!validation.IsValid)
+            return ValidationProblem(validation);
+
+        var ok = await _auth.VerifyEmailAsync(request.Token, ct);
+        return ok
+            ? Ok(new { message = "E-posta doğrulandı. Giriş yapabilirsiniz." })
+            : BadRequest(new { message = "Doğrulama bağlantısı geçersiz veya süresi dolmuş." });
+    }
+
+    [HttpPost("resend-verification")]
+    [EnableRateLimiting("auth-strict")]
+    public async Task<IActionResult> ResendVerification(
+        [FromBody] ResendVerificationRequest request, CancellationToken ct)
+    {
+        var validation = await _resendVerificationValidator.ValidateAsync(request, ct);
+        if (!validation.IsValid)
+            return ValidationProblem(validation);
+
+        await _auth.RequestEmailVerificationAsync(request.Email, ct);
+        // Generic response — never reveal whether the email exists or has already been verified.
+        return Ok(new { message = "Eğer adres kayıtlıysa ve doğrulanmamışsa yeni bir bağlantı gönderildi." });
     }
 
     [HttpPost("reset-password")]

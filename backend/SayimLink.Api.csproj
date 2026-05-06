@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -8,6 +8,7 @@
     <!-- 1591: missing XML comment for publicly visible type/member.
          We don't require docstrings on every controller action. -->
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <UserSecretsId>0a4cb36d-1cd2-4285-86f7-14226657d69b</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

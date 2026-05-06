@@ -49,7 +49,9 @@ sayim-link/
 # Backend
 cd backend
 cp appsettings.Example.json appsettings.Development.json
-# appsettings.Development.json içindeki MongoDB ve JWT alanlarını doldur
+# appsettings.Development.json sadece NON-secret ayarları içerir.
+# Sırlar (MongoDb__ConnectionString, Jwt__Secret) için "Local Development Setup"
+# bölümüne bak.
 dotnet restore
 dotnet run
 
@@ -60,6 +62,32 @@ npm start
 ```
 
 Frontend `http://localhost:4200`, backend `http://localhost:5080` üzerinde ayağa kalkar. Bağlantı kontrolü: `GET /api/health`.
+
+### Local Development Setup — Sırlar (Secrets)
+
+Backend, geliştirme sırlarını **`appsettings.Development.json` içinde değil**, .NET'in `dotnet user-secrets` mekanizmasında saklar. Bu sayede sırlar disk üzerinde repo dışında, kullanıcı profilinde tutulur ve yanlışlıkla commit edilmeleri imkânsızlaşır.
+
+İlk kurulumda (her makinede bir kez):
+
+```bash
+cd backend
+
+# Lokal bir Mongo veya Atlas bağlantı dizesi
+dotnet user-secrets set "MongoDb:ConnectionString" "mongodb://localhost:27017"
+
+# JWT için yüksek entropili bir secret üret (en az 32 karakter)
+dotnet user-secrets set "Jwt:Secret" "$(openssl rand -base64 48)"
+
+# (opsiyonel) Resend API key — yoksa parola sıfırlama linki dev modda log'a düşer
+dotnet user-secrets set "Resend:ApiKey" "re_xxxxxxxxxxxxx"
+```
+
+Mevcut sırları görmek için: `dotnet user-secrets list`.
+Sırları silmek için: `dotnet user-secrets clear`.
+
+Sırlar Windows'ta `%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json`, macOS/Linux'ta `~/.microsoft/usersecrets/<UserSecretsId>/secrets.json` dosyasında tutulur.
+
+> **Production'da `dotnet user-secrets` kullanılmaz.** Render env var'ları (`MongoDb__ConnectionString`, `Jwt__Secret`, `Resend__ApiKey`, …) override eder. Detay için `deployment.md`.
 
 ### Geliştirme Fazları
 

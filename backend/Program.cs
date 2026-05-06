@@ -156,6 +156,31 @@ if (string.IsNullOrWhiteSpace(jwtSettings.Secret) || jwtSettings.Secret.Length <
         "(e.g. `openssl rand -base64 48`). Refusing to start.");
 }
 
+// ─── Resend / outbound email — fail-fast in production ───────────────────────
+// Dev path is allowed to run without Resend configured; ResendEmailService
+// short-circuits and logs the reset link instead of calling the API.
+var resendSettings = builder.Configuration
+    .GetSection(ResendSettings.SectionName).Get<ResendSettings>() ?? new ResendSettings();
+
+if (!builder.Environment.IsDevelopment())
+{
+    if (string.IsNullOrWhiteSpace(resendSettings.ApiKey))
+        throw new InvalidOperationException(
+            "Resend:ApiKey is missing. Set Resend__ApiKey env var. Refusing to start.");
+
+    if (string.IsNullOrWhiteSpace(resendSettings.FromEmail) || !resendSettings.FromEmail.Contains('@'))
+        throw new InvalidOperationException(
+            "Resend:FromEmail must be a valid address on a Resend-verified domain. " +
+            "Set Resend__FromEmail env var. Refusing to start.");
+
+    if (string.IsNullOrWhiteSpace(resendSettings.PasswordResetUrlTemplate)
+        || !resendSettings.PasswordResetUrlTemplate.Contains("{token}"))
+        throw new InvalidOperationException(
+            "Resend:PasswordResetUrlTemplate must include the literal '{token}' placeholder " +
+            "(e.g. https://syncompare.com/reset-password?token={token}). " +
+            "Set Resend__PasswordResetUrlTemplate env var. Refusing to start.");
+}
+
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

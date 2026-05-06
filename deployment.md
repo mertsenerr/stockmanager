@@ -65,10 +65,13 @@
 | `Cors__AllowedOrigins__0` | `https://<netlify-site>.netlify.app` | hayır |
 | `Cors__AllowedOrigins__1` | `https://<custom-domain>` (varsa) | hayır |
 | `Resend__ApiKey` | `re_xxxxxxxxxxxxxxx` | **evet** |
-| `Resend__FromAddress` | `noreply@yourdomain.com` | hayır |
+| `Resend__FromEmail` | `noreply@syncompare.com` (Resend'de doğrulanmış domain üzerinde olmalı) | hayır |
 | `Resend__FromName` | `SayımLink` | hayır |
-| `Seed__AdminEmail` | `admin@sayimlink.local` | hayır |
+| `Resend__PasswordResetUrlTemplate` | `https://syncompare.com/reset-password?token={token}` (literal `{token}` placeholder) | hayır |
+| `Seed__AdminEmail` | `admin@syncompare.com` | hayır |
 | `Seed__AdminPassword` | (güçlü) | **evet** |
+
+> **Önceki sürümlerde yanlışlıkla `Resend__FromAddress` olarak belgelenmişti — kod karşılığı yoktur.** `ResendSettings.FromEmail` propertysi `Resend__FromEmail` env var'ı ile bağlanır. Stale bir `Resend__FromAddress` env var'ı varsa Render dashboard'dan sil.
 
 > `PORT` Render tarafından otomatik enjekte edilir — manuel ekleme.
 

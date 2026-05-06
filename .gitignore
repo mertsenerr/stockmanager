@@ -20,11 +20,39 @@ yarn-error.log*
 
 # ─── Secrets / local config ──────────────────────────────────────────────────
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 backend/appsettings.Development.json
 backend/appsettings.Production.json
+backend/appsettings.*.Local.json
 backend/.env
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Certificates / private keys / credential blobs
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+**/secrets.json
+**/secrets/
+**/credentials.json
+**/serviceAccountKey.json
+**/firebase-adminsdk-*.json
+.aws/
+.ssh/
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
 
 # ─── .NET ────────────────────────────────────────────────────────────────────
 bin/

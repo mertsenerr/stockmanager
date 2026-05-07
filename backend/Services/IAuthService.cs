@@ -110,10 +110,16 @@ public sealed class AuthService : IAuthService
         var kisaltma = request.FirmaKisaltmasi.Trim().ToUpperInvariant();
         var ad = request.FirmaAdi.Trim();
 
+        // Phase 2.5: firma name + kisaltma uniqueness no longer enforced. Each SayimBaskani
+        // register creates their own personal Firma — duplicates of name/kisaltma are
+        // expected and allowed. We surface them in logs to make the registration pattern
+        // visible without blocking the user.
         if (await _firmalar.AdExistsAsync(ad, null, ct))
-            return new RegisterResult(false, "Bu firma adı zaten kullanılıyor.", null);
+            _logger.LogWarning(
+                "SayimBaskani register: firma name '{Ad}' already in use — creating duplicate per personal tenancy", ad);
         if (await _firmalar.KisaltmaExistsAsync(kisaltma, null, ct))
-            return new RegisterResult(false, "Bu kısaltma zaten kullanılıyor.", null);
+            _logger.LogWarning(
+                "SayimBaskani register: kisaltma '{Kisaltma}' already in use — creating duplicate per personal tenancy", kisaltma);
 
         var firma = new Firma
         {

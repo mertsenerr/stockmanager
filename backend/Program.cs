@@ -55,6 +55,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddHostedService<AdminSeederHostedService>();
 builder.Services.AddHostedService<Phase2MigrationHostedService>();
+builder.Services.AddHostedService<Phase2_5MigrationHostedService>();
 builder.Services.AddHostedService<CellLockSweeperService>();
 builder.Services.AddHostedService<AuditWriterService>();
 

@@ -12,6 +12,7 @@ namespace SayimLink.Api.Controllers;
 public sealed class KullanicilarController : AdminControllerBase
 {
     private readonly IUserRepository _users;
+    private readonly IFirmaRepository _firmalar;
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IPasswordHasher _hasher;
     private readonly IAuditService _audit;
@@ -20,6 +21,7 @@ public sealed class KullanicilarController : AdminControllerBase
 
     public KullanicilarController(
         IUserRepository users,
+        IFirmaRepository firmalar,
         IRefreshTokenRepository refreshTokens,
         IPasswordHasher hasher,
         IAuditService audit,
@@ -27,6 +29,7 @@ public sealed class KullanicilarController : AdminControllerBase
         IValidator<KullaniciUpdateRequest> updateValidator)
     {
         _users = users;
+        _firmalar = firmalar;
         _refreshTokens = refreshTokens;
         _hasher = hasher;
         _audit = audit;
@@ -38,8 +41,9 @@ public sealed class KullanicilarController : AdminControllerBase
     public async Task<IActionResult> List([FromQuery] bool includeInactive, CancellationToken ct)
     {
         var users = await _users.ListAsync(includeInactive, ct);
-        // C-1: SayimBaskani only sees users with the same FirmaId; Sistem sees all.
-        var scoped = ScopeToCallerFirma(users);
+        // Phase 2.5: caller sees themselves + every user attached to a Firma the caller owns.
+        // Sistem keeps full visibility.
+        var scoped = await ScopeToCallerOwnedFirmasAsync(users, ct);
         return Ok(scoped.Select(ToListDto));
     }
 
@@ -48,23 +52,40 @@ public sealed class KullanicilarController : AdminControllerBase
     {
         var user = await _users.FindByIdAsync(id, ct);
         if (user is null) return NotFound();
-        // C-1: SayimBaskani may only fetch users in the same FirmaId.
-        if (!User.IsSistem())
-        {
-            var firmaId = User.GetFirmaId();
-            if (string.IsNullOrEmpty(firmaId) || user.FirmaId != firmaId) return Forbid();
-        }
+        if (User.IsSistem()) return Ok(ToListDto(user));
+
+        // Phase 2.5: self-fetch always allowed; otherwise the target user must live in a
+        // Firma the caller owns.
+        var uid = User.GetUserId();
+        if (uid is null) return Forbid();
+        if (user.Id == uid) return Ok(ToListDto(user));
+
+        var ownedFirmaIds = await GetCallerOwnedFirmaIdsAsync(uid, ct);
+        if (string.IsNullOrEmpty(user.FirmaId) || !ownedFirmaIds.Contains(user.FirmaId))
+            return Forbid();
+
         return Ok(ToListDto(user));
     }
 
-    // C-1 helper: returns the original list for Sistem, otherwise filters to users
-    // in the caller's firma (via primary FirmaId or legacy FirmaIds list).
-    private IEnumerable<User> ScopeToCallerFirma(IEnumerable<User> users)
+    // Phase 2.5 scoping helper — replaces the C-1 same-FirmaId filter.
+    // "Users I see" = me + every active user attached to an organizasyon Firma I own.
+    private async Task<IEnumerable<User>> ScopeToCallerOwnedFirmasAsync(
+        IEnumerable<User> users, CancellationToken ct)
     {
         if (User.IsSistem()) return users;
-        var firmaId = User.GetFirmaId();
-        if (string.IsNullOrEmpty(firmaId)) return Array.Empty<User>();
-        return users.Where(u => u.FirmaId == firmaId || u.FirmaIds.Contains(firmaId));
+        var uid = User.GetUserId();
+        if (string.IsNullOrEmpty(uid)) return Array.Empty<User>();
+
+        var ownedFirmaIds = await GetCallerOwnedFirmaIdsAsync(uid, ct);
+        return users.Where(u =>
+            u.Id == uid ||
+            (!string.IsNullOrEmpty(u.FirmaId) && ownedFirmaIds.Contains(u.FirmaId)));
+    }
+
+    private async Task<HashSet<string>> GetCallerOwnedFirmaIdsAsync(string uid, CancellationToken ct)
+    {
+        var firmas = await _firmalar.ListOwnedOrgFirmasByAsync(uid, ct);
+        return firmas.Select(f => f.Id).ToHashSet();
     }
 
     [HttpPost]
@@ -139,17 +160,27 @@ public sealed class KullanicilarController : AdminControllerBase
     [HttpGet("pending")]
     public async Task<IActionResult> ListPending(CancellationToken ct)
     {
-        // C-1: same scope rule as List — Sistem sees everyone, SayimBaskani sees only their firma.
+        // Phase 2.5: same scope rule as List — Sistem sees everyone awaiting approval;
+        // SayimBaskani sees only pending users attached to a Firma they own.
         if (User.IsSistem())
         {
             var all = await _users.ListAsync(includeInactive: false, ct);
             return Ok(all.Where(u => !u.Onayli).Select(ToListDto));
         }
 
-        var firmaId = User.GetFirmaId();
-        if (string.IsNullOrEmpty(firmaId))
+        var uid = User.GetUserId();
+        if (string.IsNullOrEmpty(uid))
             return Ok(Array.Empty<KullaniciListDto>());
-        var pending = await _users.ListPendingForFirmaAsync(firmaId, ct);
+
+        var ownedFirmaIds = await GetCallerOwnedFirmaIdsAsync(uid, ct);
+        if (ownedFirmaIds.Count == 0)
+            return Ok(Array.Empty<KullaniciListDto>());
+
+        var allActive = await _users.ListAsync(includeInactive: false, ct);
+        var pending = allActive.Where(u =>
+            !u.Onayli
+            && !string.IsNullOrEmpty(u.FirmaId)
+            && ownedFirmaIds.Contains(u.FirmaId));
         return Ok(pending.Select(ToListDto));
     }
 

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SayimLink.Api.Common;
 using SayimLink.Api.Dtos.Admin;
 using SayimLink.Api.Models;
 using SayimLink.Api.Repositories;
@@ -37,6 +38,13 @@ public sealed class FirmalarController : ControllerBase
     public async Task<IActionResult> List([FromQuery] bool includeInactive, CancellationToken ct)
     {
         var firmalar = await _firmalar.ListAsync(includeInactive, ct);
+        // Phase 3: SayimBaskani only sees firmas they created. Sistem keeps full visibility.
+        if (!User.IsSistem())
+        {
+            var uid = User.GetUserId();
+            if (string.IsNullOrEmpty(uid)) return Ok(Array.Empty<FirmaDto>());
+            firmalar = firmalar.Where(f => f.OlusturanKullaniciId == uid).ToList();
+        }
         return Ok(firmalar.Select(ToDto));
     }
 
@@ -44,7 +52,10 @@ public sealed class FirmalarController : ControllerBase
     public async Task<IActionResult> Get(string id, CancellationToken ct)
     {
         var firma = await _firmalar.FindByIdAsync(id, ct);
-        return firma is null ? NotFound() : Ok(ToDto(firma));
+        if (firma is null) return NotFound();
+        // Phase 3: non-Sistem must own the firma.
+        if (!User.IsSistem() && firma.OlusturanKullaniciId != User.GetUserId()) return Forbid();
+        return Ok(ToDto(firma));
     }
 
     [HttpPost]
@@ -85,6 +96,8 @@ public sealed class FirmalarController : ControllerBase
 
         var firma = await _firmalar.FindByIdAsync(id, ct);
         if (firma is null) return NotFound();
+        // Phase 3: non-Sistem may only update firmas they created.
+        if (!User.IsSistem() && firma.OlusturanKullaniciId != User.GetUserId()) return Forbid();
 
         if (!string.Equals(firma.Ad, request.Ad, StringComparison.OrdinalIgnoreCase)
             && await _firmalar.AdExistsAsync(request.Ad, id, ct))
@@ -114,6 +127,8 @@ public sealed class FirmalarController : ControllerBase
     {
         var firma = await _firmalar.FindByIdAsync(id, ct);
         if (firma is null) return NotFound();
+        // Phase 3: non-Sistem may only delete firmas they created.
+        if (!User.IsSistem() && firma.OlusturanKullaniciId != User.GetUserId()) return Forbid();
 
         if (await _magazalar.AnyForFirmaAsync(id, ct))
             return Conflict(new { message = "Firmaya bağlı aktif mağazalar var. Önce mağazaları silin." });

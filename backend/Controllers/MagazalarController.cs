@@ -131,6 +131,8 @@ public sealed class MagazalarController : ControllerBase
 
         var magaza = await _magazalar.FindByIdAsync(id, ct);
         if (magaza is null) return NotFound();
+        // Phase 3: non-Sistem may only update magazas they created.
+        if (!User.IsSistem() && magaza.OlusturanKullaniciId != User.GetUserId()) return Forbid();
 
         var oldMudurId = magaza.MuduruKullaniciId;
 
@@ -164,6 +166,8 @@ public sealed class MagazalarController : ControllerBase
     {
         var magaza = await _magazalar.FindByIdAsync(id, ct);
         if (magaza is null) return NotFound();
+        // Phase 3: non-Sistem may only delete magazas they created.
+        if (!User.IsSistem() && magaza.OlusturanKullaniciId != User.GetUserId()) return Forbid();
 
         await _magazalar.SoftDeleteAsync(id, ct);
         if (!string.IsNullOrEmpty(magaza.MuduruKullaniciId))

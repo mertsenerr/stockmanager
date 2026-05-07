@@ -17,6 +17,11 @@ public interface IFirmaRepository
     Task InsertAsync(Firma firma, CancellationToken ct = default);
     Task ReplaceAsync(Firma firma, CancellationToken ct = default);
     Task SoftDeleteAsync(string id, CancellationToken ct = default);
+    /// <summary>
+    /// Phase 2.5: returns active organizasyon Firmas the given user owns (created).
+    /// Used to scope per-user visibility under the personal-tenancy model.
+    /// </summary>
+    Task<IReadOnlyList<Firma>> ListOwnedOrgFirmasByAsync(string ownerUserId, CancellationToken ct = default);
 }
 
 public sealed class FirmaRepository : IFirmaRepository
@@ -27,46 +32,11 @@ public sealed class FirmaRepository : IFirmaRepository
     {
         _firmalar = mongo.Database.GetCollection<Firma>("firmalar");
 
-        // Eski hard-unique indexleri drop et (varsa) — silinmiş kayıtlar yeni kayıtla çakışıyordu.
-        TryDropIndex("ix_firmalar_ad_unique");
-        TryDropIndex("ix_firmalar_kisaltma_unique");
-
-        // Yeni partial unique indexler — sadece aktif kayıtlar arasında benzersizlik.
-        var activeFilter = Builders<Firma>.Filter.Eq(f => f.AktifMi, true);
-
-        try
-        {
-            _firmalar.Indexes.CreateOne(new CreateIndexModel<Firma>(
-                Builders<Firma>.IndexKeys.Ascending(f => f.Ad),
-                new CreateIndexOptions<Firma>
-                {
-                    Unique = true,
-                    Name = "ix_firmalar_ad_unique_active",
-                    PartialFilterExpression = activeFilter,
-                }));
-        }
-        catch { /* mevcut çakışan veride bile servis ayağa kalksın */ }
-
-        try
-        {
-            _firmalar.Indexes.CreateOne(new CreateIndexModel<Firma>(
-                Builders<Firma>.IndexKeys.Ascending(f => f.Kisaltma),
-                new CreateIndexOptions<Firma>
-                {
-                    Unique = true,
-                    Name = "ix_firmalar_kisaltma_unique_active",
-                    PartialFilterExpression = Builders<Firma>.Filter.And(
-                        activeFilter,
-                        Builders<Firma>.Filter.Ne(f => f.Kisaltma, string.Empty)),
-                }));
-        }
-        catch { /* mevcut çakışan veride bile servis ayağa kalksın */ }
-    }
-
-    private void TryDropIndex(string name)
-    {
-        try { _firmalar.Indexes.DropOne(name); }
-        catch { /* yoksa yoksay */ }
+        // Phase 2.5: index management moved to Phase2_5MigrationHostedService.
+        // Under personal tenancy, FirmaAdi/Kisaltma duplicates are allowed, so the
+        // formerly-unique partial indexes are dropped and replaced with non-unique
+        // versions in the migration. The repository constructor no longer touches
+        // indexes — single source of truth lives in the hosted service.
     }
 
     public Task<Firma?> FindByKisaltmaAsync(string kisaltma, CancellationToken ct = default) =>
@@ -118,5 +88,14 @@ public sealed class FirmaRepository : IFirmaRepository
         // Firma silme akışı kalıcıdır: aynı ad/kısaltmayla yeniden oluşturulabilsin diye DB'den tamamen kaldırılır.
         // Geçmiş sayım oturumları FirmaId referansı taşır; organizasyon firmaları (OrganizasyonMu=true) bu listeye gelmez.
         await _firmalar.DeleteOneAsync(f => f.Id == id, ct);
+    }
+
+    public async Task<IReadOnlyList<Firma>> ListOwnedOrgFirmasByAsync(string ownerUserId, CancellationToken ct = default)
+    {
+        var filter = Builders<Firma>.Filter.And(
+            Builders<Firma>.Filter.Eq(f => f.OlusturanKullaniciId, ownerUserId),
+            Builders<Firma>.Filter.Eq(f => f.OrganizasyonMu, true),
+            Builders<Firma>.Filter.Eq(f => f.AktifMi, true));
+        return await _firmalar.Find(filter).ToListAsync(ct);
     }
 }

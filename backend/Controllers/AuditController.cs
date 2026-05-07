@@ -15,11 +15,13 @@ public sealed class AuditController : ControllerBase
 {
     private readonly IAuditLogRepository _logs;
     private readonly IUserRepository _users;
+    private readonly IFirmaRepository _firmalar;
 
-    public AuditController(IAuditLogRepository logs, IUserRepository users)
+    public AuditController(IAuditLogRepository logs, IUserRepository users, IFirmaRepository firmalar)
     {
         _logs = logs;
         _users = users;
+        _firmalar = firmalar;
     }
 
     [HttpGet]
@@ -35,22 +37,25 @@ public sealed class AuditController : ControllerBase
         if (take is < 1 or > 200) take = 50;
         if (skip < 0) skip = 0;
 
-        // C-1: SayimBaskani sees only audit rows whose KullaniciId belongs to a user in the
-        // same firma. We resolve the allow-set up front (one users.ListAsync) and pass either
-        // the requested kullaniciId (verified against the set) or no filter (then post-filter).
-        // Sistem keeps the unrestricted view.
+        // Phase 2.5: SayimBaskani sees only logs for themselves + users attached to a Firma
+        // they own. Sistem keeps the unrestricted view.
         HashSet<string>? allowedUserIds = null;
         if (!User.IsSistem())
         {
-            var firmaId = User.GetFirmaId();
-            if (string.IsNullOrEmpty(firmaId))
+            var uid = User.GetUserId();
+            if (string.IsNullOrEmpty(uid))
                 return Ok(EmptyPage(skip, take));
 
+            var ownedFirmas = await _firmalar.ListOwnedOrgFirmasByAsync(uid, ct);
+            var ownedFirmaIds = ownedFirmas.Select(f => f.Id).ToHashSet();
+
             var all = await _users.ListAsync(includeInactive: true, ct);
-            allowedUserIds = all
-                .Where(u => u.FirmaId == firmaId || u.FirmaIds.Contains(firmaId))
-                .Select(u => u.Id)
-                .ToHashSet();
+            allowedUserIds = new HashSet<string> { uid };
+            foreach (var u in all)
+            {
+                if (!string.IsNullOrEmpty(u.FirmaId) && ownedFirmaIds.Contains(u.FirmaId))
+                    allowedUserIds.Add(u.Id);
+            }
 
             if (!string.IsNullOrEmpty(kullaniciId) && !allowedUserIds.Contains(kullaniciId))
                 return Ok(EmptyPage(skip, take));

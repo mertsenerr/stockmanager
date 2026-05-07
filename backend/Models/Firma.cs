@@ -52,4 +52,12 @@ public sealed class Firma
 
     [BsonRepresentation(BsonType.ObjectId)]
     public string? OlusturanKullaniciId { get; set; }
+
+    /// <summary>
+    /// Phase 2.5: when set, this Firma is one of N personal Firmas split out from a previously
+    /// shared organizasyon Firma. Points to the original Firma.Id. Acts as an idempotence
+    /// marker for the split migration — already-split Firmas are skipped on re-run.
+    /// </summary>
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string? SplitFromOriginalId { get; set; }
 }

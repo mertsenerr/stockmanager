@@ -14,6 +14,15 @@ public interface IFirmaRepository
     Task<Firma?> FindByKisaltmaAsync(string kisaltma, CancellationToken ct = default);
     Task<bool> AdExistsAsync(string ad, string? excludeId, CancellationToken ct = default);
     Task<bool> KisaltmaExistsAsync(string kisaltma, string? excludeId, CancellationToken ct = default);
+    /// <summary>
+    /// Phase 3.1: owner-scoped uniqueness for client firma create/update. Two SayimBaskanis
+    /// independently auditing the same real-world brand (e.g. "LCW") can each keep their
+    /// own client firma record — duplicates only conflict within a single owner's catalog.
+    /// Filters out organizasyon firmas so an owner's personal org firma doesn't clash with
+    /// a client firma of the same name.
+    /// </summary>
+    Task<bool> AdExistsForOwnerAsync(string ad, string ownerUserId, string? excludeId, CancellationToken ct = default);
+    Task<bool> KisaltmaExistsForOwnerAsync(string kisaltma, string ownerUserId, string? excludeId, CancellationToken ct = default);
     Task InsertAsync(Firma firma, CancellationToken ct = default);
     Task ReplaceAsync(Firma firma, CancellationToken ct = default);
     Task SoftDeleteAsync(string id, CancellationToken ct = default);
@@ -97,5 +106,30 @@ public sealed class FirmaRepository : IFirmaRepository
             Builders<Firma>.Filter.Eq(f => f.OrganizasyonMu, true),
             Builders<Firma>.Filter.Eq(f => f.AktifMi, true));
         return await _firmalar.Find(filter).ToListAsync(ct);
+    }
+
+    public async Task<bool> AdExistsForOwnerAsync(
+        string ad, string ownerUserId, string? excludeId, CancellationToken ct = default)
+    {
+        var filter = Builders<Firma>.Filter.Eq(f => f.Ad, ad)
+                   & Builders<Firma>.Filter.Eq(f => f.AktifMi, true)
+                   & Builders<Firma>.Filter.Eq(f => f.OlusturanKullaniciId, ownerUserId)
+                   & Builders<Firma>.Filter.Ne(f => f.OrganizasyonMu, true);
+        if (!string.IsNullOrEmpty(excludeId))
+            filter &= Builders<Firma>.Filter.Ne(f => f.Id, excludeId);
+        return await _firmalar.Find(filter).AnyAsync(ct);
+    }
+
+    public async Task<bool> KisaltmaExistsForOwnerAsync(
+        string kisaltma, string ownerUserId, string? excludeId, CancellationToken ct = default)
+    {
+        var k = kisaltma.ToUpperInvariant();
+        var filter = Builders<Firma>.Filter.Eq(f => f.Kisaltma, k)
+                   & Builders<Firma>.Filter.Eq(f => f.AktifMi, true)
+                   & Builders<Firma>.Filter.Eq(f => f.OlusturanKullaniciId, ownerUserId)
+                   & Builders<Firma>.Filter.Ne(f => f.OrganizasyonMu, true);
+        if (!string.IsNullOrEmpty(excludeId))
+            filter &= Builders<Firma>.Filter.Ne(f => f.Id, excludeId);
+        return await _firmalar.Find(filter).AnyAsync(ct);
     }
 }

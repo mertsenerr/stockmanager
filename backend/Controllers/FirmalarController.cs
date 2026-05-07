@@ -65,13 +65,18 @@ public sealed class FirmalarController : ControllerBase
         var validation = await _validator.ValidateAsync(request, ct);
         if (!validation.IsValid) return ValidationFailure(validation);
 
-        if (await _firmalar.AdExistsAsync(request.Ad, null, ct))
-            return Conflict(new { message = "Bu ad ile bir firma zaten var." });
+        var uid = User.GetUserId();
+        if (string.IsNullOrEmpty(uid)) return Unauthorized();
+
+        // Phase 3.1: uniqueness scoped to caller's own catalog. Two SayimBaskanis can
+        // each keep their own client firma "LCW" — they audit it separately.
+        if (await _firmalar.AdExistsForOwnerAsync(request.Ad, uid, null, ct))
+            return Conflict(new { message = "Bu ad ile zaten bir firmanız var." });
 
         var kisaltma = string.IsNullOrWhiteSpace(request.Kisaltma)
             ? string.Empty : request.Kisaltma.Trim().ToUpperInvariant();
-        if (!string.IsNullOrEmpty(kisaltma) && await _firmalar.KisaltmaExistsAsync(kisaltma, null, ct))
-            return Conflict(new { message = "Bu kısaltma zaten kullanılıyor." });
+        if (!string.IsNullOrEmpty(kisaltma) && await _firmalar.KisaltmaExistsForOwnerAsync(kisaltma, uid, null, ct))
+            return Conflict(new { message = "Bu kısaltmayı zaten kullanıyorsunuz." });
 
         var firma = new Firma
         {
@@ -80,7 +85,7 @@ public sealed class FirmalarController : ControllerBase
             Tip = request.Tip,
             LogoUrl = request.LogoUrl,
             AktifMi = request.AktifMi,
-            OlusturanKullaniciId = CurrentUserId,
+            OlusturanKullaniciId = uid,
         };
         await _firmalar.InsertAsync(firma, ct);
         _audit.Log(User, AuditAksiyonlari.FirmaCreate, "firma", firma.Id, yeni: firma.Ad);
@@ -99,16 +104,22 @@ public sealed class FirmalarController : ControllerBase
         // Phase 3: non-Sistem may only update firmas they created.
         if (!User.IsSistem() && firma.OlusturanKullaniciId != User.GetUserId()) return Forbid();
 
+        // Phase 3.1: rename uniqueness check stays scoped to the caller's own catalog so
+        // a rename can't accidentally produce two same-named firmas under one owner, but
+        // can still collide with a different SayimBaskani's identically-named record.
+        var ownerForCheck = firma.OlusturanKullaniciId ?? string.Empty;
         if (!string.Equals(firma.Ad, request.Ad, StringComparison.OrdinalIgnoreCase)
-            && await _firmalar.AdExistsAsync(request.Ad, id, ct))
-            return Conflict(new { message = "Bu ad ile bir firma zaten var." });
+            && !string.IsNullOrEmpty(ownerForCheck)
+            && await _firmalar.AdExistsForOwnerAsync(request.Ad, ownerForCheck, id, ct))
+            return Conflict(new { message = "Bu ad ile zaten bir firmanız var." });
 
         var oldName = firma.Ad;
         var newKisaltma = string.IsNullOrWhiteSpace(request.Kisaltma)
             ? firma.Kisaltma : request.Kisaltma.Trim().ToUpperInvariant();
         if (!string.IsNullOrEmpty(newKisaltma) && newKisaltma != firma.Kisaltma
-            && await _firmalar.KisaltmaExistsAsync(newKisaltma, id, ct))
-            return Conflict(new { message = "Bu kısaltma zaten kullanılıyor." });
+            && !string.IsNullOrEmpty(ownerForCheck)
+            && await _firmalar.KisaltmaExistsForOwnerAsync(newKisaltma, ownerForCheck, id, ct))
+            return Conflict(new { message = "Bu kısaltmayı zaten kullanıyorsunuz." });
 
         firma.Ad = request.Ad.Trim();
         firma.Kisaltma = newKisaltma;

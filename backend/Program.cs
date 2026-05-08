@@ -213,9 +213,6 @@ builder.Services
         };
         // Allow JWT to come via the access_token query string for SignalR
         // (browser EventSource/WebSocket clients can't set Authorization headers).
-        // OnTokenValidated rejects tokens missing the `firmaId` claim (issued by code
-        // before the Phase 2 final deploy) — the frontend's 401 path then redirects
-        // to login, where the user gets a fresh token with the new shape.
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = ctx =>
@@ -224,19 +221,6 @@ builder.Services
                 var path = ctx.HttpContext.Request.Path;
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
                     ctx.Token = accessToken;
-                return Task.CompletedTask;
-            },
-            OnTokenValidated = ctx =>
-            {
-                var firmaId = ctx.Principal?.FindFirst("firmaId")?.Value;
-                var role = ctx.Principal?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
-                // Sistem (platform super-admin, seeded with no firma) may have an empty firmaId.
-                // Every other role must carry one — pre-Phase-2 tokens lacked the claim, so an
-                // empty value here means a stale token and the user must re-login.
-                if (string.IsNullOrEmpty(firmaId) && role != SayimLink.Api.Models.Roles.Sistem)
-                {
-                    ctx.Fail("Token missing firmaId claim — re-login required.");
-                }
                 return Task.CompletedTask;
             },
         };

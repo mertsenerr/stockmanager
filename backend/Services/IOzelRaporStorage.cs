@@ -28,12 +28,12 @@ public sealed class OzelRaporStorage : IOzelRaporStorage
     public OzelRaporStorage(IOptions<OzelRaporSettings> options, IHostEnvironment env)
     {
         _settings = options.Value;
-        var root = string.IsNullOrWhiteSpace(_settings.StorageRoot)
+        _root = string.IsNullOrWhiteSpace(_settings.StorageRoot)
             ? Path.Combine(env.ContentRootPath, "App_Data", "ozel-raporlar")
             : _settings.StorageRoot;
-        Directory.CreateDirectory(root);
-        _root = root;
     }
+
+    private void EnsureRoot() => Directory.CreateDirectory(_root);
 
     public long MaxFileSizeBytes => _settings.MaxFileSizeBytes;
 
@@ -53,6 +53,7 @@ public sealed class OzelRaporStorage : IOzelRaporStorage
     public async Task<string> SaveAsync(
         string raporId, string storageId, string originalFileName, Stream content, CancellationToken ct)
     {
+        EnsureRoot();
         var ext = Path.GetExtension(originalFileName).ToLowerInvariant();
         var storageName = storageId + ext;
         var folder = Path.Combine(_root, raporId);

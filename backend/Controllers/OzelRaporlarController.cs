@@ -58,11 +58,19 @@ public sealed class OzelRaporlarController : ControllerBase
             raporlar = await _repo.ListAccessibleByAsync(uid, ct);
         }
 
-        var olusturanIds = raporlar.Select(r => r.OlusturanKullaniciId).Distinct().ToList();
-        var olusturanlar = (await _users.ListByIdsAsync(olusturanIds, ct)).ToDictionary(u => u.Id);
+        var olusturanIds = raporlar
+            .Select(r => r.OlusturanKullaniciId)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Distinct()
+            .ToList();
+        var olusturanlar = olusturanIds.Count == 0
+            ? new Dictionary<string, User>()
+            : (await _users.ListByIdsAsync(olusturanIds, ct))
+                .GroupBy(u => u.Id)
+                .ToDictionary(g => g.Key, g => g.First());
 
         var isSistem = User.IsSistem();
-        return Ok(raporlar.Select(r => ToListDto(r, uid, isSistem, olusturanlar)));
+        return Ok(raporlar.Select(r => ToListDto(r, uid, isSistem, olusturanlar)).ToList());
     }
 
     [HttpGet("{id}")]

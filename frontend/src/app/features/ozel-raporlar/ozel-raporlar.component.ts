@@ -1,13 +1,13 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 import { ModalComponent } from '../../shared/ui/modal/modal.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header/page-header.component';
 import { ConfirmService } from '../../shared/ui/confirm/confirm.service';
 import { ToastService } from '../../shared/ui/toast/toast.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { KullaniciService } from '../admin/kullanici.service';
-import { KullaniciList } from '../admin/admin.models';
+import { ArkadasService, Friend } from '../arkadaslar/arkadas.service';
 import { OzelRaporService } from './ozel-rapor.service';
 import { OzelRapor, OzelRaporDosya } from './ozel-rapor.models';
 
@@ -17,14 +17,14 @@ const ALLOWED_EXT = ['.xlsx', '.xls', '.pdf'];
 @Component({
   selector: 'app-ozel-raporlar',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent, PageHeaderComponent],
+  imports: [ReactiveFormsModule, RouterLink, ModalComponent, PageHeaderComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ozel-raporlar.component.html',
 })
 export class OzelRaporlarComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly svc = inject(OzelRaporService);
-  private readonly kSvc = inject(KullaniciService);
+  private readonly arkadasSvc = inject(ArkadasService);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
@@ -46,13 +46,14 @@ export class OzelRaporlarComponent implements OnInit {
   readonly uploading = signal<string | null>(null);
   readonly downloadingId = signal<string | null>(null);
 
-  /** Raporlara erişim verilebilecek kendi kullanıcılarımız (yalnızca Kullanici rolündekiler). */
-  readonly availableUsers = signal<KullaniciList[]>([]);
+  /** Mevcut arkadaşlar (erişim verilebilecek havuz). */
+  readonly friends = signal<Friend[]>([]);
+  /** Modal'da seçilmiş arkadaş id'leri (User.Id). */
+  readonly selectedFriendIds = signal<string[]>([]);
+  readonly friendQuery = signal('');
 
   readonly form = this.fb.nonNullable.group({
     ad: ['', [Validators.required, Validators.maxLength(160)]],
-    aciklama: ['', [Validators.maxLength(2000)]],
-    erisebilenKullaniciIds: this.fb.nonNullable.control<string[]>([]),
   });
 
   readonly filtered = computed(() => {
@@ -62,11 +63,28 @@ export class OzelRaporlarComponent implements OnInit {
       : this.raporlar().filter((r) => r.ad.toLowerCase().includes(q));
   });
 
+  readonly selectedFriends = computed(() => {
+    const ids = new Set(this.selectedFriendIds());
+    return this.friends().filter((f) => ids.has(f.kullaniciId));
+  });
+
+  readonly suggestedFriends = computed(() => {
+    const q = this.friendQuery().toLowerCase().trim();
+    const selected = new Set(this.selectedFriendIds());
+    const pool = this.friends().filter((f) => !selected.has(f.kullaniciId));
+    if (q === '') return pool.slice(0, 8);
+    return pool
+      .filter((f) =>
+        f.adSoyad.toLowerCase().includes(q) || f.email.toLowerCase().includes(q),
+      )
+      .slice(0, 8);
+  });
+
   ngOnInit(): void {
     this.refresh();
     if (this.canManage()) {
-      this.kSvc.list(false).subscribe({
-        next: (r) => this.availableUsers.set(r.filter((u) => u.rol === 'Kullanici' && u.aktifMi)),
+      this.arkadasSvc.list().subscribe({
+        next: (r) => this.friends.set(r.arkadaslar),
         error: () => undefined,
       });
     }
@@ -83,18 +101,18 @@ export class OzelRaporlarComponent implements OnInit {
   openCreate(): void {
     this.editing.set(null);
     this.serverError.set(null);
-    this.form.reset({ ad: '', aciklama: '', erisebilenKullaniciIds: [] });
+    this.form.reset({ ad: '' });
+    this.selectedFriendIds.set([]);
+    this.friendQuery.set('');
     this.modalOpen.set(true);
   }
 
   openEdit(r: OzelRapor): void {
     this.editing.set(r);
     this.serverError.set(null);
-    this.form.reset({
-      ad: r.ad,
-      aciklama: r.aciklama ?? '',
-      erisebilenKullaniciIds: [...r.erisebilenKullaniciIds],
-    });
+    this.form.reset({ ad: r.ad });
+    this.selectedFriendIds.set([...r.erisebilenKullaniciIds]);
+    this.friendQuery.set('');
     this.modalOpen.set(true);
   }
 
@@ -102,15 +120,15 @@ export class OzelRaporlarComponent implements OnInit {
     this.modalOpen.set(false);
   }
 
-  toggleAccess(uid: string): void {
-    const cur = this.form.controls.erisebilenKullaniciIds.value;
-    this.form.controls.erisebilenKullaniciIds.setValue(
-      cur.includes(uid) ? cur.filter((x) => x !== uid) : [...cur, uid],
-    );
+  addFriend(f: Friend): void {
+    const cur = this.selectedFriendIds();
+    if (cur.includes(f.kullaniciId)) return;
+    this.selectedFriendIds.set([...cur, f.kullaniciId]);
+    this.friendQuery.set('');
   }
 
-  isChecked(uid: string): boolean {
-    return this.form.controls.erisebilenKullaniciIds.value.includes(uid);
+  removeFriend(uid: string): void {
+    this.selectedFriendIds.set(this.selectedFriendIds().filter((x) => x !== uid));
   }
 
   submit(): void {
@@ -123,8 +141,8 @@ export class OzelRaporlarComponent implements OnInit {
     const v = this.form.getRawValue();
     const payload = {
       ad: v.ad.trim(),
-      aciklama: v.aciklama?.trim() || null,
-      erisebilenKullaniciIds: v.erisebilenKullaniciIds,
+      aciklama: null,
+      erisebilenKullaniciIds: this.selectedFriendIds(),
     };
     const editing = this.editing();
     const op = editing ? this.svc.update(editing.id, payload) : this.svc.create(payload);
@@ -133,7 +151,6 @@ export class OzelRaporlarComponent implements OnInit {
         this.saving.set(false);
         this.modalOpen.set(false);
         this.toast.success(editing ? 'Rapor güncellendi.' : 'Rapor oluşturuldu.');
-        // Yeni oluşturulanı listeye ekle / güncelle
         const list = this.raporlar();
         if (editing) {
           this.raporlar.set(list.map((r) => (r.id === saved.id ? saved : r)));

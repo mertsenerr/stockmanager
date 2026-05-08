@@ -267,9 +267,9 @@ public sealed class OzelRaporlarController : ControllerBase
         User.IsSistem() || rapor.OlusturanKullaniciId == uid;
 
     /// <summary>
-    /// Erişim listesindeki id'leri SayımBaşkanı'nın kendi kapsamına filtreler:
-    /// yalnızca aynı oluşturan tarafından açılmış aktif Kullanici hesapları kabul edilir.
-    /// Sistem rolü için filtre uygulanmaz.
+    /// Erişim listesindeki id'leri sadeleştirir: yalnızca DB'de bulunan ve aktif olan
+    /// kullanıcılar kabul edilir. Frontend tarafı UI'da seçimi rapor sahibinin arkadaş
+    /// listesiyle sınırlıyor; bu metod ise temel sanity check (var-mı/aktif-mi) yapar.
     /// </summary>
     private async Task<List<string>> FilterAccessibleUserIdsAsync(
         string ownerUserId, IEnumerable<string> requested, CancellationToken ct)
@@ -278,12 +278,7 @@ public sealed class OzelRaporlarController : ControllerBase
         if (distinctIds.Count == 0) return [];
 
         var users = await _users.ListByIdsAsync(distinctIds, ct);
-        if (User.IsSistem()) return users.Select(u => u.Id).ToList();
-
-        return users
-            .Where(u => u.AktifMi && u.Rol == Roles.Kullanici)
-            .Select(u => u.Id)
-            .ToList();
+        return users.Where(u => u.AktifMi).Select(u => u.Id).ToList();
     }
 
     private static OzelRaporListDto ToListDto(

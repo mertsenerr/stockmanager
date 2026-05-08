@@ -9,6 +9,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { FirmaService } from '../../admin/firma.service';
 import { MagazaService } from '../../admin/magaza.service';
 import { Firma, Magaza } from '../../admin/admin.models';
+import { ArkadasService, Friend } from '../../arkadaslar/arkadas.service';
 import { OturumService } from '../oturum.service';
 import { OTURUM_DURUM_COLOR, OTURUM_DURUM_LABELS, OturumDurum, OturumList } from '../sayim.models';
 
@@ -24,6 +25,7 @@ export class OturumlarComponent implements OnInit {
   private readonly svc = inject(OturumService);
   private readonly fSvc = inject(FirmaService);
   private readonly mSvc = inject(MagazaService);
+  private readonly arkadasSvc = inject(ArkadasService);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
@@ -39,6 +41,27 @@ export class OturumlarComponent implements OnInit {
   readonly modalOpen = signal(false);
   readonly saving = signal(false);
   readonly serverError = signal<string | null>(null);
+
+  readonly friends = signal<Friend[]>([]);
+  readonly selectedKatilimciIds = signal<string[]>([]);
+  readonly katilimciQuery = signal('');
+
+  readonly selectedKatilimcilar = computed(() => {
+    const ids = new Set(this.selectedKatilimciIds());
+    return this.friends().filter((f) => ids.has(f.kullaniciId));
+  });
+
+  readonly suggestedKatilimcilar = computed(() => {
+    const q = this.katilimciQuery().toLowerCase().trim();
+    const selected = new Set(this.selectedKatilimciIds());
+    const pool = this.friends().filter((f) => !selected.has(f.kullaniciId));
+    if (q === '') return pool.slice(0, 8);
+    return pool
+      .filter((f) =>
+        f.adSoyad.toLowerCase().includes(q) || f.email.toLowerCase().includes(q),
+      )
+      .slice(0, 8);
+  });
 
   readonly canCreate = computed(() => {
     const u = this.auth.currentUser();
@@ -85,7 +108,22 @@ export class OturumlarComponent implements OnInit {
         next: (r) => this.magazalar.set(r),
         error: () => undefined,
       });
+      this.arkadasSvc.list().subscribe({
+        next: (r) => this.friends.set(r.arkadaslar),
+        error: () => undefined,
+      });
     }
+  }
+
+  addKatilimci(f: Friend): void {
+    const cur = this.selectedKatilimciIds();
+    if (cur.includes(f.kullaniciId)) return;
+    this.selectedKatilimciIds.set([...cur, f.kullaniciId]);
+    this.katilimciQuery.set('');
+  }
+
+  removeKatilimci(uid: string): void {
+    this.selectedKatilimciIds.set(this.selectedKatilimciIds().filter((x) => x !== uid));
   }
 
   refresh(): void {
@@ -104,6 +142,8 @@ export class OturumlarComponent implements OnInit {
   openCreate(): void {
     this.serverError.set(null);
     this.form.reset({ magazaId: '', tarih: this.todayYmd() });
+    this.selectedKatilimciIds.set([]);
+    this.katilimciQuery.set('');
     this.modalOpen.set(true);
   }
 
@@ -120,7 +160,10 @@ export class OturumlarComponent implements OnInit {
     this.svc.create({
       magazaId: v.magazaId,
       tarih: v.tarih,
-      katilimcilar: [],
+      katilimcilar: this.selectedKatilimciIds().map((id) => ({
+        kullaniciId: id,
+        rol: 'Kullanici',
+      })),
     }).subscribe({
       next: (created) => {
         this.saving.set(false);

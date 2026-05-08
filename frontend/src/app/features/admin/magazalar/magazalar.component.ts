@@ -21,8 +21,7 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { FirmaService } from '../firma.service';
 import { MagazaService } from '../magaza.service';
-import { KullaniciService } from '../kullanici.service';
-import { Firma, KullaniciList, Magaza } from '../admin.models';
+import { Firma, Magaza } from '../admin.models';
 
 type ViewMode = 'list' | 'map';
 
@@ -39,7 +38,6 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly mSvc = inject(MagazaService);
   private readonly fSvc = inject(FirmaService);
-  private readonly uSvc = inject(KullaniciService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
 
@@ -49,7 +47,6 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
 
   readonly magazalar = signal<Magaza[]>([]);
   readonly firmalar = signal<Firma[]>([]);
-  readonly mudurAdaylari = signal<KullaniciList[]>([]);
   readonly loading = signal(false);
   readonly query = signal('');
   readonly firmaFilter = signal<string>('');
@@ -67,9 +64,6 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
     sehir: ['', [Validators.required]],
     ilce: ['', [Validators.required]],
     adres: ['', [Validators.required]],
-    lat: [null as number | null],
-    lng: [null as number | null],
-    muduruKullaniciId: [''],
     aktifMi: [true],
   });
 
@@ -100,12 +94,6 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     this.refresh();
     this.fSvc.list(false).subscribe({ next: (r) => this.firmalar.set(r) });
-    this.uSvc.list(false).subscribe({
-      next: (r) =>
-        this.mudurAdaylari.set(
-          r.filter((u) => u.rol === 'SayimBaskani' || u.rol === 'Kullanici'),
-        ),
-    });
   }
 
   ngAfterViewInit(): void {
@@ -193,8 +181,7 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
     this.editing.set(null);
     this.serverError.set(null);
     this.form.reset({
-      firmaId: '', ad: '', sehir: '', ilce: '', adres: '',
-      lat: null, lng: null, muduruKullaniciId: '', aktifMi: true,
+      firmaId: '', ad: '', sehir: '', ilce: '', adres: '', aktifMi: true,
     });
     this.modalOpen.set(true);
   }
@@ -208,9 +195,6 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
       sehir: m.sehir,
       ilce: m.ilce,
       adres: m.adres,
-      lat: m.koordinat?.lat ?? null,
-      lng: m.koordinat?.lng ?? null,
-      muduruKullaniciId: m.muduruKullaniciId ?? '',
       aktifMi: m.aktifMi,
     });
     this.modalOpen.set(true);
@@ -226,23 +210,20 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     const v = this.form.getRawValue();
-    const koordinat = v.lat !== null && v.lng !== null
-      ? { lat: Number(v.lat), lng: Number(v.lng) }
-      : null;
+    const editing = this.editing();
     const payload = {
       firmaId: v.firmaId,
       ad: v.ad.trim(),
       sehir: v.sehir.trim(),
       ilce: v.ilce.trim(),
       adres: v.adres.trim(),
-      koordinat,
-      muduruKullaniciId: v.muduruKullaniciId || null,
+      koordinat: editing?.koordinat ?? null,
+      muduruKullaniciId: editing?.muduruKullaniciId ?? null,
       aktifMi: v.aktifMi,
     };
     this.saving.set(true);
     this.serverError.set(null);
 
-    const editing = this.editing();
     const op = editing
       ? this.mSvc.update(editing.id, payload)
       : this.mSvc.create(payload);

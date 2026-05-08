@@ -86,7 +86,7 @@ export class AppShellComponent {
       preview: { title: 'Sayım oturumları', desc: 'Aktif ve geçmiş canlı sayımları yönet.' },
     },
     {
-      label: 'Raporlar',
+      label: 'Karşılaştırma Raporları',
       path: '/raporlar',
       icon: '⌗',
       color: '#5cc99a',

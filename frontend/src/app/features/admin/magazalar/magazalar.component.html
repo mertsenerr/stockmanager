@@ -138,30 +138,6 @@
              class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm" />
     </div>
 
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="block text-xs text-text-secondary mb-1.5">Enlem (lat)</label>
-        <input type="number" step="any" formControlName="lat"
-               class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm font-mono" />
-      </div>
-      <div>
-        <label class="block text-xs text-text-secondary mb-1.5">Boylam (lng)</label>
-        <input type="number" step="any" formControlName="lng"
-               class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm font-mono" />
-      </div>
-    </div>
-
-    <div>
-      <label class="block text-xs text-text-secondary mb-1.5">Müdür <span class="text-text-muted">(opsiyonel)</span></label>
-      <select formControlName="muduruKullaniciId"
-              class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm">
-        <option value="">— Atanmadı —</option>
-        @for (u of mudurAdaylari(); track u.id) {
-          <option [value]="u.id">{{ u.adSoyad }} ({{ u.email }})</option>
-        }
-      </select>
-    </div>
-
     <label class="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
       <input type="checkbox" formControlName="aktifMi"
              class="w-3.5 h-3.5 bg-surface-elevated border border-border accent-text-primary" />

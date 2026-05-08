@@ -71,7 +71,7 @@
   </table>
 </div>
 
-<app-modal [open]="modalOpen()" title="Yeni sayım oturumu" (closed)="closeModal()">
+<app-modal [open]="modalOpen()" title="Yeni sayım oturumu" (closed)="closeModal()" size="lg">
   <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4" novalidate>
     <div>
       <label class="block text-xs text-text-secondary mb-1.5">Mağaza</label>
@@ -90,6 +90,59 @@
       <label class="block text-xs text-text-secondary mb-1.5">Tarih</label>
       <input type="date" formControlName="tarih"
              class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm font-mono" />
+    </div>
+
+    <div>
+      <div class="text-xs text-text-secondary mb-1.5">Katılabilecek arkadaşlar</div>
+
+      @if (selectedKatilimcilar().length > 0) {
+        <div class="flex flex-wrap gap-1.5 mb-2">
+          @for (f of selectedKatilimcilar(); track f.kullaniciId) {
+            <span class="inline-flex items-center gap-1.5 text-xs bg-text-primary text-bg px-2 py-1 rounded-sm">
+              {{ f.adSoyad }}
+              <button type="button" (click)="removeKatilimci(f.kullaniciId)"
+                      class="text-bg/80 hover:text-bg leading-none"
+                      aria-label="Çıkar">×</button>
+            </span>
+          }
+        </div>
+      }
+
+      <input type="search"
+             [value]="katilimciQuery()"
+             (input)="katilimciQuery.set(($any($event.target)).value)"
+             placeholder="Arkadaş ara: isim veya e-posta..."
+             class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm placeholder:text-text-muted" />
+
+      @if (friends().length === 0) {
+        <p class="text-[11px] text-ink-muted mt-1.5">
+          Henüz arkadaşın yok. Arkadaşlar sayfasından ekledikten sonra burada listelenirler.
+        </p>
+      } @else if (suggestedKatilimcilar().length === 0) {
+        <p class="text-[11px] text-ink-muted mt-1.5">
+          @if (katilimciQuery()) { Eşleşen arkadaş bulunamadı. }
+          @else { Tüm arkadaşların eklendi. }
+        </p>
+      } @else {
+        <ul class="mt-2 max-h-40 overflow-y-auto border border-border rounded-sm bg-surface-elevated divide-y divide-border">
+          @for (f of suggestedKatilimcilar(); track f.kullaniciId) {
+            <li>
+              <button type="button" (click)="addKatilimci(f)"
+                      class="w-full text-left flex items-center justify-between px-3 py-2 hover:bg-bg transition-colors">
+                <span class="min-w-0">
+                  <span class="block text-sm truncate">{{ f.adSoyad }}</span>
+                  <span class="block text-[11px] font-mono text-ink-muted truncate">{{ f.email }}</span>
+                </span>
+                <span class="text-xs text-text-secondary shrink-0">+ Ekle</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      <p class="text-[11px] text-ink-muted mt-1.5">
+        Seçtiğin arkadaşlar oturum başlangıcından itibaren bu sayım oturumuna katılabilir.
+      </p>
     </div>
 
     @if (serverError()) {

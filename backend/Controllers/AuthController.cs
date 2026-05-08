@@ -112,10 +112,7 @@ public sealed class AuthController : ControllerBase
                 message = result.FailureReason ?? "Giriş başarısız.",
                 code = result.FailureCode ?? AuthFailureCodes.InvalidCredentials,
             };
-            // EMAIL_NOT_VERIFIED and NOT_APPROVED are state-of-account problems, not auth
-            // failures — return 403 so the frontend can branch on a state UI ("verify
-            // your email", "waiting for approval") rather than the generic 401 path.
-            return result.FailureCode is AuthFailureCodes.EmailNotVerified or AuthFailureCodes.NotApproved
+            return result.FailureCode is AuthFailureCodes.EmailNotVerified
                 ? StatusCode(StatusCodes.Status403Forbidden, body)
                 : Unauthorized(body);
         }

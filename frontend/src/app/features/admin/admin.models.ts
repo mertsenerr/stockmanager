@@ -90,7 +90,6 @@ export interface KullaniciList {
   firmaIds: string[];
   magazaIds: string[];
   aktifMi: boolean;
-  onayli: boolean;
   sonGirisTarihi?: string | null;
   olusturmaTarihi: string;
 }

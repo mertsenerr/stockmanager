@@ -24,11 +24,6 @@ public sealed class RegisterSayimBaskaniRequestValidator : AbstractValidator<Reg
         RuleFor(x => x.FirmaAdi)
             .NotEmpty().WithMessage("Firma adı zorunludur.")
             .MaximumLength(120);
-
-        RuleFor(x => x.FirmaKisaltmasi)
-            .NotEmpty().WithMessage("Firma kısaltması zorunludur.")
-            .Matches("^[A-Za-z0-9]{3,6}$")
-            .WithMessage("Firma kısaltması 3-6 karakter, sadece harf/rakam olmalıdır.");
     }
 }
 

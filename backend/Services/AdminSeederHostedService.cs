@@ -53,7 +53,6 @@ public sealed class AdminSeederHostedService : IHostedService
                 Rol = Roles.Sistem,
                 PasswordHash = hasher.Hash(_settings.AdminPassword),
                 AktifMi = true,
-                Onayli = true,
             };
 
             await users.InsertAsync(admin, cancellationToken);
@@ -86,18 +85,13 @@ public sealed class AdminSeederHostedService : IHostedService
         {
             if (oldRole == newRole) continue;
             var filter = Builders<User>.Filter.Eq(u => u.Rol, oldRole);
-            var update = Builders<User>.Update.Set(u => u.Rol, newRole).Set(u => u.Onayli, true);
+            var update = Builders<User>.Update.Set(u => u.Rol, newRole);
             var result = await users.UpdateManyAsync(filter, update, cancellationToken: ct);
             if (result.ModifiedCount > 0)
                 _logger.LogInformation(
                     "Migrated {Count} users from rol={Old} → rol={New}",
                     result.ModifiedCount, oldRole, newRole);
         }
-
-        // Onayli alanı eski kayıtlarda yoksa true olarak işaretle (default).
-        var fillOnayliFilter = Builders<User>.Filter.Exists(u => u.Onayli, false);
-        var fillOnayliUpdate = Builders<User>.Update.Set(u => u.Onayli, true);
-        await users.UpdateManyAsync(fillOnayliFilter, fillOnayliUpdate, cancellationToken: ct);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

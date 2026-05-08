@@ -34,7 +34,6 @@ export class KullanicilarComponent implements OnInit {
   private readonly confirm = inject(ConfirmService);
 
   readonly users = signal<KullaniciList[]>([]);
-  readonly pendingUsers = signal<KullaniciList[]>([]);
   readonly firmalar = signal<Firma[]>([]);
   readonly magazalar = signal<Magaza[]>([]);
   readonly loading = signal(false);
@@ -75,7 +74,6 @@ export class KullanicilarComponent implements OnInit {
 
   ngOnInit(): void {
     this.refresh();
-    this.refreshPending();
     this.fSvc.list(false).subscribe({ next: (r) => this.firmalar.set(r) });
     this.mSvc.list({ includeInactive: false }).subscribe({ next: (r) => this.magazalar.set(r) });
   }
@@ -91,25 +89,6 @@ export class KullanicilarComponent implements OnInit {
         this.loading.set(false);
         this.toast.error('Kullanıcılar yüklenemedi.');
       },
-    });
-  }
-
-  refreshPending(): void {
-    this.svc.listPending().subscribe({
-      next: (r) => this.pendingUsers.set(r),
-      error: () => undefined,
-    });
-  }
-
-  approve(u: KullaniciList): void {
-    this.svc.approve(u.id).subscribe({
-      next: () => {
-        this.toast.success(`${u.adSoyad} onaylandı.`);
-        this.refreshPending();
-        this.refresh();
-      },
-      error: (err: HttpErrorResponse) =>
-        this.toast.error(err.error?.message ?? 'Onay başarısız.'),
     });
   }
 

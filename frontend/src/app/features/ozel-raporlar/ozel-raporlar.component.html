@@ -1,0 +1,165 @@
+<app-page-header title="Özel Raporlar" description="Excel/PDF raporları yükle ve seçtiğin kullanıcılarla paylaş.">
+  <div actions class="flex items-center gap-2">
+    <input
+      type="search"
+      [value]="query()"
+      (input)="query.set(($any($event.target)).value)"
+      placeholder="Ara..."
+      class="focus-ring text-xs px-2.5 py-1.5 bg-surface-elevated border border-border rounded-sm w-44 placeholder:text-text-muted"
+    />
+    @if (canManage()) {
+      <button (click)="openCreate()"
+              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
+        Yeni rapor
+      </button>
+    }
+  </div>
+</app-page-header>
+
+@if (loading()) {
+  <div class="card p-8 text-center text-xs text-text-muted">Yükleniyor...</div>
+} @else if (filtered().length === 0) {
+  <div class="card p-8 text-center text-xs text-text-muted">
+    @if (canManage()) {
+      Henüz özel rapor yok. "Yeni rapor" ile bir tane oluştur ve dosya ekle.
+    } @else {
+      Sana paylaşılan özel rapor yok.
+    }
+  </div>
+} @else {
+  <div class="space-y-4">
+    @for (r of filtered(); track r.id) {
+      <div class="card p-5">
+        <header class="flex items-start justify-between gap-4 mb-3">
+          <div class="min-w-0 flex-1">
+            <h3 class="font-display font-bold text-base truncate">{{ r.ad }}</h3>
+            @if (r.aciklama) {
+              <p class="text-xs text-text-secondary mt-1 whitespace-pre-line">{{ r.aciklama }}</p>
+            }
+            <p class="text-[11px] text-ink-muted mt-2 font-mono uppercase tracking-wider">
+              {{ r.olusturanAdSoyad ?? 'Bilinmiyor' }} · {{ formatDate(r.olusturmaTarihi) }} · {{ r.dosyalar.length }} dosya
+              @if (r.duzenleyebilir && r.erisebilenKullaniciIds.length > 0) {
+                · {{ r.erisebilenKullaniciIds.length }} kişiyle paylaşıldı
+              }
+            </p>
+          </div>
+          @if (r.duzenleyebilir) {
+            <div class="flex items-center gap-1 shrink-0">
+              <input #fileInput type="file" multiple accept=".xlsx,.xls,.pdf" class="hidden"
+                     (change)="onFilesChosen(r, $event)" />
+              <button type="button" (click)="triggerUpload(r, fileInput)"
+                      [disabled]="uploading() === r.id"
+                      class="focus-ring text-xs font-medium px-2.5 py-1.5 rounded-sm border border-border text-text-primary hover:bg-surface-elevated transition-colors disabled:opacity-50">
+                {{ uploading() === r.id ? 'Yükleniyor...' : 'Dosya ekle' }}
+              </button>
+              <button type="button" (click)="openEdit(r)"
+                      class="focus-ring text-xs text-text-secondary hover:text-text-primary transition-colors px-2 py-1.5">
+                Düzenle
+              </button>
+              <button type="button" (click)="remove(r)"
+                      class="focus-ring text-xs text-accent-danger/80 hover:text-accent-danger transition-colors px-2 py-1.5">
+                Sil
+              </button>
+            </div>
+          }
+        </header>
+
+        @if (r.dosyalar.length === 0) {
+          <p class="text-xs text-ink-muted italic">
+            @if (r.duzenleyebilir) { Henüz dosya yok — "Dosya ekle" ile yükle. }
+            @else { Henüz dosya yüklenmedi. }
+          </p>
+        } @else {
+          <ul class="divide-y divide-border border border-border rounded-sm bg-surface-elevated">
+            @for (d of r.dosyalar; track d.id) {
+              <li class="flex items-center justify-between gap-3 px-3 py-2.5">
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium truncate">{{ d.ad }}</p>
+                  <p class="text-[11px] text-ink-muted font-mono">
+                    {{ formatSize(d.boyut) }} · {{ formatDate(d.yuklemeTarihi) }}
+                  </p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button type="button" (click)="download(r, d)"
+                          [disabled]="downloadingId() === d.id"
+                          class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg disabled:opacity-50 transition-opacity">
+                    {{ downloadingId() === d.id ? 'İndiriliyor...' : 'İndir' }}
+                  </button>
+                  @if (r.duzenleyebilir) {
+                    <button type="button" (click)="removeFile(r, d)"
+                            class="focus-ring text-xs text-accent-danger/80 hover:text-accent-danger transition-colors">
+                      Sil
+                    </button>
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    }
+  </div>
+}
+
+<app-modal [open]="modalOpen()" [title]="editing() ? 'Raporu düzenle' : 'Yeni özel rapor'" (closed)="closeModal()" size="lg">
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4" novalidate>
+    <div>
+      <label class="block text-xs text-text-secondary mb-1.5">Ad</label>
+      <input type="text" formControlName="ad"
+             class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm placeholder:text-text-muted"
+             placeholder="Örn. Aralık LCW sapma raporu" />
+      @if (form.controls.ad.touched && form.controls.ad.errors?.['required']) {
+        <p class="text-xs text-accent-danger mt-1.5">Rapor adı zorunludur.</p>
+      }
+    </div>
+
+    <div>
+      <label class="block text-xs text-text-secondary mb-1.5">Açıklama <span class="text-text-muted">(opsiyonel)</span></label>
+      <textarea formControlName="aciklama" rows="3"
+                class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm"></textarea>
+    </div>
+
+    <div>
+      <div class="text-xs text-text-secondary mb-1.5">Erişebilecek kullanıcılar</div>
+      @if (availableUsers().length === 0) {
+        <p class="text-xs text-ink-muted bg-surface-elevated border border-border rounded-sm p-3">
+          Kendi firmanda henüz kullanıcı yok — eklemek için önce Kullanıcılar sayfasından bir hesap oluştur.
+        </p>
+      } @else {
+        <div class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto border border-border rounded-sm bg-surface-elevated p-2">
+          @for (u of availableUsers(); track u.id) {
+            <button type="button" (click)="toggleAccess(u.id)"
+                    class="text-xs px-2 py-1 rounded-sm border transition-colors"
+                    [class.bg-text-primary]="isChecked(u.id)"
+                    [class.text-bg]="isChecked(u.id)"
+                    [class.border-text-primary]="isChecked(u.id)"
+                    [class.text-text-secondary]="!isChecked(u.id)"
+                    [class.border-border]="!isChecked(u.id)">
+              {{ u.adSoyad }}
+            </button>
+          }
+        </div>
+        <p class="text-[11px] text-ink-muted mt-1.5">
+          Sadece seçilen kullanıcılar bu raporu ve içindeki dosyaları görebilir.
+        </p>
+      }
+    </div>
+
+    @if (serverError()) {
+      <div class="text-xs text-accent-danger bg-accent-danger/10 border border-accent-danger/30 rounded-sm px-3 py-2">
+        {{ serverError() }}
+      </div>
+    }
+
+    <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+      <button type="button" (click)="closeModal()"
+              class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
+        Vazgeç
+      </button>
+      <button type="submit" [disabled]="saving()"
+              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg disabled:opacity-50 active:scale-[0.98] transition-all duration-150">
+        {{ saving() ? 'Kaydediliyor...' : (editing() ? 'Güncelle' : 'Oluştur') }}
+      </button>
+    </div>
+  </form>
+</app-modal>

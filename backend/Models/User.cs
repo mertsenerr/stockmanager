@@ -22,8 +22,6 @@ public sealed class User
     public List<string> MagazaIds { get; set; } = [];
 
     public bool AktifMi { get; set; } = true;
-    /// <summary>Sayım Başkanı tarafından onaylandı mı? Sistem/SayimBaskani için true; yeni Kullanici kayıtları için false.</summary>
-    public bool Onayli { get; set; } = true;
 
     public DateTime OlusturmaTarihi { get; set; } = DateTime.UtcNow;
     public DateTime? SonGirisTarihi { get; set; }

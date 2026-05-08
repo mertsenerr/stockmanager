@@ -6,7 +6,6 @@ public sealed class RegisterSayimBaskaniRequest
     public string Password { get; set; } = string.Empty;
     public string AdSoyad { get; set; } = string.Empty;
     public string FirmaAdi { get; set; } = string.Empty;
-    public string FirmaKisaltmasi { get; set; } = string.Empty;
 }
 
 public sealed class RegisterKullaniciRequest

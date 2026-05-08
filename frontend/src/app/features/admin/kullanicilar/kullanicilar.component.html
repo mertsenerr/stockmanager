@@ -19,31 +19,6 @@
   </div>
 </app-page-header>
 
-@if (pendingUsers().length > 0) {
-  <div class="card mb-4 border-[1.5px] border-accent-warning/60 bg-accent-warning/10 p-4">
-    <header class="flex items-center justify-between mb-3">
-      <h3 class="font-display font-bold text-sm">Onay Bekleyen Kayıtlar ({{ pendingUsers().length }})</h3>
-      <span class="text-[11px] font-mono uppercase tracking-wider text-text-muted">
-        Yeni kullanıcı kayıtları aşağıda — onaylayınca giriş yapabilir
-      </span>
-    </header>
-    <div class="space-y-2">
-      @for (p of pendingUsers(); track p.id) {
-        <div class="flex items-center justify-between gap-3 px-3 py-2 bg-bg rounded-sm border border-border">
-          <div class="flex-1 min-w-0">
-            <p class="text-sm text-text-primary font-medium">{{ p.adSoyad }}</p>
-            <p class="text-xs text-text-secondary font-mono">{{ p.email }}</p>
-          </div>
-          <button (click)="approve(p)"
-                  class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-accent-success text-bg hover:opacity-90 transition-opacity">
-            Onayla
-          </button>
-        </div>
-      }
-    </div>
-  </div>
-}
-
 <div class="card overflow-hidden">
   <table class="w-full text-sm">
     <thead class="bg-surface-elevated">

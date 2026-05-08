@@ -1,0 +1,314 @@
+using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
+using SayimLink.Api.Common;
+using SayimLink.Api.Dtos.Admin;
+using SayimLink.Api.Models;
+using SayimLink.Api.Repositories;
+using SayimLink.Api.Services;
+
+namespace SayimLink.Api.Controllers;
+
+[ApiController]
+[Authorize]
+[Route("api/ozel-raporlar")]
+public sealed class OzelRaporlarController : ControllerBase
+{
+    private readonly IOzelRaporRepository _repo;
+    private readonly IUserRepository _users;
+    private readonly IOzelRaporStorage _storage;
+    private readonly IAuditService _audit;
+    private readonly IValidator<OzelRaporUpsertRequest> _validator;
+    private readonly ILogger<OzelRaporlarController> _logger;
+
+    public OzelRaporlarController(
+        IOzelRaporRepository repo,
+        IUserRepository users,
+        IOzelRaporStorage storage,
+        IAuditService audit,
+        IValidator<OzelRaporUpsertRequest> validator,
+        ILogger<OzelRaporlarController> logger)
+    {
+        _repo = repo;
+        _users = users;
+        _storage = storage;
+        _audit = audit;
+        _validator = validator;
+        _logger = logger;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> List(CancellationToken ct)
+    {
+        var uid = User.GetUserId();
+        if (string.IsNullOrEmpty(uid)) return Ok(Array.Empty<OzelRaporListDto>());
+
+        IReadOnlyList<OzelRapor> raporlar;
+        if (User.IsSistem())
+        {
+            raporlar = await _repo.ListAllAsync(ct);
+        }
+        else if (User.IsInRole(Roles.SayimBaskani))
+        {
+            raporlar = await _repo.ListByOwnerAsync(uid, ct);
+        }
+        else
+        {
+            raporlar = await _repo.ListAccessibleByAsync(uid, ct);
+        }
+
+        var olusturanIds = raporlar.Select(r => r.OlusturanKullaniciId).Distinct().ToList();
+        var olusturanlar = (await _users.ListByIdsAsync(olusturanIds, ct)).ToDictionary(u => u.Id);
+
+        var isSistem = User.IsSistem();
+        return Ok(raporlar.Select(r => ToListDto(r, uid, isSistem, olusturanlar)));
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> Get(string id, CancellationToken ct)
+    {
+        var rapor = await _repo.FindByIdAsync(id, ct);
+        if (rapor is null) return NotFound();
+
+        var uid = User.GetUserId();
+        if (uid is null) return Unauthorized();
+        if (!CanRead(rapor, uid)) return Forbid();
+
+        var olusturanlar = (await _users.ListByIdsAsync([rapor.OlusturanKullaniciId], ct))
+            .ToDictionary(u => u.Id);
+        return Ok(ToListDto(rapor, uid, User.IsSistem(), olusturanlar));
+    }
+
+    [HttpPost]
+    [Authorize(Roles = Roles.AdminLevel)]
+    public async Task<IActionResult> Create(
+        [FromBody] OzelRaporUpsertRequest request, CancellationToken ct)
+    {
+        var validation = await _validator.ValidateAsync(request, ct);
+        if (!validation.IsValid) return ValidationProblemFromResult(validation);
+
+        var uid = User.GetUserId();
+        if (uid is null) return Unauthorized();
+
+        var allowedAccess = await FilterAccessibleUserIdsAsync(uid, request.ErisebilenKullaniciIds, ct);
+
+        var rapor = new OzelRapor
+        {
+            Ad = request.Ad.Trim(),
+            Aciklama = string.IsNullOrWhiteSpace(request.Aciklama) ? null : request.Aciklama.Trim(),
+            OlusturanKullaniciId = uid,
+            ErisebilenKullaniciIds = allowedAccess,
+        };
+        await _repo.InsertAsync(rapor, ct);
+        _audit.Log(User, AuditAksiyonlari.OzelRaporCreate, "ozel-rapor", rapor.Id, yeni: rapor.Ad);
+
+        var olusturanlar = (await _users.ListByIdsAsync([rapor.OlusturanKullaniciId], ct))
+            .ToDictionary(u => u.Id);
+        return CreatedAtAction(nameof(Get), new { id = rapor.Id },
+            ToListDto(rapor, uid, User.IsSistem(), olusturanlar));
+    }
+
+    [HttpPut("{id}")]
+    [Authorize(Roles = Roles.AdminLevel)]
+    public async Task<IActionResult> Update(
+        string id, [FromBody] OzelRaporUpsertRequest request, CancellationToken ct)
+    {
+        var validation = await _validator.ValidateAsync(request, ct);
+        if (!validation.IsValid) return ValidationProblemFromResult(validation);
+
+        var rapor = await _repo.FindByIdAsync(id, ct);
+        if (rapor is null) return NotFound();
+        var uid = User.GetUserId();
+        if (uid is null) return Unauthorized();
+        if (!CanWrite(rapor, uid)) return Forbid();
+
+        rapor.Ad = request.Ad.Trim();
+        rapor.Aciklama = string.IsNullOrWhiteSpace(request.Aciklama) ? null : request.Aciklama.Trim();
+        rapor.ErisebilenKullaniciIds = await FilterAccessibleUserIdsAsync(
+            rapor.OlusturanKullaniciId, request.ErisebilenKullaniciIds, ct);
+        await _repo.ReplaceAsync(rapor, ct);
+        _audit.Log(User, AuditAksiyonlari.OzelRaporUpdate, "ozel-rapor", rapor.Id, yeni: rapor.Ad);
+
+        var olusturanlar = (await _users.ListByIdsAsync([rapor.OlusturanKullaniciId], ct))
+            .ToDictionary(u => u.Id);
+        return Ok(ToListDto(rapor, uid, User.IsSistem(), olusturanlar));
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = Roles.AdminLevel)]
+    public async Task<IActionResult> Delete(string id, CancellationToken ct)
+    {
+        var rapor = await _repo.FindByIdAsync(id, ct);
+        if (rapor is null) return NotFound();
+        var uid = User.GetUserId();
+        if (uid is null) return Unauthorized();
+        if (!CanWrite(rapor, uid)) return Forbid();
+
+        await _repo.DeleteAsync(id, ct);
+        try { _storage.DeleteRaporFolder(rapor.Id); }
+        catch (Exception ex) { _logger.LogWarning(ex, "OzelRapor klasör silme hatası: {Id}", rapor.Id); }
+        _audit.Log(User, AuditAksiyonlari.OzelRaporDelete, "ozel-rapor", rapor.Id, eski: rapor.Ad);
+        return NoContent();
+    }
+
+    [HttpPost("{id}/files")]
+    [Authorize(Roles = Roles.AdminLevel)]
+    [RequestSizeLimit(60_000_000)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 60_000_000)]
+    public async Task<IActionResult> UploadFiles(
+        string id,
+        [FromForm] IFormFileCollection files,
+        CancellationToken ct)
+    {
+        var rapor = await _repo.FindByIdAsync(id, ct);
+        if (rapor is null) return NotFound();
+        var uid = User.GetUserId();
+        if (uid is null) return Unauthorized();
+        if (!CanWrite(rapor, uid)) return Forbid();
+
+        if (files is null || files.Count == 0)
+            return BadRequest(new { message = "Dosya seçilmedi." });
+
+        var added = new List<OzelRaporDosya>();
+        foreach (var file in files)
+        {
+            var hata = _storage.ValidateUpload(file.FileName, file.Length);
+            if (hata is not null)
+                return BadRequest(new { message = $"{file.FileName}: {hata}" });
+        }
+
+        foreach (var file in files)
+        {
+            var dosyaId = ObjectId.GenerateNewId().ToString();
+            await using var src = file.OpenReadStream();
+            var storageName = await _storage.SaveAsync(rapor.Id, dosyaId, file.FileName, src, ct);
+            var dosya = new OzelRaporDosya
+            {
+                Id = dosyaId,
+                Ad = Path.GetFileName(file.FileName),
+                MimeType = string.IsNullOrEmpty(file.ContentType)
+                    ? "application/octet-stream" : file.ContentType,
+                Boyut = file.Length,
+                StorageName = storageName,
+            };
+            rapor.Dosyalar.Add(dosya);
+            added.Add(dosya);
+        }
+
+        await _repo.ReplaceAsync(rapor, ct);
+        foreach (var d in added)
+        {
+            _audit.Log(User, AuditAksiyonlari.OzelRaporFileAdd, "ozel-rapor", rapor.Id,
+                yeni: $"{d.Ad} ({d.Boyut} bayt)");
+        }
+
+        var olusturanlar = (await _users.ListByIdsAsync([rapor.OlusturanKullaniciId], ct))
+            .ToDictionary(u => u.Id);
+        return Ok(ToListDto(rapor, uid, User.IsSistem(), olusturanlar));
+    }
+
+    [HttpDelete("{id}/files/{fileId}")]
+    [Authorize(Roles = Roles.AdminLevel)]
+    public async Task<IActionResult> DeleteFile(string id, string fileId, CancellationToken ct)
+    {
+        var rapor = await _repo.FindByIdAsync(id, ct);
+        if (rapor is null) return NotFound();
+        var uid = User.GetUserId();
+        if (uid is null) return Unauthorized();
+        if (!CanWrite(rapor, uid)) return Forbid();
+
+        var dosya = rapor.Dosyalar.FirstOrDefault(d => d.Id == fileId);
+        if (dosya is null) return NotFound();
+
+        rapor.Dosyalar.Remove(dosya);
+        await _repo.ReplaceAsync(rapor, ct);
+        try { _storage.DeleteFile(rapor.Id, dosya.StorageName); }
+        catch (Exception ex) { _logger.LogWarning(ex, "OzelRapor dosya silme hatası: {Id}/{FileId}", rapor.Id, fileId); }
+        _audit.Log(User, AuditAksiyonlari.OzelRaporFileDelete, "ozel-rapor", rapor.Id, eski: dosya.Ad);
+
+        return NoContent();
+    }
+
+    [HttpGet("{id}/files/{fileId}/download")]
+    public async Task<IActionResult> Download(string id, string fileId, CancellationToken ct)
+    {
+        var rapor = await _repo.FindByIdAsync(id, ct);
+        if (rapor is null) return NotFound();
+        var uid = User.GetUserId();
+        if (uid is null) return Unauthorized();
+        if (!CanRead(rapor, uid)) return Forbid();
+
+        var dosya = rapor.Dosyalar.FirstOrDefault(d => d.Id == fileId);
+        if (dosya is null) return NotFound();
+
+        Stream stream;
+        try { stream = await _storage.OpenReadAsync(rapor.Id, dosya.StorageName, ct); }
+        catch (FileNotFoundException) { return NotFound(); }
+
+        _audit.Log(User, AuditAksiyonlari.OzelRaporDownload, "ozel-rapor", rapor.Id, yeni: dosya.Ad);
+        return File(stream, dosya.MimeType, dosya.Ad);
+    }
+
+    private bool CanRead(OzelRapor rapor, string uid) =>
+        User.IsSistem()
+        || rapor.OlusturanKullaniciId == uid
+        || rapor.ErisebilenKullaniciIds.Contains(uid);
+
+    private bool CanWrite(OzelRapor rapor, string uid) =>
+        User.IsSistem() || rapor.OlusturanKullaniciId == uid;
+
+    /// <summary>
+    /// Erişim listesindeki id'leri SayımBaşkanı'nın kendi kapsamına filtreler:
+    /// yalnızca aynı oluşturan tarafından açılmış aktif Kullanici hesapları kabul edilir.
+    /// Sistem rolü için filtre uygulanmaz.
+    /// </summary>
+    private async Task<List<string>> FilterAccessibleUserIdsAsync(
+        string ownerUserId, IEnumerable<string> requested, CancellationToken ct)
+    {
+        var distinctIds = requested.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().ToList();
+        if (distinctIds.Count == 0) return [];
+
+        var users = await _users.ListByIdsAsync(distinctIds, ct);
+        if (User.IsSistem()) return users.Select(u => u.Id).ToList();
+
+        return users
+            .Where(u => u.AktifMi && u.Rol == Roles.Kullanici)
+            .Select(u => u.Id)
+            .ToList();
+    }
+
+    private static OzelRaporListDto ToListDto(
+        OzelRapor r, string callerUid, bool callerIsSistem, IDictionary<string, User> olusturanlar)
+    {
+        olusturanlar.TryGetValue(r.OlusturanKullaniciId, out var olusturan);
+        return new OzelRaporListDto
+        {
+            Id = r.Id,
+            Ad = r.Ad,
+            Aciklama = r.Aciklama,
+            OlusturanKullaniciId = r.OlusturanKullaniciId,
+            OlusturanAdSoyad = olusturan?.AdSoyad,
+            ErisebilenKullaniciIds = r.ErisebilenKullaniciIds,
+            Dosyalar = r.Dosyalar.Select(d => new OzelRaporDosyaDto
+            {
+                Id = d.Id,
+                Ad = d.Ad,
+                MimeType = d.MimeType,
+                Boyut = d.Boyut,
+                YuklemeTarihi = d.YuklemeTarihi,
+            }).ToList(),
+            OlusturmaTarihi = r.OlusturmaTarihi,
+            GuncellenmeTarihi = r.GuncellenmeTarihi,
+            Duzenleyebilir = callerIsSistem || r.OlusturanKullaniciId == callerUid,
+        };
+    }
+
+    private IActionResult ValidationProblemFromResult(FluentValidation.Results.ValidationResult result)
+    {
+        var errors = result.Errors
+            .GroupBy(e => e.PropertyName)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+        return ValidationProblem(new ValidationProblemDetails(errors));
+    }
+}

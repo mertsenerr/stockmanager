@@ -11,5 +11,4 @@ public sealed class UserDto
     public string? FirmaKisaltmasi { get; set; }
     public IReadOnlyList<string> FirmaIds { get; set; } = [];
     public IReadOnlyList<string> MagazaIds { get; set; } = [];
-    public bool Onayli { get; set; } = true;
 }

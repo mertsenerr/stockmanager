@@ -10,7 +10,6 @@ public sealed class KullaniciListDto
     public IReadOnlyList<string> FirmaIds { get; set; } = [];
     public IReadOnlyList<string> MagazaIds { get; set; } = [];
     public bool AktifMi { get; set; }
-    public bool Onayli { get; set; } = true;
     public DateTime? SonGirisTarihi { get; set; }
     public DateTime OlusturmaTarihi { get; set; }
 }

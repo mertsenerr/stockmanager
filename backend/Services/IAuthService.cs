@@ -25,7 +25,6 @@ public static class AuthFailureCodes
 {
     public const string InvalidCredentials = "INVALID_CREDENTIALS";
     public const string EmailNotVerified  = "EMAIL_NOT_VERIFIED";
-    public const string NotApproved       = "NOT_APPROVED";
     public const string RefreshInvalid    = "REFRESH_INVALID";
 }
 
@@ -90,9 +89,6 @@ public sealed class AuthService : IAuthService
         if (!user.IsEmailVerified)
             return new AuthResult(false, "Lütfen önce e-posta adresinizi doğrulayın.", AuthFailureCodes.EmailNotVerified, null, null, null, false);
 
-        if (!user.Onayli)
-            return new AuthResult(false, "Sayım Başkanınızın onayını bekliyorsunuz.", AuthFailureCodes.NotApproved, null, null, null, false);
-
         user.SonGirisTarihi = DateTime.UtcNow;
         await _users.ReplaceAsync(user, ct);
 
@@ -107,27 +103,17 @@ public sealed class AuthService : IAuthService
         if (await _users.FindByEmailAsync(email, ct) is not null)
             return new RegisterResult(false, "Bu e-posta zaten kayıtlı.", null);
 
-        var kisaltma = request.FirmaKisaltmasi.Trim().ToUpperInvariant();
         var ad = request.FirmaAdi.Trim();
-
-        // Phase 2.5: firma name + kisaltma uniqueness no longer enforced. Each SayimBaskani
-        // register creates their own personal Firma — duplicates of name/kisaltma are
-        // expected and allowed. We surface them in logs to make the registration pattern
-        // visible without blocking the user.
         if (await _firmalar.AdExistsAsync(ad, null, ct))
             _logger.LogWarning(
                 "SayimBaskani register: firma name '{Ad}' already in use — creating duplicate per personal tenancy", ad);
-        if (await _firmalar.KisaltmaExistsAsync(kisaltma, null, ct))
-            _logger.LogWarning(
-                "SayimBaskani register: kisaltma '{Kisaltma}' already in use — creating duplicate per personal tenancy", kisaltma);
 
         var firma = new Firma
         {
             Ad = ad,
-            Kisaltma = kisaltma,
             Tip = FirmaTipleri.Diger,
             AktifMi = true,
-            OrganizasyonMu = true, // Sayım Başkanı'nın kendi sayım organizasyonu
+            OrganizasyonMu = true,
         };
         await _firmalar.InsertAsync(firma, ct);
 
@@ -140,9 +126,7 @@ public sealed class AuthService : IAuthService
             FirmaId = firma.Id,
             FirmaIds = [firma.Id],
             AktifMi = true,
-            Onayli = true,
         };
-        // H-3: register flow now requires email verification — set token, send mail.
         user.IsEmailVerified = false;
         var rawToken = GenerateOpaqueToken();
         user.EmailVerificationTokenHash = _jwt.HashRefreshToken(rawToken);
@@ -155,8 +139,8 @@ public sealed class AuthService : IAuthService
         await SendVerificationEmailSafelyAsync(user, rawToken, ct);
 
         _logger.LogInformation(
-            "New SayimBaskani registered: {Email} for firma {FirmaAd} ({Kisaltma})",
-            email, ad, kisaltma);
+            "New SayimBaskani registered: {Email} for firma {FirmaAd}",
+            email, ad);
 
         return new RegisterResult(true, null, ToDto(user));
     }
@@ -177,7 +161,6 @@ public sealed class AuthService : IAuthService
             Rol = Roles.Kullanici,
             PasswordHash = _hasher.Hash(request.Password),
             AktifMi = true,
-            Onayli = true,
             IsEmailVerified = false,
             EmailVerificationTokenHash = _jwt.HashRefreshToken(rawToken),
             EmailVerificationTokenExpiresAt = DateTime.UtcNow.Add(EmailVerificationTtl),
@@ -406,7 +389,6 @@ public sealed class AuthService : IAuthService
         FirmaId = user.FirmaId,
         FirmaIds = user.FirmaIds,
         MagazaIds = user.MagazaIds,
-        Onayli = user.Onayli,
     };
 
     private static string GenerateOpaqueToken()

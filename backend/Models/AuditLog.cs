@@ -38,6 +38,13 @@ public static class AuditAksiyonlari
     public const string TalepCreate = "oturum.talep.olustur";
     public const string TalepApprove = "oturum.talep.onayla";
     public const string TalepReject = "oturum.talep.reddet";
+
+    public const string OzelRaporCreate = "ozel-rapor.create";
+    public const string OzelRaporUpdate = "ozel-rapor.update";
+    public const string OzelRaporDelete = "ozel-rapor.delete";
+    public const string OzelRaporFileAdd = "ozel-rapor.file.add";
+    public const string OzelRaporFileDelete = "ozel-rapor.file.delete";
+    public const string OzelRaporDownload = "ozel-rapor.download";
 }
 
 public sealed class AuditLog

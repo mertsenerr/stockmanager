@@ -15,36 +15,6 @@
     }
   </div>
 
-  @if (canManageUsers() && pendingUsers().length > 0) {
-    <div class="card mb-5 border-[1.5px] border-accent-warning/60 bg-accent-warning/10 p-5">
-      <header class="flex items-center justify-between mb-3">
-        <div>
-          <h3 class="font-display font-bold text-base">Onay Bekleyen Kayıtlar</h3>
-          <p class="text-xs text-text-secondary mt-0.5">
-            Firmana katılmak isteyen {{ pendingUsers().length }} kullanıcı var. Onayladıktan sonra giriş yapabilirler.
-          </p>
-        </div>
-        <span class="font-mono text-xs uppercase tracking-wider text-accent-warning font-bold">
-          {{ pendingUsers().length }}
-        </span>
-      </header>
-      <div class="space-y-2">
-        @for (p of pendingUsers(); track p.id) {
-          <div class="flex items-center justify-between gap-3 px-3 py-2.5 bg-bg rounded-sm border border-border">
-            <div class="flex-1 min-w-0">
-              <p class="text-sm text-text-primary font-medium">{{ p.adSoyad }}</p>
-              <p class="text-xs text-text-secondary font-mono">{{ p.email }}</p>
-            </div>
-            <button (click)="approve(p)" [disabled]="approvingId() === p.id"
-                    class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-accent-success text-bg hover:opacity-90 transition-opacity disabled:opacity-50">
-              {{ approvingId() === p.id ? 'Onaylanıyor...' : 'Onayla' }}
-            </button>
-          </div>
-        }
-      </div>
-    </div>
-  }
-
   <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
     <div class="card p-5">
       <h3 class="font-mono text-[11px] text-ink-secondary uppercase tracking-[0.14em] mb-4">Hesap</h3>

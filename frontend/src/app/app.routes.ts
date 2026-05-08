@@ -93,6 +93,11 @@ export const routes: Routes = [
           import('./features/rapor/raporlar/raporlar.component').then((m) => m.RaporlarComponent),
       },
       {
+        path: 'ozel-raporlar',
+        loadComponent: () =>
+          import('./features/ozel-raporlar/ozel-raporlar.component').then((m) => m.OzelRaporlarComponent),
+      },
+      {
         path: 'arkadaslar',
         loadComponent: () =>
           import('./features/arkadaslar/arkadaslar.component').then((m) => m.ArkadaslarComponent),

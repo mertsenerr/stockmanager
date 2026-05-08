@@ -95,6 +95,14 @@ export class AppShellComponent {
       roles: ['Sistem', 'SayimBaskani'],
     },
     {
+      label: 'Özel Raporlar',
+      path: '/ozel-raporlar',
+      icon: '◫',
+      color: '#a78bfa',
+      image: 'https://picsum.photos/seed/sayimlink-special/600/320',
+      preview: { title: 'Paylaşılan dosyalar', desc: 'Sayım Başkanından paylaşılan Excel/PDF raporlar.' },
+    },
+    {
       label: 'Arkadaşlar',
       path: '/arkadaslar',
       icon: '☻',

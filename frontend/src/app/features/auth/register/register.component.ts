@@ -31,7 +31,6 @@ export class RegisterComponent {
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(8)]],
     firmaAdi: ['', [Validators.required, Validators.maxLength(120)]],
-    firmaKisaltmasi: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9]{3,6}$/)]],
   });
 
   readonly kullaniciForm = this.fb.nonNullable.group({

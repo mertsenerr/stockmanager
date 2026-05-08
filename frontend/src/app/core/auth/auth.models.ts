@@ -10,7 +10,6 @@ export interface CurrentUser {
   firmaKisaltmasi?: string | null;
   firmaIds: string[];
   magazaIds: string[];
-  onayli: boolean;
 }
 
 export interface LoginRequest {
@@ -52,7 +51,6 @@ export interface RegisterSayimBaskaniRequest {
   password: string;
   adSoyad: string;
   firmaAdi: string;
-  firmaKisaltmasi: string;
 }
 
 export interface RegisterKullaniciRequest {
@@ -69,7 +67,6 @@ export interface RegisterResponse {
 export type AuthFailureCode =
   | 'INVALID_CREDENTIALS'
   | 'EMAIL_NOT_VERIFIED'
-  | 'NOT_APPROVED'
   | 'REFRESH_INVALID';
 
 export interface AuthFailureBody {

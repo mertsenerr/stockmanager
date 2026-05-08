@@ -13,7 +13,6 @@ public interface IUserRepository
     Task<bool> AnyAdminAsync(CancellationToken ct = default);
     Task<int> CountActiveAdminsAsync(CancellationToken ct = default);
     Task<IReadOnlyList<User>> ListAsync(bool includeInactive, CancellationToken ct = default);
-    Task<IReadOnlyList<User>> ListPendingForFirmaAsync(string firmaId, CancellationToken ct = default);
     Task<IReadOnlyList<User>> ListByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default);
     Task InsertAsync(User user, CancellationToken ct = default);
     Task ReplaceAsync(User user, CancellationToken ct = default);
@@ -73,17 +72,6 @@ public sealed class UserRepository : IUserRepository
             ? Builders<User>.Filter.Empty
             : Builders<User>.Filter.Eq(u => u.AktifMi, true);
         return await _users.Find(filter).SortBy(u => u.AdSoyad).ToListAsync(ct);
-    }
-
-    public async Task<IReadOnlyList<User>> ListPendingForFirmaAsync(string firmaId, CancellationToken ct = default)
-    {
-        var filter = Builders<User>.Filter.And(
-            Builders<User>.Filter.Eq(u => u.Onayli, false),
-            Builders<User>.Filter.Eq(u => u.AktifMi, true),
-            Builders<User>.Filter.Or(
-                Builders<User>.Filter.Eq(u => u.FirmaId, firmaId),
-                Builders<User>.Filter.AnyEq(u => u.FirmaIds, firmaId)));
-        return await _users.Find(filter).SortBy(u => u.OlusturmaTarihi).ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<User>> ListByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default)

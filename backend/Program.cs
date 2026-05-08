@@ -32,6 +32,8 @@ builder.Services.Configure<ResendSettings>(
     builder.Configuration.GetSection(ResendSettings.SectionName));
 builder.Services.Configure<SeedSettings>(
     builder.Configuration.GetSection(SeedSettings.SectionName));
+builder.Services.Configure<OzelRaporSettings>(
+    builder.Configuration.GetSection(OzelRaporSettings.SectionName));
 
 // ─── Application services ────────────────────────────────────────────────────
 builder.Services.AddSingleton<IMongoDbService, MongoDbService>();
@@ -42,6 +44,8 @@ builder.Services.AddSingleton<IMagazaRepository, MagazaRepository>();
 builder.Services.AddSingleton<IAtamaRepository, AtamaRepository>();
 builder.Services.AddSingleton<IOturumRepository, OturumRepository>();
 builder.Services.AddSingleton<IFriendshipRepository, FriendshipRepository>();
+builder.Services.AddSingleton<IOzelRaporRepository, OzelRaporRepository>();
+builder.Services.AddSingleton<IOzelRaporStorage, OzelRaporStorage>();
 builder.Services.AddSingleton<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddSingleton<IAuditService, AuditService>();
 builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();

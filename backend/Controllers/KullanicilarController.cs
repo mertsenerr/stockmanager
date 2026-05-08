@@ -157,46 +157,6 @@ public sealed class KullanicilarController : AdminControllerBase
         return Ok(ToListDto(user));
     }
 
-    [HttpGet("pending")]
-    public async Task<IActionResult> ListPending(CancellationToken ct)
-    {
-        // Phase 2.5: same scope rule as List — Sistem sees everyone awaiting approval;
-        // SayimBaskani sees only pending users attached to a Firma they own.
-        if (User.IsSistem())
-        {
-            var all = await _users.ListAsync(includeInactive: false, ct);
-            return Ok(all.Where(u => !u.Onayli).Select(ToListDto));
-        }
-
-        var uid = User.GetUserId();
-        if (string.IsNullOrEmpty(uid))
-            return Ok(Array.Empty<KullaniciListDto>());
-
-        var ownedFirmaIds = await GetCallerOwnedFirmaIdsAsync(uid, ct);
-        if (ownedFirmaIds.Count == 0)
-            return Ok(Array.Empty<KullaniciListDto>());
-
-        var allActive = await _users.ListAsync(includeInactive: false, ct);
-        var pending = allActive.Where(u =>
-            !u.Onayli
-            && !string.IsNullOrEmpty(u.FirmaId)
-            && ownedFirmaIds.Contains(u.FirmaId));
-        return Ok(pending.Select(ToListDto));
-    }
-
-    [HttpPatch("{id}/approve")]
-    public async Task<IActionResult> Approve(string id, CancellationToken ct)
-    {
-        var user = await _users.FindByIdAsync(id, ct);
-        if (user is null) return NotFound();
-        if (user.Onayli) return Ok(ToListDto(user));
-
-        user.Onayli = true;
-        await _users.ReplaceAsync(user, ct);
-        _audit.Log(User, AuditAksiyonlari.KullaniciUpdate, "kullanici", user.Id, yeni: $"approved · {user.Email}");
-        return Ok(ToListDto(user));
-    }
-
     [HttpDelete("{id}")]
     public async Task<IActionResult> SoftDelete(string id, CancellationToken ct)
     {
@@ -229,7 +189,6 @@ public sealed class KullanicilarController : AdminControllerBase
         FirmaIds = u.FirmaIds,
         MagazaIds = u.MagazaIds,
         AktifMi = u.AktifMi,
-        Onayli = u.Onayli,
         SonGirisTarihi = u.SonGirisTarihi,
         OlusturmaTarihi = u.OlusturmaTarihi,
     };

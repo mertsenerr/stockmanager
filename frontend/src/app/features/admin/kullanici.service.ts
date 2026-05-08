@@ -30,12 +30,4 @@ export class KullaniciService {
   remove(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
   }
-
-  listPending(): Observable<KullaniciList[]> {
-    return this.http.get<KullaniciList[]>(`${this.base}/pending`);
-  }
-
-  approve(id: string): Observable<KullaniciList> {
-    return this.http.patch<KullaniciList>(`${this.base}/${id}/approve`, {});
-  }
 }

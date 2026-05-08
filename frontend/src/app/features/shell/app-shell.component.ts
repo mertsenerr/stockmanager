@@ -78,21 +78,12 @@ export class AppShellComponent {
       roles: ['Sistem', 'SayimBaskani'],
     },
     {
-      label: 'Oturumlar',
+      label: 'Karşılaştırma Oturumu',
       path: '/oturumlar',
       icon: '◐',
       color: '#ff5d3a',
       image: 'https://picsum.photos/seed/sayimlink-warehouse/600/320',
-      preview: { title: 'Sayım oturumları', desc: 'Aktif ve geçmiş canlı sayımları yönet.' },
-    },
-    {
-      label: 'Karşılaştırma Raporları',
-      path: '/raporlar',
-      icon: '⌗',
-      color: '#5cc99a',
-      image: 'https://picsum.photos/seed/sayimlink-charts/600/320',
-      preview: { title: 'Sapma & performans', desc: 'Geçmiş sayımları ve sapmaları analiz et.' },
-      roles: ['Sistem', 'SayimBaskani'],
+      preview: { title: 'Karşılaştırma oturumları', desc: 'Aktif ve geçmiş canlı karşılaştırmaları yönet.' },
     },
     {
       label: 'Özel Raporlar',

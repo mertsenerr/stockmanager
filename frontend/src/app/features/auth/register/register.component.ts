@@ -38,7 +38,6 @@ export class RegisterComponent {
     adSoyad: ['', [Validators.required, Validators.maxLength(120)]],
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(8)]],
-    firmaKisaltmasi: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9]{3,6}$/)]],
   });
 
   setTab(t: Tab): void {
@@ -78,7 +77,7 @@ export class RegisterComponent {
         next: () => {
           this.submitting.set(false);
           this.successMessage.set(
-            'Kayıt alındı. Doğrulama bağlantısını e-postana gönderdik. Sayım Başkanının onayından sonra giriş yapabilirsin.',
+            'Kayıt tamamlandı. Doğrulama bağlantısını e-postana gönderdik — e-postanı doğruladıktan sonra giriş yapabilirsin.',
           );
         },
         error: (err: HttpErrorResponse) => this.handleError(err),

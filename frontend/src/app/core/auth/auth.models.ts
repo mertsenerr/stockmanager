@@ -59,7 +59,6 @@ export interface RegisterKullaniciRequest {
   email: string;
   password: string;
   adSoyad: string;
-  firmaKisaltmasi: string;
 }
 
 export interface RegisterResponse {

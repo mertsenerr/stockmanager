@@ -103,20 +103,6 @@
       </div>
 
       <div>
-        <label class="auth-label">Firma Kısaltması</label>
-        <input type="text" formControlName="firmaKisaltmasi" class="auth-input uppercase"
-               maxlength="6" placeholder="LCW"
-               [class.is-invalid]="kullaniciForm.controls.firmaKisaltmasi.touched && kullaniciForm.controls.firmaKisaltmasi.invalid" />
-        <p class="text-[11px] text-ink-secondary mt-1">Bağlı olduğun firmanın Sayım Başkanı seninle paylaşır.</p>
-        @if (kullaniciForm.controls.firmaKisaltmasi.touched && kullaniciForm.controls.firmaKisaltmasi.errors?.['required']) {
-          <p class="auth-error">Firma kısaltması zorunludur.</p>
-        }
-        @if (kullaniciForm.controls.firmaKisaltmasi.touched && kullaniciForm.controls.firmaKisaltmasi.errors?.['pattern']) {
-          <p class="auth-error">3-6 karakter, sadece harf/rakam.</p>
-        }
-      </div>
-
-      <div>
         <label class="auth-label">E-posta</label>
         <input type="email" formControlName="email" autocomplete="email" class="auth-input"
                [class.is-invalid]="kullaniciForm.controls.email.touched && kullaniciForm.controls.email.invalid" />

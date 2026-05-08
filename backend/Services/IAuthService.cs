@@ -169,11 +169,6 @@ public sealed class AuthService : IAuthService
         if (await _users.FindByEmailAsync(email, ct) is not null)
             return new RegisterResult(false, "Bu e-posta zaten kayıtlı.", null);
 
-        var kisaltma = request.FirmaKisaltmasi.Trim().ToUpperInvariant();
-        var firma = await _firmalar.FindByKisaltmaAsync(kisaltma, ct);
-        if (firma is null)
-            return new RegisterResult(false, "Firma kısaltması bulunamadı. Sayım Başkanından doğru anahtarı isteyin.", null);
-
         var rawToken = GenerateOpaqueToken();
         var user = new User
         {
@@ -181,10 +176,8 @@ public sealed class AuthService : IAuthService
             AdSoyad = request.AdSoyad.Trim(),
             Rol = Roles.Kullanici,
             PasswordHash = _hasher.Hash(request.Password),
-            FirmaId = firma.Id,
-            FirmaIds = [firma.Id],
             AktifMi = true,
-            Onayli = false, // Sayım Başkanı onayı bekleyecek
+            Onayli = true,
             IsEmailVerified = false,
             EmailVerificationTokenHash = _jwt.HashRefreshToken(rawToken),
             EmailVerificationTokenExpiresAt = DateTime.UtcNow.Add(EmailVerificationTtl),
@@ -193,9 +186,7 @@ public sealed class AuthService : IAuthService
 
         await SendVerificationEmailSafelyAsync(user, rawToken, ct);
 
-        _logger.LogInformation(
-            "New Kullanici registered (pending approval): {Email} for firma {Kisaltma}",
-            email, kisaltma);
+        _logger.LogInformation("New Kullanici registered: {Email}", email);
 
         return new RegisterResult(true, null, ToDto(user));
     }

@@ -83,10 +83,10 @@ public sealed class AuthController : ControllerBase
             AuditAksiyonlari.KullaniciCreate, kullaniciId: result.User.Id,
             kullaniciAdi: result.User.AdSoyad, rol: result.User.Rol,
             hedef: "user", hedefId: result.User.Id, ip: GetIp(), userAgent: GetUserAgent(),
-            yeniDeger: $"kullanici register (pending) · {result.User.Email}"));
+            yeniDeger: $"kullanici register · {result.User.Email}"));
         return Ok(new
         {
-            message = "Kayıt alındı. Sayım Başkanı onayından sonra giriş yapabilirsiniz.",
+            message = "Kayıt tamamlandı. E-posta adresinizi doğruladıktan sonra giriş yapabilirsiniz.",
             user = result.User,
         });
     }

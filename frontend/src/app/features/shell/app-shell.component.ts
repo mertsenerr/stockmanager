@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ROLE_LABELS, UserRole } from '../../core/auth/auth.models';
@@ -9,20 +9,27 @@ import { ConfirmHostComponent } from '../../shared/ui/confirm/confirm-host.compo
 import { IncomingCallService } from '../../core/realtime/incoming-call.service';
 import { IncomingCallHostComponent } from '../../core/realtime/incoming-call-host.component';
 
-interface NavItem {
+interface SubItem {
   label: string;
   path: string;
+  description: string;
+  badge?: string;
+  roles?: UserRole[];
+}
+
+interface NavGroup {
+  id: string;
+  label: string;
   icon: string;
-  color: string;
-  image: string;
-  preview: { title: string; desc: string };
+  description: string;
+  items: SubItem[];
   roles?: UserRole[];
 }
 
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ToastHostComponent, ConfirmHostComponent, IncomingCallHostComponent],
+  imports: [RouterOutlet, RouterLink, ToastHostComponent, ConfirmHostComponent, IncomingCallHostComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app-shell.component.html',
   styleUrls: ['./app-shell.component.css'],
@@ -30,7 +37,6 @@ interface NavItem {
 export class AppShellComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
-  // Inject sadece — servis kendi effect'i ile auth'a bakıp hub'ı bağlar ve callRinging'i dinler.
   private readonly incomingCalls = inject(IncomingCallService);
   private readonly themeSvc = inject(ThemeService);
 
@@ -54,72 +60,110 @@ export class AppShellComponent {
   });
 
   readonly mobileNavOpen = signal(false);
+  readonly currentPath = signal<string>(this.router.url);
 
-  private readonly allNavItems: NavItem[] = [
+  private readonly allGroups: NavGroup[] = [
     {
+      id: 'home',
       label: 'Anasayfa',
-      path: '/',
       icon: '◎',
-      color: '#ffd66e',
-      image: 'https://picsum.photos/seed/sayimlink-home/600/320',
-      preview: { title: 'Hızlı bakış', desc: 'Hesabın, sistem durumu ve aktif sayım özetin.' },
+      description: 'Hızlı bakış',
+      items: [
+        { label: 'Anasayfa', path: '/', description: 'Hesap & sistem özet' },
+      ],
     },
     {
-      label: 'Firmalar',
-      path: '/firmalar',
-      icon: '◇',
-      color: '#4f46e5',
-      image: 'https://picsum.photos/seed/sayimlink-brand/600/320',
-      preview: { title: 'Müşteri firmaları', desc: 'LC Waikiki, Levi\'s, BP gibi firmaları yönet.' },
-      roles: ['Sistem', 'SayimBaskani'],
-    },
-    {
-      label: 'Mağazalar',
-      path: '/magazalar',
-      icon: '⌂',
-      color: '#ffd66e',
-      image: 'https://picsum.photos/seed/sayimlink-retail/600/320',
-      preview: { title: 'Mağaza ağı', desc: 'Şubeleri, lokasyonları ve harita konumlarını yönet.' },
-      roles: ['Sistem', 'SayimBaskani'],
-    },
-    {
+      id: 'compare',
       label: 'Karşılaştırma',
-      path: '/oturumlar',
       icon: '◐',
-      color: '#ff5d3a',
-      image: 'https://picsum.photos/seed/sayimlink-warehouse/600/320',
-      preview: { title: 'Karşılaştırma oturumları', desc: 'Aktif ve geçmiş canlı karşılaştırmaları yönet.' },
+      description: 'Sayım & raporlar',
+      items: [
+        { label: 'Oturumlar', path: '/oturumlar', description: 'Aktif & geçmiş canlı sayımlar' },
+        { label: 'Özel Raporlar', path: '/ozel-raporlar', description: 'Excel/PDF paylaşımlı raporlar' },
+      ],
     },
     {
-      label: 'Özel Raporlar',
-      path: '/ozel-raporlar',
-      icon: '◫',
-      color: '#a78bfa',
-      image: 'https://picsum.photos/seed/sayimlink-special/600/320',
-      preview: { title: 'Paylaşılan dosyalar', desc: 'Sayım Başkanından paylaşılan Excel/PDF raporlar.' },
+      id: 'data',
+      label: 'Veri',
+      icon: '◇',
+      description: 'Firmalar & mağazalar',
+      roles: ['Sistem', 'SayimBaskani'],
+      items: [
+        { label: 'Firmalar', path: '/firmalar', description: 'Müşteri firma listesi' },
+        { label: 'Mağazalar', path: '/magazalar', description: 'Şube ağı' },
+      ],
     },
     {
-      label: 'Arkadaşlar',
-      path: '/arkadaslar',
+      id: 'people',
+      label: 'Hesap',
       icon: '☻',
-      color: '#c7e84d',
-      image: 'https://picsum.photos/seed/sayimlink-friends/600/320',
-      preview: { title: 'Arkadaş listesi', desc: 'Arkadaş ekle ve sayım aramalarına davet et.' },
+      description: 'Kullanıcılar & arkadaşlar',
+      items: [
+        { label: 'Arkadaşlar', path: '/arkadaslar', description: 'Arkadaş listesi & istekler' },
+        { label: 'Kullanıcılar', path: '/kullanicilar', description: 'Sistem kullanıcı yönetimi', roles: ['Sistem'] },
+      ],
+    },
+    {
+      id: 'system',
+      label: 'Sistem',
+      icon: '⚙',
+      description: 'Yönetim araçları',
+      roles: ['Sistem'],
+      items: [
+        { label: 'Takvim', path: '/takvim', description: 'Atama takvimi' },
+        { label: 'Audit', path: '/audit', description: 'Değişiklik kayıtları' },
+      ],
     },
   ];
 
-  readonly navItems = computed(() => {
-    const u = this.user();
-    if (!u) return [];
-    return this.allNavItems.filter(
-      (item) => !item.roles || item.roles.includes(u.rol),
-    );
+  readonly groups = computed<NavGroup[]>(() => {
+    const role = this.user()?.rol;
+    if (!role) return [];
+    return this.allGroups
+      .filter((g) => !g.roles || g.roles.includes(role))
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((i) => !i.roles || i.roles.includes(role)),
+      }))
+      .filter((g) => g.items.length > 0);
   });
+
+  /** Hangi grup aktif — URL'den çıkarılır, kullanıcı tıklarsa override edilir. */
+  private readonly _activeGroupId = signal<string | null>(null);
+  readonly activeGroupId = computed<string>(() => {
+    const overridden = this._activeGroupId();
+    if (overridden) return overridden;
+    const path = this.currentPath();
+    const match = this.groups().find((g) => g.items.some((i) => this.matchesPath(i.path, path)));
+    return match?.id ?? this.groups()[0]?.id ?? '';
+  });
+
+  readonly activeGroup = computed<NavGroup | undefined>(
+    () => this.groups().find((g) => g.id === this.activeGroupId()),
+  );
+
+  setActiveGroup(id: string): void {
+    this._activeGroupId.set(id);
+  }
+
+  isPathActive(path: string): boolean {
+    return this.matchesPath(path, this.currentPath());
+  }
+
+  private matchesPath(itemPath: string, current: string): boolean {
+    if (itemPath === '/') return current === '/' || current === '';
+    return current === itemPath || current.startsWith(itemPath + '/');
+  }
 
   constructor() {
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
-      .subscribe(() => this.mobileNavOpen.set(false));
+      .subscribe((e) => {
+        this.mobileNavOpen.set(false);
+        this.currentPath.set(e.urlAfterRedirects);
+        // Navigation sonrası override'ı temizle ki URL gerçek aktif grubu sürsün.
+        this._activeGroupId.set(null);
+      });
   }
 
   toggleMobileNav(): void {

@@ -30,6 +30,18 @@ module.exports = {
         butter: 'var(--color-butter)',
         cobalt: 'var(--color-cobalt)',
         mint: 'var(--color-mint)',
+        violet: {
+          DEFAULT: 'var(--color-violet, #8b5cf6)',
+          strong: 'var(--color-violet-strong, #7c3aed)',
+          soft: 'var(--color-violet-soft, rgba(139, 92, 246, 0.16))',
+        },
+        status: {
+          blue:  'var(--color-status-blue, #3b82f6)',
+          cyan:  'var(--color-status-cyan, #06b6d4)',
+          green: 'var(--color-status-green, #22c55e)',
+          pink:  'var(--color-status-pink, #ec4899)',
+          amber: 'var(--color-status-amber, #f59e0b)',
+        },
         accent: {
           success: 'var(--color-accent-success)',
           warning: 'var(--color-accent-warning)',

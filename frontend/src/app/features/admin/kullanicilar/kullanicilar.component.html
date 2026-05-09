@@ -12,9 +12,8 @@
       placeholder="Ara..."
       class="focus-ring text-xs px-2.5 py-1.5 bg-surface-elevated border border-border rounded-sm w-44 placeholder:text-text-muted"
     />
-    <button (click)="openCreate()"
-            class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
-      Yeni kullanıcı
+    <button (click)="openCreate()" class="pill-btn pill-btn-violet">
+      <span aria-hidden="true">+</span> Yeni kullanıcı
     </button>
   </div>
 </app-page-header>
@@ -47,9 +46,9 @@
             </td>
             <td class="px-4 py-2.5">
               @if (u.aktifMi) {
-                <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-accent-success"></span>aktif</span>
+                <span class="chip-status is-green">aktif</span>
               } @else {
-                <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span>pasif</span>
+                <span class="chip-status">pasif</span>
               }
             </td>
             <td class="px-4 py-2.5 text-right">
@@ -171,8 +170,7 @@
               class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
         Vazgeç
       </button>
-      <button type="submit" [disabled]="saving()"
-              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg disabled:opacity-50 active:scale-[0.98] transition-all duration-150">
+      <button type="submit" [disabled]="saving()" class="pill-btn pill-btn-violet">
         {{ saving() ? 'Kaydediliyor...' : (editing() ? 'Güncelle' : 'Oluştur') }}
       </button>
     </div>

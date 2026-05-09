@@ -34,9 +34,8 @@
               [class.text-text-primary]="view() === 'map'"
               [class.text-text-muted]="view() !== 'map'">Harita</button>
     </div>
-    <button (click)="openCreate()"
-            class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
-      Yeni mağaza
+    <button (click)="openCreate()" class="pill-btn pill-btn-violet">
+      <span aria-hidden="true">+</span> Yeni mağaza
     </button>
   </div>
 </app-page-header>
@@ -68,9 +67,9 @@
               <td class="px-4 py-2.5 text-text-secondary text-xs">{{ m.muduruAdSoyad ?? '—' }}</td>
               <td class="px-4 py-2.5">
                 @if (m.aktifMi) {
-                  <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-accent-success"></span>aktif</span>
+                  <span class="chip-status is-green">aktif</span>
                 } @else {
-                  <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span>pasif</span>
+                  <span class="chip-status">pasif</span>
                 }
               </td>
               <td class="px-4 py-2.5 text-right">
@@ -155,8 +154,7 @@
               class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
         Vazgeç
       </button>
-      <button type="submit" [disabled]="saving()"
-              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg disabled:opacity-50 active:scale-[0.98] transition-all duration-150">
+      <button type="submit" [disabled]="saving()" class="pill-btn pill-btn-violet">
         {{ saving() ? 'Kaydediliyor...' : (editing() ? 'Güncelle' : 'Oluştur') }}
       </button>
     </div>

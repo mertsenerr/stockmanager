@@ -13,9 +13,8 @@
            placeholder="Ara..."
            class="focus-ring text-xs px-2.5 py-1.5 bg-surface-elevated border border-border rounded-sm w-44 placeholder:text-text-muted" />
     @if (canCreate()) {
-      <button (click)="openCreate()"
-              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
-        Yeni oturum
+      <button (click)="openCreate()" class="pill-btn pill-btn-violet">
+        <span aria-hidden="true">+</span> Yeni oturum
       </button>
     }
   </div>
@@ -46,10 +45,7 @@
               <div class="text-text-muted text-xs">{{ o.magazaAdi }}</div>
             </td>
             <td class="px-4 py-2.5">
-              <span class="chip">
-                <span class="w-1.5 h-1.5 rounded-full" [class]="durumColor(o.durum)"></span>
-                {{ durumLabel(o.durum) }}
-              </span>
+              <span class="chip-status" [class]="'chip-status ' + durumChipClass(o.durum)">{{ durumLabel(o.durum) }}</span>
             </td>
             <td class="px-4 py-2.5 text-text-muted text-xs">
               @if (o.ozetler.toplamUrun > 0) {
@@ -156,8 +152,7 @@
               class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
         Vazgeç
       </button>
-      <button type="submit" [disabled]="saving()"
-              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg disabled:opacity-50 active:scale-[0.98] transition-all duration-150">
+      <button type="submit" [disabled]="saving()" class="pill-btn pill-btn-violet">
         {{ saving() ? 'Oluşturuluyor...' : 'Oluştur' }}
       </button>
     </div>

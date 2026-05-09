@@ -70,6 +70,16 @@ export class OturumlarComponent implements OnInit {
 
   readonly durumLabel = (d: OturumDurum) => OTURUM_DURUM_LABELS[d];
   readonly durumColor = (d: OturumDurum) => OTURUM_DURUM_COLOR[d];
+  readonly durumChipClass = (d: OturumDurum): string => {
+    switch (d) {
+      case 'aktif': return 'is-blue';
+      case 'kilitli': return 'is-amber';
+      case 'tamamlandi': return 'is-green';
+      case 'iptal': return 'is-coral';
+      case 'excel_bekleniyor': return 'is-cyan';
+      default: return 'is-violet';
+    }
+  };
 
   readonly durumOptions: { value: OturumDurum | ''; label: string }[] = [
     { value: '', label: 'Tüm durumlar' },

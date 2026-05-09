@@ -79,6 +79,26 @@ export class OturumDetailComponent implements OnInit {
 
   readonly durumLabel = (d: OturumDurum) => OTURUM_DURUM_LABELS[d];
   readonly durumColor = (d: OturumDurum) => OTURUM_DURUM_COLOR[d];
+  readonly durumChipClass = (d: OturumDurum): string => {
+    switch (d) {
+      case 'aktif': return 'is-blue';
+      case 'kilitli': return 'is-amber';
+      case 'tamamlandi': return 'is-green';
+      case 'iptal': return 'is-coral';
+      case 'excel_bekleniyor': return 'is-cyan';
+      default: return 'is-violet';
+    }
+  };
+  readonly urunChipClass = (d: UrunDurum): string => {
+    switch (d) {
+      case 'beklemede': return 'is-blue';
+      case 'tekrar_sayiliyor': return 'is-coral';
+      case 'onaylandi': return 'is-green';
+      case 'iptal': return 'is-violet';
+      case 'incele': return 'is-amber';
+      default: return 'is-violet';
+    }
+  };
   readonly urunDurumLabel = (d: UrunDurum) => URUN_DURUM_LABELS[d];
 
   ngOnInit(): void {

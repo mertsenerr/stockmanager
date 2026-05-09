@@ -1,88 +1,206 @@
-<section class="max-w-4xl">
-  <div class="mb-7">
-    <h2 class="font-display font-bold text-[28px] tracking-tight leading-tight">
+<div class="dash-root">
+  <!-- Hero -->
+  <header class="dash-hero">
+    <div>
+      <p class="section-label">Anasayfa</p>
       @if (user(); as u) {
-        Hoş geldin, <span class="font-serif italic font-medium text-coral">{{ u.adSoyad }}</span>.
-      }
-    </h2>
-    @if (user(); as u) {
-      @if (u.firmaAdi) {
-        <p class="text-sm text-ink-secondary mt-2">
-          {{ u.firmaAdi }}
-          @if (u.firmaKisaltmasi) { <span class="font-mono text-xs text-ink-muted ml-1">[{{ u.firmaKisaltmasi }}]</span> }
+        <h1 class="dash-hero-title">
+          Hoş geldin, <span class="dash-hero-name">{{ u.adSoyad }}</span>.
+        </h1>
+        <p class="dash-hero-sub">
+          @if (u.firmaAdi) { {{ u.firmaAdi }} · }
+          {{ metrics().aktif }} aktif, {{ metrics().tamamlandi }} tamamlanan oturum
         </p>
-      }
-    }
-  </div>
-
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-    <div class="card p-5">
-      <h3 class="font-mono text-[11px] text-ink-secondary uppercase tracking-[0.14em] mb-4">Hesap</h3>
-      @if (user(); as u) {
-        <dl class="space-y-3 text-sm">
-          <div class="flex justify-between gap-4 items-baseline">
-            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Email</dt>
-            <dd class="font-mono text-xs truncate">{{ u.email }}</dd>
-          </div>
-          <div class="flex justify-between gap-4 items-baseline">
-            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Rol</dt>
-            <dd class="text-sm font-semibold">{{ u.rol }}</dd>
-          </div>
-          @if (u.firmaAdi) {
-            <div class="flex justify-between gap-4 items-baseline">
-              <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Firma</dt>
-              <dd class="text-sm font-semibold">{{ u.firmaAdi }}</dd>
-            </div>
-          }
-          @if (u.firmaKisaltmasi) {
-            <div class="flex justify-between gap-4 items-baseline">
-              <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Katılım anahtarı</dt>
-              <dd class="font-mono text-sm font-semibold">{{ u.firmaKisaltmasi }}</dd>
-            </div>
-          }
-          <div class="flex justify-between gap-4 items-baseline">
-            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Mağaza sayısı</dt>
-            <dd class="font-mono text-sm font-semibold">{{ u.magazaIds.length }}</dd>
-          </div>
-        </dl>
       }
     </div>
 
-    <div class="card p-5">
-      <h3 class="font-mono text-[11px] text-ink-secondary uppercase tracking-[0.14em] mb-4">Sistem</h3>
-      @if (healthState(); as h) {
-        <dl class="space-y-3 text-sm">
-          <div class="flex justify-between gap-4 items-baseline">
-            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">API</dt>
-            <dd>
-              @if (h.status === 'healthy') {
-                <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-mint"></span>healthy</span>
-              } @else if (h.status === 'degraded') {
-                <span class="chip" style="background: var(--color-butter);"><span class="w-1.5 h-1.5 rounded-full bg-ink"></span>degraded</span>
-              } @else {
-                <span class="chip" style="background: var(--color-coral); color: #fff;"><span class="w-1.5 h-1.5 rounded-full bg-white"></span>kapalı</span>
-              }
-            </dd>
-          </div>
-          <div class="flex justify-between gap-4 items-baseline">
-            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">MongoDB</dt>
-            <dd>
-              <span class="chip">
-                <span class="w-1.5 h-1.5 rounded-full"
-                      [class.bg-mint]="h.checks?.mongo === 'up'"
-                      [class.bg-coral]="h.checks?.mongo !== 'up'"></span>
-                {{ h.checks?.mongo ?? '—' }}
+    @if (canManage()) {
+      <button type="button" (click)="goNewOturum()" class="pill-btn pill-btn-violet">
+        <span aria-hidden="true">+</span>
+        Yeni karşılaştırma
+      </button>
+    }
+  </header>
+
+  <!-- Metric strip -->
+  <div class="dash-metrics">
+    <div class="dash-metric">
+      <span class="dash-metric-label">Aktif</span>
+      <span class="dash-metric-value">{{ metrics().aktif }}</span>
+      <span class="chip-status is-cyan">aktif oturum</span>
+    </div>
+    <div class="dash-metric">
+      <span class="dash-metric-label">Tamamlandı</span>
+      <span class="dash-metric-value">{{ metrics().tamamlandi }}</span>
+      <span class="chip-status is-green">bitirildi</span>
+    </div>
+    <div class="dash-metric">
+      <span class="dash-metric-label">Taslak</span>
+      <span class="dash-metric-value">{{ metrics().taslak }}</span>
+      <span class="chip-status is-violet">excel bekliyor</span>
+    </div>
+    <div class="dash-metric">
+      <span class="dash-metric-label">Toplam ürün</span>
+      <span class="dash-metric-value">{{ metrics().toplamUrun }}</span>
+      <span class="chip-status is-pink">{{ metrics().onaylanmis }} onaylı</span>
+    </div>
+  </div>
+
+  <!-- Bento grid -->
+  <div class="dash-grid">
+    <!-- Gauge — completion -->
+    <section class="bento dash-card-gauge">
+      <header class="bento-header">
+        <div>
+          <p class="section-label">Tamamlanma</p>
+          <h3 class="bento-title">Genel onay oranı</h3>
+        </div>
+      </header>
+
+      <div class="dash-gauge">
+        <svg viewBox="0 0 200 110" class="dash-gauge-svg" role="img" aria-label="Tamamlanma yayı">
+          <defs>
+            <linearGradient id="dashGaugeArc" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#06b6d4" />
+              <stop offset="35%" stop-color="#22c55e" />
+              <stop offset="65%" stop-color="#f59e0b" />
+              <stop offset="100%" stop-color="#ec4899" />
+            </linearGradient>
+          </defs>
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14" stroke-linecap="round" />
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#dashGaugeArc)" stroke-width="14" stroke-linecap="round"
+                [attr.stroke-dasharray]="arcLength(metrics().oran)" />
+        </svg>
+        <div class="dash-gauge-text">
+          <span class="dash-gauge-value">%{{ metrics().oran }}</span>
+          <span class="dash-gauge-sub">{{ metrics().onaylanmis }} / {{ metrics().toplamUrun }} ürün</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Yaklaşan oturumlar -->
+    <section class="bento dash-card-upcoming">
+      <header class="bento-header">
+        <div>
+          <p class="section-label">Yaklaşanlar</p>
+          <h3 class="bento-title">Plan listesi</h3>
+        </div>
+        <a routerLink="/oturumlar" class="pill-btn">Tümü</a>
+      </header>
+
+      @if (yaklasanOturumlar().length === 0) {
+        <p class="dash-empty">Yaklaşan plan yok.</p>
+      } @else {
+        <ul class="dash-upcoming-list">
+          @for (o of yaklasanOturumlar(); track o.id) {
+            <li (click)="open(o)" class="dash-upcoming-item" tabindex="0">
+              <span class="dash-upcoming-date">
+                <span class="dash-upcoming-day">{{ formatDate(o.tarih).slice(8, 10) }}</span>
+                <span class="dash-upcoming-month">{{ formatDate(o.tarih).slice(5, 7) }}</span>
               </span>
-            </dd>
+              <span class="dash-upcoming-body">
+                <span class="dash-upcoming-title">{{ o.firmaAdi }} · {{ o.magazaAdi }}</span>
+                <span class="chip-status" [class]="'chip-status ' + durumChipClass(o.durum)">{{ durumLabel(o.durum) }}</span>
+              </span>
+              <span class="dash-upcoming-arrow" aria-hidden="true">→</span>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    <!-- Son aktivite -->
+    <section class="bento dash-card-activity">
+      <header class="bento-header">
+        <div>
+          <p class="section-label">Aktivite</p>
+          <h3 class="bento-title">Son hareketler</h3>
+        </div>
+      </header>
+
+      @if (recentActivity().length === 0) {
+        <p class="dash-empty">Henüz aktivite yok.</p>
+      } @else {
+        <ul class="dash-activity-list">
+          @for (a of recentActivity(); track a.id) {
+            <li class="dash-activity-item">
+              <span class="dash-activity-icon" [attr.data-tone]="a.tone">{{ a.icon }}</span>
+              <span class="dash-activity-body">
+                <span class="dash-activity-title">{{ a.title }}</span>
+                <span class="dash-activity-meta">{{ a.meta }}</span>
+              </span>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    <!-- Sistem durumu -->
+    <section class="bento dash-card-system">
+      <header class="bento-header">
+        <div>
+          <p class="section-label">Sistem</p>
+          <h3 class="bento-title">Sağlık durumu</h3>
+        </div>
+        @if (healthState(); as h) {
+          @if (h.status === 'healthy') {
+            <span class="chip-status is-green">healthy</span>
+          } @else if (h.status === 'degraded') {
+            <span class="chip-status is-amber">degraded</span>
+          } @else {
+            <span class="chip-status is-coral">offline</span>
+          }
+        }
+      </header>
+
+      @if (healthState(); as h) {
+        <dl class="dash-system-grid">
+          <div class="dash-system-row">
+            <dt>API</dt>
+            <dd>{{ h.status }}</dd>
           </div>
-          <div class="flex justify-between gap-4 items-baseline">
-            <dt class="text-ink-muted text-xs uppercase tracking-wider font-mono">Versiyon</dt>
-            <dd class="font-mono text-sm font-semibold">{{ h.version ?? '—' }}</dd>
+          <div class="dash-system-row">
+            <dt>MongoDB</dt>
+            <dd>{{ h.checks?.mongo ?? '—' }}</dd>
+          </div>
+          <div class="dash-system-row">
+            <dt>Sürüm</dt>
+            <dd class="dash-system-mono">{{ h.version ?? '—' }}</dd>
           </div>
         </dl>
       } @else {
-        <p class="text-xs text-ink-muted">Sistem durumu yükleniyor...</p>
+        <p class="dash-empty">Sistem durumu yükleniyor...</p>
       }
-    </div>
+    </section>
+
+    <!-- Hızlı linkler -->
+    <section class="bento dash-card-quick">
+      <header class="bento-header">
+        <div>
+          <p class="section-label">Hızlı erişim</p>
+          <h3 class="bento-title">Sık kullanılanlar</h3>
+        </div>
+      </header>
+      <div class="dash-quick-grid">
+        <a routerLink="/oturumlar" class="dash-quick-tile">
+          <span class="dash-quick-icon">◐</span>
+          <span class="dash-quick-label">Oturumlar</span>
+        </a>
+        <a routerLink="/ozel-raporlar" class="dash-quick-tile">
+          <span class="dash-quick-icon">◫</span>
+          <span class="dash-quick-label">Özel Raporlar</span>
+        </a>
+        <a routerLink="/arkadaslar" class="dash-quick-tile">
+          <span class="dash-quick-icon">☻</span>
+          <span class="dash-quick-label">Arkadaşlar</span>
+        </a>
+        @if (canManage()) {
+          <a routerLink="/firmalar" class="dash-quick-tile">
+            <span class="dash-quick-icon">◇</span>
+            <span class="dash-quick-label">Firmalar</span>
+          </a>
+        }
+      </div>
+    </section>
   </div>
-</section>
+</div>

@@ -58,7 +58,7 @@
       </header>
 
       <div class="dash-gauge">
-        <svg viewBox="0 0 200 110" class="dash-gauge-svg" role="img" aria-label="Tamamlanma yayı">
+        <svg viewBox="0 0 200 150" class="dash-gauge-svg" role="img" aria-label="Tamamlanma yayı">
           <defs>
             <linearGradient id="dashGaugeArc" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stop-color="#06b6d4" />
@@ -67,14 +67,12 @@
               <stop offset="100%" stop-color="#ec4899" />
             </linearGradient>
           </defs>
-          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14" stroke-linecap="round" />
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" class="dash-gauge-track" stroke-width="14" stroke-linecap="round" />
           <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#dashGaugeArc)" stroke-width="14" stroke-linecap="round"
                 [attr.stroke-dasharray]="arcLength(metrics().oran)" />
+          <text x="100" y="92" text-anchor="middle" class="dash-gauge-value-text">%{{ metrics().oran }}</text>
+          <text x="100" y="125" text-anchor="middle" class="dash-gauge-sub-text">{{ metrics().onaylanmis }} / {{ metrics().toplamUrun }} ürün</text>
         </svg>
-        <div class="dash-gauge-text">
-          <span class="dash-gauge-value">%{{ metrics().oran }}</span>
-          <span class="dash-gauge-sub">{{ metrics().onaylanmis }} / {{ metrics().toplamUrun }} ürün</span>
-        </div>
       </div>
     </section>
 

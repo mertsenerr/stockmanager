@@ -766,10 +766,10 @@
   .bento {
     position: relative;
     background: var(--color-surface);
-    border: 1.5px solid var(--color-ink);
+    border: 1px solid rgba(0, 0, 0, 0.06);
     border-radius: 18px;
     padding: 18px;
-    box-shadow: var(--shadow-stamp-sm);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
     transition: transform var(--transition-soft-200), box-shadow var(--transition-soft-200), border-color var(--transition-soft);
   }
   .bento-header {
@@ -1151,9 +1151,9 @@
   display: flex; flex-direction: column; gap: 6px;
   padding: 16px 18px;
   background: var(--color-surface);
-  border: 1.5px solid var(--color-ink);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 16px;
-  box-shadow: var(--shadow-stamp-sm);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
 }
 [data-theme="dark"] .dash-metric {
   border: 1px solid var(--color-border);
@@ -1218,28 +1218,26 @@
 
 /* Gauge */
 .dash-gauge {
-  position: relative;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   height: 100%;
-  padding: 8px 0 4px;
+  padding: 8px 0;
 }
-.dash-gauge-svg { width: 100%; max-width: 280px; height: auto; display: block; }
-.dash-gauge-text {
-  position: absolute;
-  bottom: 24px; left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.dash-gauge-value {
+.dash-gauge-svg { width: 100%; max-width: 300px; height: auto; display: block; }
+.dash-gauge-track { stroke: rgba(0, 0, 0, 0.08); }
+[data-theme="dark"] .dash-gauge-track { stroke: rgba(255, 255, 255, 0.06); }
+.dash-gauge-value-text {
   font-family: Inter, system-ui, sans-serif;
-  font-size: 38px;
+  font-size: 32px;
   font-weight: 800;
   letter-spacing: -0.025em;
-  color: var(--color-ink);
-  line-height: 1;
+  fill: var(--color-ink);
 }
-.dash-gauge-sub { font-size: 11.5px; color: var(--color-ink-secondary); }
+.dash-gauge-sub-text {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  fill: var(--color-ink-secondary);
+}
 
 /* Upcoming list */
 .dash-upcoming-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }

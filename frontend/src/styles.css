@@ -1404,3 +1404,162 @@
   color: var(--color-violet);
 }
 .dash-quick-label { font-size: 12.5px; font-weight: 600; color: var(--color-ink); }
+
+/* ─── Arkadaşlar — friend rows ────────────────────────────────────────────── */
+.friend-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+  border: 1px solid transparent;
+  transition: background 150ms, border-color 150ms;
+}
+.friend-row:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+[data-theme="dark"] .friend-row {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-border);
+}
+[data-theme="dark"] .friend-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--color-border-strong);
+}
+
+.friend-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px;
+  border-radius: 12px;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+.friend-avatar-violet {
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.30);
+}
+.friend-avatar-cyan {
+  background: linear-gradient(135deg, #06b6d4, #3b82f6);
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.30);
+}
+[data-theme="dark"] .friend-avatar-violet {
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.45);
+}
+[data-theme="dark"] .friend-avatar-cyan {
+  box-shadow: 0 4px 16px rgba(6, 182, 212, 0.40);
+}
+
+/* ─── FullCalendar — dark variant ─────────────────────────────────────────── */
+[data-theme="dark"] .fc {
+  --fc-border-color: rgba(255, 255, 255, 0.08);
+  --fc-button-bg-color: var(--color-surface);
+  --fc-button-border-color: var(--color-border-strong);
+  --fc-button-text-color: var(--color-ink-secondary);
+  --fc-button-hover-bg-color: var(--color-surface-elevated);
+  --fc-button-hover-border-color: var(--color-border-strong);
+  --fc-button-active-bg-color: var(--color-violet, #8b5cf6);
+  --fc-button-active-border-color: transparent;
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: var(--color-surface);
+  --fc-neutral-text-color: var(--color-ink-secondary);
+  --fc-list-event-hover-bg-color: var(--color-surface);
+  --fc-today-bg-color: rgba(139, 92, 246, 0.10);
+  --fc-event-bg-color: var(--color-violet, #8b5cf6);
+  --fc-event-border-color: transparent;
+  --fc-event-text-color: #ffffff;
+  color: var(--color-ink);
+}
+[data-theme="dark"] .fc-theme-standard .fc-scrollgrid {
+  border-color: var(--color-border);
+}
+[data-theme="dark"] .fc-theme-standard td,
+[data-theme="dark"] .fc-theme-standard th {
+  border-color: var(--color-border);
+}
+[data-theme="dark"] .fc-col-header-cell {
+  background: var(--color-surface);
+}
+[data-theme="dark"] .fc-col-header-cell-cushion {
+  color: var(--color-ink-secondary);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+[data-theme="dark"] .fc-daygrid-day-number,
+[data-theme="dark"] .fc-list-day-text,
+[data-theme="dark"] .fc-list-day-side-text {
+  color: var(--color-ink);
+}
+[data-theme="dark"] .fc-daygrid-day.fc-day-today {
+  background: rgba(139, 92, 246, 0.10) !important;
+}
+[data-theme="dark"] .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  color: var(--color-violet);
+  font-weight: 800;
+}
+[data-theme="dark"] .fc-event {
+  border-radius: 8px !important;
+  padding: 2px 6px !important;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.30);
+}
+[data-theme="dark"] .fc-button {
+  border-radius: 999px !important;
+  padding: 6px 14px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+}
+[data-theme="dark"] .fc-button-primary:not(:disabled).fc-button-active,
+[data-theme="dark"] .fc-button-primary:not(:disabled):active {
+  box-shadow: 0 6px 18px rgba(139, 92, 246, 0.35) !important;
+}
+[data-theme="dark"] .fc-toolbar-title {
+  font-weight: 700;
+  color: var(--color-ink);
+}
+[data-theme="dark"] .fc-list-empty {
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
+}
+
+/* ─── Auth dark variant — violet gradient hero ────────────────────────────── */
+[data-theme="dark"] .auth-display em {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 60%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-style: normal;
+  font-weight: 800;
+}
+[data-theme="dark"] .auth-display .dot {
+  background: var(--color-violet, #8b5cf6);
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.55);
+}
+
+/* Auth shell decorative blobs — dark için tonalı */
+[data-theme="dark"] .auth-page::before {
+  content: '';
+  position: absolute;
+  top: -10%; right: -10%;
+  width: 460px; height: 460px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.20), transparent 65%);
+  filter: blur(20px);
+  pointer-events: none;
+  z-index: 0;
+}
+[data-theme="dark"] .auth-page::after {
+  content: '';
+  position: absolute;
+  bottom: -10%; left: -10%;
+  width: 420px; height: 420px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.16), transparent 60%);
+  filter: blur(20px);
+  pointer-events: none;
+  z-index: 0;
+}

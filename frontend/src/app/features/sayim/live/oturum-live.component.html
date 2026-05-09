@@ -70,7 +70,7 @@
     </button>
     <button (click)="setFilter('beklemede')" class="filter-tab" [class.active]="filterTab() === 'beklemede'">
       <p class="font-mono text-[10px] uppercase tracking-wider text-ink-muted">Beklemede</p>
-      <p class="text-2xl font-display font-bold font-mono mt-1" style="color: var(--color-cobalt);">{{ o.ozetler.beklemedeSayisi }}</p>
+      <p class="text-2xl font-display font-bold font-mono mt-1 text-status-blue">{{ o.ozetler.beklemedeSayisi }}</p>
     </button>
     <button (click)="setFilter('tekrar')" class="filter-tab" [class.active]="filterTab() === 'tekrar'">
       <p class="font-mono text-[10px] uppercase tracking-wider text-ink-muted">Tekrar say</p>

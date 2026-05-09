@@ -22,6 +22,7 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { FirmaService } from '../firma.service';
 import { MagazaService } from '../magaza.service';
 import { Firma, Magaza } from '../admin.models';
+import { ThemeService } from '../../../core/theme/theme.service';
 
 type ViewMode = 'list' | 'map';
 
@@ -40,6 +41,8 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly fSvc = inject(FirmaService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
+  private readonly themeSvc = inject(ThemeService);
+  private tileLayer?: L.TileLayer;
 
   @ViewChild('mapEl') private mapEl?: ElementRef<HTMLDivElement>;
   private map?: L.Map;
@@ -89,6 +92,29 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
       // Re-render markers when filtered list changes and we are in map mode.
       if (this.view() === 'map') this.renderMarkers(this.filtered());
     });
+    effect(() => {
+      // Switch tile layer when theme changes.
+      const t = this.themeSvc.theme();
+      if (this.map && this.tileLayer) {
+        this.map.removeLayer(this.tileLayer);
+        this.tileLayer = this.tileLayerFor(t);
+        this.tileLayer.addTo(this.map);
+      }
+    });
+  }
+
+  private tileLayerFor(theme: 'light' | 'dark'): L.TileLayer {
+    if (theme === 'dark') {
+      return L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap, © CARTO',
+        maxZoom: 19,
+        subdomains: 'abcd',
+      });
+    }
+    return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 19,
+    });
   }
 
   ngOnInit(): void {
@@ -137,14 +163,12 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
   private ensureMap(): void {
     if (this.map || !this.mapEl) return;
     this.map = L.map(this.mapEl.nativeElement, {
-      center: [39.0, 35.0], // approx Türkiye centroid
+      center: [39.0, 35.0],
       zoom: 5,
       zoomControl: true,
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
-      maxZoom: 19,
-    }).addTo(this.map);
+    this.tileLayer = this.tileLayerFor(this.themeSvc.theme());
+    this.tileLayer.addTo(this.map);
     this.markerLayer = L.layerGroup().addTo(this.map);
     this.renderMarkers(this.filtered());
   }
@@ -154,10 +178,14 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
     this.markerLayer.clearLayers();
 
     const withCoords = list.filter((m) => m.koordinat);
+    const isDark = this.themeSvc.theme() === 'dark';
+    const fill = isDark ? '#8b5cf6' : '#3b82f6';
+    const ring = isDark ? '#0a0a0a' : '#fafafa';
+    const glow = isDark ? '0 0 12px rgba(139,92,246,0.6)' : '0 0 0 1px #1f1f1f';
     const dot = L.divIcon({
       className: '',
-      html: '<div style="width:10px;height:10px;border-radius:9999px;background:#3b82f6;border:2px solid #fafafa;box-shadow:0 0 0 1px #1f1f1f"></div>',
-      iconSize: [14, 14],
+      html: `<div style="width:11px;height:11px;border-radius:9999px;background:${fill};border:2px solid ${ring};box-shadow:${glow}"></div>`,
+      iconSize: [15, 15],
       iconAnchor: [7, 7],
     });
 

@@ -18,8 +18,17 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
 
     <div class="grid gap-4 grid-cols-1 lg:grid-cols-2">
       <!-- Arkadaş ara / ekle -->
-      <section class="card-flat p-4">
-        <h3 class="font-mono text-[10px] uppercase tracking-wider text-ink-muted mb-2">Arkadaş ekle</h3>
+      <section class="bento">
+        <header class="bento-header">
+          <div>
+            <p class="section-label">Keşfet</p>
+            <h3 class="bento-title">Arkadaş ekle</h3>
+          </div>
+          @if (outgoing().length > 0) {
+            <span class="num-badge is-violet">{{ outgoing().length }} bekleyen</span>
+          }
+        </header>
+
         <input type="search"
                [value]="searchQuery()"
                (input)="onSearchInput(($any($event.target)).value)"
@@ -31,31 +40,26 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
         } @else if (searchResults().length > 0) {
           <ul class="space-y-1.5 max-h-[40vh] overflow-y-auto -mx-2 px-2">
             @for (u of searchResults(); track u.id) {
-              <li class="flex items-center gap-2 p-2 rounded-lg border-[1.5px] border-ink/20 hover:border-ink transition-colors">
-                <div class="w-8 h-8 rounded-full border-[1.5px] border-ink bg-mint/40 flex items-center justify-center text-[10px] font-bold font-mono shrink-0">
-                  {{ u.adSoyad.slice(0, 2).toUpperCase() }}
-                </div>
+              <li class="friend-row">
+                <span class="friend-avatar friend-avatar-violet">{{ u.adSoyad.slice(0, 2).toUpperCase() }}</span>
                 <div class="flex-1 min-w-0">
-                  <p class="text-xs font-semibold truncate">{{ u.adSoyad }}</p>
+                  <p class="text-sm font-semibold truncate text-ink">{{ u.adSoyad }}</p>
                   <p class="text-[11px] text-ink-muted truncate">{{ u.email }} · {{ u.rol }}</p>
                 </div>
                 @switch (u.arkadaslikDurumu) {
                   @case ('arkadas') {
-                    <span class="font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded shrink-0"
-                          style="background: var(--color-mint);">Arkadaş</span>
+                    <span class="chip-status is-green shrink-0">Arkadaş</span>
                   }
                   @case ('giden') {
-                    <span class="font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded shrink-0"
-                          style="background: var(--color-butter);">Gönderildi</span>
+                    <span class="chip-status is-amber shrink-0">Gönderildi</span>
                   }
                   @case ('gelen') {
-                    <span class="font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded shrink-0"
-                          style="background: var(--color-cobalt); color: #fff;">Gelen istek</span>
+                    <span class="chip-status is-violet shrink-0">Gelen istek</span>
                   }
                   @default {
                     <button type="button" (click)="sendRequest(u)"
                             [disabled]="sending() === u.id"
-                            class="btn btn-xs btn-primary shrink-0 disabled:opacity-50">
+                            class="pill-btn pill-btn-violet shrink-0">
                       {{ sending() === u.id ? '...' : '+ Ekle' }}
                     </button>
                   }
@@ -64,32 +68,37 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
             }
           </ul>
         } @else if (searchQuery().trim().length >= 2) {
-          <p class="text-xs text-ink-muted text-center py-4 italic">Eşleşen kullanıcı yok.</p>
+          <p class="text-xs text-ink-muted text-center py-4">Eşleşen kullanıcı yok.</p>
         } @else {
-          <p class="text-xs text-ink-muted text-center py-4 italic">Aramaya başla...</p>
+          <p class="text-xs text-ink-muted text-center py-4">Aramaya başla...</p>
         }
       </section>
 
       <!-- Gelen istekler -->
-      <section class="card-flat p-4">
-        <h3 class="font-mono text-[10px] uppercase tracking-wider text-ink-muted mb-2">
-          Gelen istekler ({{ incoming().length }})
-        </h3>
+      <section class="bento">
+        <header class="bento-header">
+          <div>
+            <p class="section-label">Bekliyor</p>
+            <h3 class="bento-title">Gelen istekler</h3>
+          </div>
+          @if (incoming().length > 0) {
+            <span class="num-badge is-violet">{{ incoming().length }}</span>
+          }
+        </header>
+
         @if (incoming().length === 0) {
-          <p class="text-xs text-ink-muted text-center py-4 italic">Bekleyen istek yok.</p>
+          <p class="text-xs text-ink-muted text-center py-4">Bekleyen istek yok.</p>
         } @else {
           <ul class="space-y-1.5">
             @for (f of incoming(); track f.id) {
-              <li class="flex items-center gap-2 p-2 rounded-lg border-[1.5px] border-ink/20">
-                <div class="w-8 h-8 rounded-full border-[1.5px] border-ink bg-cobalt/30 flex items-center justify-center text-[10px] font-bold font-mono shrink-0">
-                  {{ f.adSoyad.slice(0, 2).toUpperCase() }}
-                </div>
+              <li class="friend-row">
+                <span class="friend-avatar friend-avatar-cyan">{{ f.adSoyad.slice(0, 2).toUpperCase() }}</span>
                 <div class="flex-1 min-w-0">
-                  <p class="text-xs font-semibold truncate">{{ f.adSoyad }}</p>
+                  <p class="text-sm font-semibold truncate text-ink">{{ f.adSoyad }}</p>
                   <p class="text-[11px] text-ink-muted truncate">{{ f.email }}</p>
                 </div>
-                <button type="button" (click)="accept(f)" class="btn btn-xs btn-primary shrink-0">Kabul</button>
-                <button type="button" (click)="reject(f)" class="btn btn-xs btn-ghost shrink-0">Red</button>
+                <button type="button" (click)="accept(f)" class="pill-btn pill-btn-violet shrink-0">Kabul</button>
+                <button type="button" (click)="reject(f)" class="pill-btn shrink-0">Red</button>
               </li>
             }
           </ul>
@@ -97,31 +106,29 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
       </section>
 
       <!-- Arkadaşlarım -->
-      <section class="card-flat p-4 lg:col-span-2">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="font-mono text-[10px] uppercase tracking-wider text-ink-muted">
-            Arkadaşlarım ({{ friends().length }})
-          </h3>
-          @if (outgoing().length > 0) {
-            <span class="font-mono text-[10px] text-ink-muted">{{ outgoing().length }} bekleyen istek gönderildi</span>
-          }
-        </div>
+      <section class="bento lg:col-span-2">
+        <header class="bento-header">
+          <div>
+            <p class="section-label">Arkadaşlarım</p>
+            <h3 class="bento-title">{{ friends().length }} arkadaş</h3>
+          </div>
+        </header>
+
         @if (loading()) {
           <p class="text-xs text-ink-muted text-center py-6">Yükleniyor...</p>
         } @else if (friends().length === 0) {
-          <p class="text-xs text-ink-muted text-center py-6 italic">Henüz arkadaşın yok. Yukarıdan birini ara.</p>
+          <p class="text-xs text-ink-muted text-center py-6">Henüz arkadaşın yok. Yukarıdan birini ara.</p>
         } @else {
           <ul class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
             @for (f of friends(); track f.id) {
-              <li class="flex items-center gap-2 p-2 rounded-lg border-[1.5px] border-ink/20 hover:border-ink transition-colors">
-                <div class="w-8 h-8 rounded-full border-[1.5px] border-ink bg-mint/40 flex items-center justify-center text-[10px] font-bold font-mono shrink-0">
-                  {{ f.adSoyad.slice(0, 2).toUpperCase() }}
-                </div>
+              <li class="friend-row">
+                <span class="friend-avatar friend-avatar-violet">{{ f.adSoyad.slice(0, 2).toUpperCase() }}</span>
                 <div class="flex-1 min-w-0">
-                  <p class="text-xs font-semibold truncate">{{ f.adSoyad }}</p>
+                  <p class="text-sm font-semibold truncate text-ink">{{ f.adSoyad }}</p>
                   <p class="text-[11px] text-ink-muted truncate">{{ f.email }} · {{ f.rol }}</p>
                 </div>
-                <button type="button" (click)="remove(f)" class="focus-ring text-ink-muted hover:text-coral text-lg leading-none shrink-0"
+                <button type="button" (click)="remove(f)"
+                        class="focus-ring text-ink-muted hover:text-coral text-lg leading-none shrink-0 px-1"
                         title="Arkadaşlıktan çıkar">×</button>
               </li>
             }

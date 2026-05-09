@@ -11,9 +11,8 @@
       Sadece bana atananlar
     </label>
     @if (isAdmin()) {
-      <button (click)="openCreate()"
-              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
-        Yeni atama
+      <button (click)="openCreate()" class="pill-btn pill-btn-violet">
+        <span aria-hidden="true">+</span> Yeni atama
       </button>
     }
   </div>
@@ -49,9 +48,9 @@
           <dt class="text-text-muted">Durum</dt>
           <dd>
             @switch (a.durum) {
-              @case ('planlandi') { <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-accent-info"></span>Planlandı</span> }
-              @case ('tamamlandi') { <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-accent-success"></span>Tamamlandı</span> }
-              @case ('iptal') { <span class="chip"><span class="w-1.5 h-1.5 rounded-full bg-accent-danger"></span>İptal</span> }
+              @case ('planlandi') { <span class="chip-status is-blue">Planlandı</span> }
+              @case ('tamamlandi') { <span class="chip-status is-green">Tamamlandı</span> }
+              @case ('iptal') { <span class="chip-status is-coral">İptal</span> }
             }
           </dd>
         </div>
@@ -76,14 +75,8 @@
 
       @if (isAdmin()) {
         <div class="flex items-center gap-2 mt-5 pt-4 border-t border-border">
-          <button (click)="openEditFromSelected()"
-                  class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
-            Düzenle
-          </button>
-          <button (click)="removeSelected()"
-                  class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-accent-danger/40 text-accent-danger hover:bg-accent-danger/10 transition-colors">
-            Sil
-          </button>
+          <button (click)="openEditFromSelected()" class="pill-btn pill-btn-violet">Düzenle</button>
+          <button (click)="removeSelected()" class="pill-btn">Sil</button>
         </div>
       }
     </aside>
@@ -190,8 +183,7 @@
               class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
         Vazgeç
       </button>
-      <button type="submit" [disabled]="saving()"
-              class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg disabled:opacity-50 active:scale-[0.98] transition-all duration-150">
+      <button type="submit" [disabled]="saving()" class="pill-btn pill-btn-violet">
         {{ saving() ? 'Kaydediliyor...' : (editing() ? 'Güncelle' : 'Oluştur') }}
       </button>
     </div>

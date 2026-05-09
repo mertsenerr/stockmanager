@@ -40,8 +40,9 @@ module.exports = {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
-        serif: ['Fraunces', 'Georgia', 'Cambria', 'serif'],
-        display: ['"Bricolage Grotesque"', 'Inter', 'system-ui', 'sans-serif'],
+        // Theme refresh: serif/display utility'leri Inter'a düşürüldü — italic/serif kalkar.
+        serif: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Inter', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         sm: '6px',

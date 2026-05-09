@@ -71,14 +71,25 @@
             <span class="block font-mono text-[10px] text-ink-muted uppercase tracking-wider truncate">{{ roleLabel() }}</span>
           </span>
         </div>
-        <button
-          type="button"
-          (click)="logout()"
-          class="sl-logout"
-        >
-          <span>Çıkış yap</span>
-          <span aria-hidden="true">→</span>
-        </button>
+        <div class="flex items-center">
+          <button
+            type="button"
+            (click)="logout()"
+            class="sl-logout"
+          >
+            <span>Çıkış yap</span>
+            <span aria-hidden="true">→</span>
+          </button>
+          <button
+            type="button"
+            (click)="toggleTheme()"
+            class="sl-theme-toggle"
+            [attr.aria-label]="theme() === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'"
+            [title]="theme() === 'dark' ? 'Açık tema' : 'Koyu tema'"
+          >
+            {{ theme() === 'dark' ? '☼' : '☾' }}
+          </button>
+        </div>
       }
     </div>
   </aside>

@@ -3,6 +3,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ROLE_LABELS, UserRole } from '../../core/auth/auth.models';
+import { ThemeService } from '../../core/theme/theme.service';
 import { ToastHostComponent } from '../../shared/ui/toast/toast-host.component';
 import { ConfirmHostComponent } from '../../shared/ui/confirm/confirm-host.component';
 import { IncomingCallService } from '../../core/realtime/incoming-call.service';
@@ -31,6 +32,10 @@ export class AppShellComponent {
   private readonly router = inject(Router);
   // Inject sadece — servis kendi effect'i ile auth'a bakıp hub'ı bağlar ve callRinging'i dinler.
   private readonly incomingCalls = inject(IncomingCallService);
+  private readonly themeSvc = inject(ThemeService);
+
+  readonly theme = this.themeSvc.theme;
+  readonly toggleTheme = () => this.themeSvc.toggle();
 
   readonly user = this.auth.currentUser;
   readonly roleLabel = computed(() => {
@@ -78,7 +83,7 @@ export class AppShellComponent {
       roles: ['Sistem', 'SayimBaskani'],
     },
     {
-      label: 'Karşılaştırma Oturumu',
+      label: 'Karşılaştırma',
       path: '/oturumlar',
       icon: '◐',
       color: '#ff5d3a',

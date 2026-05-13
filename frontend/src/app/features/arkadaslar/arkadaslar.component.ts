@@ -25,7 +25,7 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
             <h3 class="bento-title">Arkadaş ekle</h3>
           </div>
           @if (outgoing().length > 0) {
-            <span class="num-badge is-violet">{{ outgoing().length }} bekleyen</span>
+            <span class="num-badge is-accent">{{ outgoing().length }} bekleyen</span>
           }
         </header>
 
@@ -41,7 +41,7 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
           <ul class="space-y-1.5 max-h-[40vh] overflow-y-auto -mx-2 px-2">
             @for (u of searchResults(); track u.id) {
               <li class="friend-row">
-                <span class="friend-avatar friend-avatar-violet">{{ u.adSoyad.slice(0, 2).toUpperCase() }}</span>
+                <span class="friend-avatar friend-avatar-accent">{{ u.adSoyad.slice(0, 2).toUpperCase() }}</span>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-semibold truncate text-ink">{{ u.adSoyad }}</p>
                   <p class="text-[11px] text-ink-muted truncate">{{ u.email }} · {{ u.rol }}</p>
@@ -54,12 +54,12 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
                     <span class="chip-status is-amber shrink-0">Gönderildi</span>
                   }
                   @case ('gelen') {
-                    <span class="chip-status is-violet shrink-0">Gelen istek</span>
+                    <span class="chip-status is-accent shrink-0">Gelen istek</span>
                   }
                   @default {
                     <button type="button" (click)="sendRequest(u)"
                             [disabled]="sending() === u.id"
-                            class="pill-btn pill-btn-violet shrink-0">
+                            class="pill-btn pill-btn-accent shrink-0">
                       {{ sending() === u.id ? '...' : '+ Ekle' }}
                     </button>
                   }
@@ -82,7 +82,7 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
             <h3 class="bento-title">Gelen istekler</h3>
           </div>
           @if (incoming().length > 0) {
-            <span class="num-badge is-violet">{{ incoming().length }}</span>
+            <span class="num-badge is-accent">{{ incoming().length }}</span>
           }
         </header>
 
@@ -97,7 +97,7 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
                   <p class="text-sm font-semibold truncate text-ink">{{ f.adSoyad }}</p>
                   <p class="text-[11px] text-ink-muted truncate">{{ f.email }}</p>
                 </div>
-                <button type="button" (click)="accept(f)" class="pill-btn pill-btn-violet shrink-0">Kabul</button>
+                <button type="button" (click)="accept(f)" class="pill-btn pill-btn-accent shrink-0">Kabul</button>
                 <button type="button" (click)="reject(f)" class="pill-btn shrink-0">Red</button>
               </li>
             }
@@ -122,7 +122,7 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
           <ul class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
             @for (f of friends(); track f.id) {
               <li class="friend-row">
-                <span class="friend-avatar friend-avatar-violet">{{ f.adSoyad.slice(0, 2).toUpperCase() }}</span>
+                <span class="friend-avatar friend-avatar-accent">{{ f.adSoyad.slice(0, 2).toUpperCase() }}</span>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-semibold truncate text-ink">{{ f.adSoyad }}</p>
                   <p class="text-[11px] text-ink-muted truncate">{{ f.email }} · {{ f.rol }}</p>

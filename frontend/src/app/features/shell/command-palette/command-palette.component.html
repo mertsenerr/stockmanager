@@ -1,0 +1,152 @@
+@if (open) {
+  <div class="cmdk-backdrop" (click)="onBackdropClick()" aria-hidden="true"></div>
+
+  <div
+    class="cmdk-shell"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Hızlı arama"
+    (keydown)="onKeydown($event)"
+  >
+    <div class="cmdk-input-row">
+      <svg class="cmdk-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.7"/>
+        <path d="M20 20l-4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      </svg>
+      <input
+        #queryInput
+        type="search"
+        class="cmdk-input"
+        [value]="query()"
+        (input)="onInput($any($event.target).value)"
+        placeholder="Firma, mağaza, oturum veya kullanıcı ara…"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <kbd class="cmdk-kbd">esc</kbd>
+    </div>
+
+    <div class="cmdk-body">
+      @if (loading()) {
+        <p class="cmdk-meta">Aranıyor…</p>
+      } @else if (query().trim().length < 2) {
+        <p class="cmdk-meta">En az 2 karakter yazın.</p>
+      } @else if (!hasResults()) {
+        <p class="cmdk-meta">Sonuç bulunamadı.</p>
+      } @else {
+        <!-- Oturumlar -->
+        @if (results().oturumlar.length) {
+          <div class="cmdk-group">
+            <p class="cmdk-group-label">{{ categoryLabel('oturumlar') }}</p>
+            <ul class="cmdk-list">
+              @for (item of results().oturumlar; track item.id) {
+                @let ref = flat()[$index];
+                <li
+                  class="cmdk-row"
+                  [class.is-active]="cursor() === ref.flatIndex"
+                  (click)="activate(ref)"
+                  (mousemove)="cursor.set(ref.flatIndex)"
+                >
+                  <span class="cmdk-row-label">{{ item.label }}</span>
+                  @if (item.subtitle) {
+                    <span class="cmdk-row-sub">{{ item.subtitle }}</span>
+                  }
+                  @if (item.badge) {
+                    <span class="cmdk-row-badge">{{ item.badge }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        <!-- Mağazalar -->
+        @if (results().magazalar.length) {
+          @let offset = results().oturumlar.length;
+          <div class="cmdk-group">
+            <p class="cmdk-group-label">{{ categoryLabel('magazalar') }}</p>
+            <ul class="cmdk-list">
+              @for (item of results().magazalar; track item.id) {
+                @let ref = flat()[offset + $index];
+                <li
+                  class="cmdk-row"
+                  [class.is-active]="cursor() === ref.flatIndex"
+                  (click)="activate(ref)"
+                  (mousemove)="cursor.set(ref.flatIndex)"
+                >
+                  <span class="cmdk-row-label">{{ item.label }}</span>
+                  @if (item.subtitle) {
+                    <span class="cmdk-row-sub">{{ item.subtitle }}</span>
+                  }
+                  @if (item.badge) {
+                    <span class="cmdk-row-badge">{{ item.badge }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        <!-- Firmalar -->
+        @if (results().firmalar.length) {
+          @let offset = results().oturumlar.length + results().magazalar.length;
+          <div class="cmdk-group">
+            <p class="cmdk-group-label">{{ categoryLabel('firmalar') }}</p>
+            <ul class="cmdk-list">
+              @for (item of results().firmalar; track item.id) {
+                @let ref = flat()[offset + $index];
+                <li
+                  class="cmdk-row"
+                  [class.is-active]="cursor() === ref.flatIndex"
+                  (click)="activate(ref)"
+                  (mousemove)="cursor.set(ref.flatIndex)"
+                >
+                  <span class="cmdk-row-label">{{ item.label }}</span>
+                  @if (item.subtitle) {
+                    <span class="cmdk-row-sub">{{ item.subtitle }}</span>
+                  }
+                  @if (item.badge) {
+                    <span class="cmdk-row-badge">{{ item.badge }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        <!-- Kullanıcılar -->
+        @if (results().kullanicilar.length) {
+          @let offset = results().oturumlar.length + results().magazalar.length + results().firmalar.length;
+          <div class="cmdk-group">
+            <p class="cmdk-group-label">{{ categoryLabel('kullanicilar') }}</p>
+            <ul class="cmdk-list">
+              @for (item of results().kullanicilar; track item.id) {
+                @let ref = flat()[offset + $index];
+                <li
+                  class="cmdk-row"
+                  [class.is-active]="cursor() === ref.flatIndex"
+                  (click)="activate(ref)"
+                  (mousemove)="cursor.set(ref.flatIndex)"
+                >
+                  <span class="cmdk-row-label">{{ item.label }}</span>
+                  @if (item.subtitle) {
+                    <span class="cmdk-row-sub">{{ item.subtitle }}</span>
+                  }
+                  @if (item.badge) {
+                    <span class="cmdk-row-badge">{{ item.badge }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      }
+    </div>
+
+    <div class="cmdk-foot">
+      <span class="cmdk-foot-hint"><kbd class="cmdk-kbd">↑</kbd><kbd class="cmdk-kbd">↓</kbd> dolaş</span>
+      <span class="cmdk-foot-hint"><kbd class="cmdk-kbd">↵</kbd> aç</span>
+      <span class="cmdk-foot-hint"><kbd class="cmdk-kbd">esc</kbd> kapat</span>
+    </div>
+  </div>
+}

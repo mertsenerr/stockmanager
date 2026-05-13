@@ -30,10 +30,10 @@ module.exports = {
         butter: 'var(--color-butter)',
         cobalt: 'var(--color-cobalt)',
         mint: 'var(--color-mint)',
-        violet: {
-          DEFAULT: 'var(--color-violet, #8b5cf6)',
-          strong: 'var(--color-violet-strong, #7c3aed)',
-          soft: 'var(--color-violet-soft, rgba(139, 92, 246, 0.16))',
+        brand: {
+          DEFAULT: 'var(--color-accent, #0f766e)',
+          strong: 'var(--color-accent-strong, #115e59)',
+          soft: 'var(--color-accent-soft, rgba(15, 118, 110, 0.16))',
         },
         status: {
           blue:  'var(--color-status-blue, #3b82f6)',

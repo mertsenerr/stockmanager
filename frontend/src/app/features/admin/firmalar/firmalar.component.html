@@ -12,7 +12,7 @@
       placeholder="Ara..."
       class="focus-ring text-xs px-2.5 py-1.5 bg-surface-elevated border border-border rounded-sm w-44 placeholder:text-text-muted"
     />
-    <button type="button" (click)="openCreate()" class="pill-btn pill-btn-violet">
+    <button type="button" (click)="openCreate()" class="pill-btn pill-btn-accent">
       <span aria-hidden="true">+</span> Yeni firma
     </button>
   </div>
@@ -40,9 +40,9 @@
             <td class="px-4 py-2.5 text-text-secondary text-xs">{{ tipLabel(f.tip) }}</td>
             <td class="px-4 py-2.5">
               @if (f.aktifMi) {
-                <span class="chip-status is-green">aktif</span>
+                <span class="chip-status is-green">Aktif</span>
               } @else {
-                <span class="chip-status">pasif</span>
+                <span class="chip-status">Pasif</span>
               }
             </td>
             <td class="px-4 py-2.5 text-right">
@@ -124,7 +124,7 @@
               class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
         Vazgeç
       </button>
-      <button type="submit" [disabled]="saving()" class="pill-btn pill-btn-violet">
+      <button type="submit" [disabled]="saving()" class="pill-btn pill-btn-accent">
         {{ saving() ? 'Kaydediliyor...' : (editing() ? 'Güncelle' : 'Oluştur') }}
       </button>
     </div>

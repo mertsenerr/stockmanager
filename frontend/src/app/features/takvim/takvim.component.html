@@ -11,7 +11,7 @@
       Sadece bana atananlar
     </label>
     @if (isAdmin()) {
-      <button (click)="openCreate()" class="pill-btn pill-btn-violet">
+      <button (click)="openCreate()" class="pill-btn pill-btn-accent">
         <span aria-hidden="true">+</span> Yeni atama
       </button>
     }
@@ -75,7 +75,7 @@
 
       @if (isAdmin()) {
         <div class="flex items-center gap-2 mt-5 pt-4 border-t border-border">
-          <button (click)="openEditFromSelected()" class="pill-btn pill-btn-violet">Düzenle</button>
+          <button (click)="openEditFromSelected()" class="pill-btn pill-btn-accent">Düzenle</button>
           <button (click)="removeSelected()" class="pill-btn">Sil</button>
         </div>
       }
@@ -183,7 +183,7 @@
               class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
         Vazgeç
       </button>
-      <button type="submit" [disabled]="saving()" class="pill-btn pill-btn-violet">
+      <button type="submit" [disabled]="saving()" class="pill-btn pill-btn-accent">
         {{ saving() ? 'Kaydediliyor...' : (editing() ? 'Güncelle' : 'Oluştur') }}
       </button>
     </div>

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
@@ -8,6 +8,7 @@ import { ToastHostComponent } from '../../shared/ui/toast/toast-host.component';
 import { ConfirmHostComponent } from '../../shared/ui/confirm/confirm-host.component';
 import { IncomingCallService } from '../../core/realtime/incoming-call.service';
 import { IncomingCallHostComponent } from '../../core/realtime/incoming-call-host.component';
+import { CommandPaletteComponent } from './command-palette/command-palette.component';
 
 interface SubItem {
   label: string;
@@ -21,6 +22,7 @@ interface NavGroup {
   id: string;
   label: string;
   icon: string;
+  iconImg?: string;
   description: string;
   items: SubItem[];
   roles?: UserRole[];
@@ -29,7 +31,7 @@ interface NavGroup {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, ToastHostComponent, ConfirmHostComponent, IncomingCallHostComponent],
+  imports: [RouterOutlet, RouterLink, ToastHostComponent, ConfirmHostComponent, IncomingCallHostComponent, CommandPaletteComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app-shell.component.html',
   styleUrls: ['./app-shell.component.css'],
@@ -61,12 +63,26 @@ export class AppShellComponent {
 
   readonly mobileNavOpen = signal(false);
   readonly currentPath = signal<string>(this.router.url);
+  readonly paletteOpen = signal(false);
+
+  openPalette(): void { this.paletteOpen.set(true); }
+  closePalette(): void { this.paletteOpen.set(false); }
+
+  @HostListener('document:keydown', ['$event'])
+  onGlobalKeydown(ev: KeyboardEvent): void {
+    // Cmd+K (macOS) or Ctrl+K (Win/Linux) opens the command palette
+    if ((ev.metaKey || ev.ctrlKey) && (ev.key === 'k' || ev.key === 'K')) {
+      ev.preventDefault();
+      this.paletteOpen.update((v) => !v);
+    }
+  }
 
   private readonly allGroups: NavGroup[] = [
     {
       id: 'home',
       label: 'Anasayfa',
       icon: '◎',
+      iconImg: '/assets/images/house.png',
       description: 'Hızlı bakış',
       items: [
         { label: 'Anasayfa', path: '/', description: 'Hesap & sistem özet' },
@@ -76,6 +92,7 @@ export class AppShellComponent {
       id: 'compare',
       label: 'Karşılaştırma',
       icon: '◐',
+      iconImg: '/assets/images/online-interview.png',
       description: 'Sayım & raporlar',
       items: [
         { label: 'Oturumlar', path: '/oturumlar', description: 'Aktif & geçmiş canlı sayımlar' },
@@ -86,6 +103,7 @@ export class AppShellComponent {
       id: 'data',
       label: 'Veri',
       icon: '◇',
+      iconImg: '/assets/images/office-building.png',
       description: 'Firmalar & mağazalar',
       roles: ['Sistem', 'SayimBaskani'],
       items: [
@@ -97,6 +115,7 @@ export class AppShellComponent {
       id: 'people',
       label: 'Hesap',
       icon: '☻',
+      iconImg: '/assets/images/community.png',
       description: 'Kullanıcılar & arkadaşlar',
       items: [
         { label: 'Arkadaşlar', path: '/arkadaslar', description: 'Arkadaş listesi & istekler' },

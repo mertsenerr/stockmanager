@@ -86,7 +86,7 @@ export class OturumDetailComponent implements OnInit {
       case 'tamamlandi': return 'is-green';
       case 'iptal': return 'is-coral';
       case 'excel_bekleniyor': return 'is-cyan';
-      default: return 'is-violet';
+      default: return 'is-accent';
     }
   };
   readonly urunChipClass = (d: UrunDurum): string => {
@@ -94,9 +94,9 @@ export class OturumDetailComponent implements OnInit {
       case 'beklemede': return 'is-blue';
       case 'tekrar_sayiliyor': return 'is-coral';
       case 'onaylandi': return 'is-green';
-      case 'iptal': return 'is-violet';
+      case 'iptal': return 'is-accent';
       case 'incele': return 'is-amber';
-      default: return 'is-violet';
+      default: return 'is-accent';
     }
   };
   readonly urunDurumLabel = (d: UrunDurum) => URUN_DURUM_LABELS[d];

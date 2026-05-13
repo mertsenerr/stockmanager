@@ -1,6 +1,26 @@
 @import 'ag-grid-community/styles/ag-grid.css';
 @import 'ag-grid-community/styles/ag-theme-quartz.css';
 
+/* ─── Tip banner — soft amber, theme-aware ────────────────────────────────── */
+.tip-banner {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(245, 158, 11, 0.30);
+  background: rgba(245, 158, 11, 0.10);
+  color: #78350f;
+}
+.tip-banner-tag {
+  font-size: 9.5px;
+  letter-spacing: 0.10em;
+  opacity: 0.75;
+  margin-right: 2px;
+}
+[data-theme="dark"] .tip-banner {
+  border-color: rgba(245, 158, 11, 0.22);
+  background: rgba(245, 158, 11, 0.06);
+  color: #fcd34d;
+}
+
 /* ─── Excel-like sabit hizalama ──────────────────────────────────────────── */
 /* Header ve cell padding'leri tam eşit. Menu/filter icon kapalı ki başlık
    metni hücre değeri ile aynı X-koordinatında bitsin. */
@@ -66,7 +86,7 @@
   box-shadow: 5px 5px 0 var(--color-ink);
 }
 
-/* Dark variant — orbix bento + violet active */
+/* Dark variant — orbix bento + teal accent active */
 [data-theme="dark"] .filter-tab {
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -79,14 +99,14 @@
   box-shadow: 0 0 0 1px var(--color-border-strong), 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 [data-theme="dark"] .filter-tab.active {
-  background: rgba(139, 92, 246, 0.10);
-  border-color: rgba(139, 92, 246, 0.45);
+  background: rgba(var(--color-accent-rgb), 0.10);
+  border-color: rgba(var(--color-accent-rgb), 0.45);
   transform: none;
-  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.45), 0 8px 24px rgba(139, 92, 246, 0.20);
+  box-shadow: 0 0 0 1px rgba(var(--color-accent-rgb), 0.45), 0 8px 24px rgba(var(--color-accent-rgb), 0.20);
 }
 [data-theme="dark"] .filter-tab.active:hover {
   transform: none;
-  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.55), 0 12px 30px rgba(139, 92, 246, 0.30);
+  box-shadow: 0 0 0 1px rgba(var(--color-accent-rgb), 0.55), 0 12px 30px rgba(var(--color-accent-rgb), 0.30);
 }
 
 /* ─── Editable cell affordance (subtle) ──────────────────────────────────── */

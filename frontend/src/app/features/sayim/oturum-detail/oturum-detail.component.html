@@ -9,10 +9,10 @@
       @if (canLockUnlock()) {
         @if (o.durum === 'aktif') {
           <button (click)="lock()" class="pill-btn">Kilitle</button>
-          <button (click)="complete()" class="pill-btn pill-btn-violet">Tamamla</button>
+          <button (click)="complete()" class="pill-btn pill-btn-accent">Tamamla</button>
         } @else if (o.durum === 'kilitli') {
           <button (click)="unlock()" class="pill-btn">Kilidi aç</button>
-          <button (click)="complete()" class="pill-btn pill-btn-violet">Tamamla</button>
+          <button (click)="complete()" class="pill-btn pill-btn-accent">Tamamla</button>
         }
       }
     </div>
@@ -61,7 +61,7 @@
         <p class="text-sm text-text-primary">Canlı karşılaştırma ekranı hazır.</p>
         <p class="text-xs text-text-muted">{{ o.urunler.length }} ürün, {{ o.ozetler.beklemedeSayisi }} beklemede.</p>
       </div>
-      <button type="button" (click)="openLive()" class="pill-btn pill-btn-violet">
+      <button type="button" (click)="openLive()" class="pill-btn pill-btn-accent">
         Canlı ekrana geç →
       </button>
     </div>

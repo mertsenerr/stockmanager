@@ -77,7 +77,7 @@ export class OturumlarComponent implements OnInit {
       case 'tamamlandi': return 'is-green';
       case 'iptal': return 'is-coral';
       case 'excel_bekleniyor': return 'is-cyan';
-      default: return 'is-violet';
+      default: return 'is-accent';
     }
   };
 

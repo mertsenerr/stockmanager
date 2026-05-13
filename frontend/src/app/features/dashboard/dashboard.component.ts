@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { HealthService, HealthCheckResponse } from '../../core/services/health.service';
 import { OturumService } from '../sayim/oturum.service';
 import { OturumList, OTURUM_DURUM_LABELS, OturumDurum } from '../sayim/sayim.models';
 
@@ -10,7 +9,7 @@ interface ActivityRow {
   icon: string;
   title: string;
   meta: string;
-  tone: 'violet' | 'cyan' | 'pink' | 'green';
+  tone: 'accent' | 'cyan' | 'pink' | 'green';
 }
 
 @Component({
@@ -22,13 +21,14 @@ interface ActivityRow {
 })
 export class DashboardComponent implements OnInit {
   private readonly auth = inject(AuthService);
-  private readonly health = inject(HealthService);
   private readonly oSvc = inject(OturumService);
   private readonly router = inject(Router);
 
   readonly user = this.auth.currentUser;
-  readonly healthState = signal<HealthCheckResponse | null>(null);
   readonly oturumlar = signal<OturumList[]>([]);
+  readonly today = signal(
+    new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }),
+  );
 
   readonly canManage = computed(() => {
     const r = this.user()?.rol;
@@ -80,10 +80,6 @@ export class DashboardComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.health.check().subscribe({
-      next: (res) => this.healthState.set(res),
-      error: () => this.healthState.set(null),
-    });
     this.oSvc.list().subscribe({
       next: (r) => this.oturumlar.set(r),
       error: () => this.oturumlar.set([]),
@@ -106,7 +102,7 @@ export class DashboardComponent implements OnInit {
       case 'tamamlandi': return 'is-green';
       case 'iptal': return 'is-coral';
       case 'excel_bekleniyor': return 'is-cyan';
-      default: return 'is-violet';
+      default: return 'is-accent';
     }
   }
 
@@ -136,12 +132,12 @@ export class DashboardComponent implements OnInit {
       default: return '◌';
     }
   }
-  private toneForDurum(d: OturumDurum): 'violet' | 'cyan' | 'pink' | 'green' {
+  private toneForDurum(d: OturumDurum): 'accent' | 'cyan' | 'pink' | 'green' {
     switch (d) {
       case 'tamamlandi': return 'green';
       case 'aktif': return 'cyan';
       case 'iptal': return 'pink';
-      default: return 'violet';
+      default: return 'accent';
     }
   }
 }

@@ -84,9 +84,8 @@
 
   <!-- Edit hint banner -->
   @if (isAdmin()) {
-    <div class="mb-3 px-4 py-2.5 rounded-lg border-[1.5px] border-ink flex items-center gap-3 text-xs"
-         style="background: var(--color-butter);">
-      <span class="font-mono font-bold uppercase tracking-wider">İpucu</span>
+    <div class="tip-banner mb-3 flex items-center gap-3 text-xs">
+      <span class="tip-banner-tag font-mono font-bold uppercase tracking-wider">İpucu</span>
       <span class="font-medium">"Sayılan" veya "Durum" hücresine <strong>çift tıkla</strong> hızlı düzenle. Tüm satırı değiştirmek için sağdaki <strong>Düzenle</strong> butonu, kaldırmak için <strong>Sil</strong>.</span>
     </div>
   } @else {

@@ -179,9 +179,9 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const withCoords = list.filter((m) => m.koordinat);
     const isDark = this.themeSvc.theme() === 'dark';
-    const fill = isDark ? '#8b5cf6' : '#3b82f6';
+    const fill = isDark ? '#0f766e' : '#3b82f6';
     const ring = isDark ? '#0a0a0a' : '#fafafa';
-    const glow = isDark ? '0 0 12px rgba(139,92,246,0.6)' : '0 0 0 1px #1f1f1f';
+    const glow = isDark ? '0 0 12px rgba(15,118,110,0.6)' : '0 0 0 1px #1f1f1f';
     const dot = L.divIcon({
       className: '',
       html: `<div style="width:11px;height:11px;border-radius:9999px;background:${fill};border:2px solid ${ring};box-shadow:${glow}"></div>`,

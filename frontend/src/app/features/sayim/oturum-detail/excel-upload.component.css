@@ -34,13 +34,17 @@
 .auto-pill-source {
   font-family: 'JetBrains Mono', monospace;
   font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-weight: 600;
+  letter-spacing: 0.10em;
   text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: 999px;
-  border: 1.5px solid var(--color-ink);
-  background: var(--color-lime);
-  color: var(--color-ink);
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: rgba(var(--color-accent-rgb), 0.14);
+  color: var(--color-accent);
   flex-shrink: 0;
+}
+[data-theme="dark"] .auto-pill-source {
+  background: rgba(var(--color-accent-rgb), 0.16);
+  color: var(--color-accent);
 }

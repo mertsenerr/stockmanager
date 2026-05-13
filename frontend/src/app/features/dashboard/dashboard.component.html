@@ -1,12 +1,10 @@
 <div class="dash-root">
   <!-- Hero -->
   <header class="dash-hero">
-    <div>
+    <div class="dash-hero-text">
       <p class="section-label">Anasayfa</p>
       @if (user(); as u) {
-        <h1 class="dash-hero-title">
-          Hoş geldin, <span class="dash-hero-name">{{ u.adSoyad }}</span>.
-        </h1>
+        <h1 class="dash-hero-title">Hoş geldin, {{ u.adSoyad }}</h1>
         <p class="dash-hero-sub">
           @if (u.firmaAdi) { {{ u.firmaAdi }} · }
           {{ metrics().aktif }} aktif, {{ metrics().tamamlandi }} tamamlanan oturum
@@ -14,39 +12,74 @@
       }
     </div>
 
-    @if (canManage()) {
-      <button type="button" (click)="goNewOturum()" class="pill-btn pill-btn-violet">
-        <span aria-hidden="true">+</span>
-        Yeni karşılaştırma
-      </button>
-    }
+    <div class="dash-hero-actions">
+      <span class="dash-hero-date">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M4 9h16M9 3v4M15 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        {{ today() }}
+      </span>
+      @if (canManage()) {
+        <button type="button" (click)="goNewOturum()" class="pill-btn pill-btn-accent dash-hero-cta">
+          <span aria-hidden="true">+</span>
+          Yeni karşılaştırma
+        </button>
+      }
+    </div>
   </header>
 
-  <!-- Metric strip -->
-  <div class="dash-metrics">
-    <div class="dash-metric">
-      <span class="dash-metric-label">Aktif</span>
-      <span class="dash-metric-value">{{ metrics().aktif }}</span>
-      <span class="chip-status is-cyan">aktif oturum</span>
+  <!-- KPI strip -->
+  <section class="dash-kpi-row">
+    <div class="dash-kpi" data-tone="accent">
+      <div class="dash-kpi-head">
+        <span class="dash-kpi-label">Aktif oturum</span>
+        <svg class="dash-kpi-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="dash-kpi-value">{{ metrics().aktif }}</span>
+      <span class="dash-kpi-foot">Açık veya kilitli</span>
     </div>
-    <div class="dash-metric">
-      <span class="dash-metric-label">Tamamlandı</span>
-      <span class="dash-metric-value">{{ metrics().tamamlandi }}</span>
-      <span class="chip-status is-green">bitirildi</span>
-    </div>
-    <div class="dash-metric">
-      <span class="dash-metric-label">Taslak</span>
-      <span class="dash-metric-value">{{ metrics().taslak }}</span>
-      <span class="chip-status is-violet">excel bekliyor</span>
-    </div>
-    <div class="dash-metric">
-      <span class="dash-metric-label">Toplam ürün</span>
-      <span class="dash-metric-value">{{ metrics().toplamUrun }}</span>
-      <span class="chip-status is-pink">{{ metrics().onaylanmis }} onaylı</span>
-    </div>
-  </div>
 
-  <!-- Bento grid -->
+    <div class="dash-kpi" data-tone="green">
+      <div class="dash-kpi-head">
+        <span class="dash-kpi-label">Tamamlanan</span>
+        <svg class="dash-kpi-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 12.5l5 5L20 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span class="dash-kpi-value">{{ metrics().tamamlandi }}</span>
+      <span class="dash-kpi-foot">Onayla kapatılmış</span>
+    </div>
+
+    <div class="dash-kpi" data-tone="amber">
+      <div class="dash-kpi-head">
+        <span class="dash-kpi-label">Taslak</span>
+        <svg class="dash-kpi-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M5 4h10l4 4v12H5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M15 4v4h4" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span class="dash-kpi-value">{{ metrics().taslak }}</span>
+      <span class="dash-kpi-foot">Excel bekliyor</span>
+    </div>
+
+    <div class="dash-kpi" data-tone="coral">
+      <div class="dash-kpi-head">
+        <span class="dash-kpi-label">Toplam ürün</span>
+        <svg class="dash-kpi-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3" y="6" width="18" height="13" rx="1.5" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M3 10h18M9 6v13M15 6v13" stroke="currentColor" stroke-width="1.6"/>
+        </svg>
+      </div>
+      <span class="dash-kpi-value">{{ metrics().toplamUrun }}</span>
+      <span class="dash-kpi-foot">{{ metrics().onaylanmis }} onaylı</span>
+    </div>
+  </section>
+
+  <!-- Bento grid (2x2) -->
   <div class="dash-grid">
     <!-- Gauge — completion -->
     <section class="bento dash-card-gauge">
@@ -58,21 +91,29 @@
       </header>
 
       <div class="dash-gauge">
-        <svg viewBox="0 0 200 150" class="dash-gauge-svg" role="img" aria-label="Tamamlanma yayı">
-          <defs>
-            <linearGradient id="dashGaugeArc" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#06b6d4" />
-              <stop offset="35%" stop-color="#22c55e" />
-              <stop offset="65%" stop-color="#f59e0b" />
-              <stop offset="100%" stop-color="#ec4899" />
-            </linearGradient>
-          </defs>
-          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" class="dash-gauge-track" stroke-width="14" stroke-linecap="round" />
-          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#dashGaugeArc)" stroke-width="14" stroke-linecap="round"
-                [attr.stroke-dasharray]="arcLength(metrics().oran)" />
-          <text x="100" y="92" text-anchor="middle" class="dash-gauge-value-text">%{{ metrics().oran }}</text>
-          <text x="100" y="125" text-anchor="middle" class="dash-gauge-sub-text">{{ metrics().onaylanmis }} / {{ metrics().toplamUrun }} ürün</text>
-        </svg>
+        <div class="dash-gauge-svg-wrap">
+          <svg viewBox="0 0 200 150" class="dash-gauge-svg" role="img" aria-label="Tamamlanma yayı">
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" class="dash-gauge-track" stroke-width="10" stroke-linecap="round" />
+            <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" class="dash-gauge-arc" stroke-width="10" stroke-linecap="round"
+                  [attr.stroke-dasharray]="arcLength(metrics().oran)" />
+            <text x="100" y="85" text-anchor="middle" class="dash-gauge-value-text">%{{ metrics().oran }}</text>
+          </svg>
+        </div>
+
+        <dl class="dash-gauge-stats">
+          <div class="dash-gauge-stat">
+            <dt>Onaylı</dt>
+            <dd>{{ metrics().onaylanmis }}</dd>
+          </div>
+          <div class="dash-gauge-stat">
+            <dt>Bekleyen</dt>
+            <dd>{{ metrics().toplamUrun - metrics().onaylanmis }}</dd>
+          </div>
+          <div class="dash-gauge-stat">
+            <dt>Toplam</dt>
+            <dd>{{ metrics().toplamUrun }}</dd>
+          </div>
+        </dl>
       </div>
     </section>
 
@@ -83,11 +124,17 @@
           <p class="section-label">Yaklaşanlar</p>
           <h3 class="bento-title">Plan listesi</h3>
         </div>
-        <a routerLink="/oturumlar" class="pill-btn">Tümü</a>
+        <a routerLink="/oturumlar" class="bento-link">Tümü</a>
       </header>
 
       @if (yaklasanOturumlar().length === 0) {
-        <p class="dash-empty">Yaklaşan plan yok.</p>
+        <div class="dash-empty">
+          <svg class="dash-empty-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M4 9h16M9 3v4M15 3v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <p>Yaklaşan plan yok.</p>
+        </div>
       } @else {
         <ul class="dash-upcoming-list">
           @for (o of yaklasanOturumlar(); track o.id) {
@@ -117,7 +164,12 @@
       </header>
 
       @if (recentActivity().length === 0) {
-        <p class="dash-empty">Henüz aktivite yok.</p>
+        <div class="dash-empty">
+          <svg class="dash-empty-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 12h4l3-7 4 14 3-7h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p>Henüz aktivite yok.</p>
+        </div>
       } @else {
         <ul class="dash-activity-list">
           @for (a of recentActivity(); track a.id) {
@@ -133,44 +185,6 @@
       }
     </section>
 
-    <!-- Sistem durumu -->
-    <section class="bento dash-card-system">
-      <header class="bento-header">
-        <div>
-          <p class="section-label">Sistem</p>
-          <h3 class="bento-title">Sağlık durumu</h3>
-        </div>
-        @if (healthState(); as h) {
-          @if (h.status === 'healthy') {
-            <span class="chip-status is-green">healthy</span>
-          } @else if (h.status === 'degraded') {
-            <span class="chip-status is-amber">degraded</span>
-          } @else {
-            <span class="chip-status is-coral">offline</span>
-          }
-        }
-      </header>
-
-      @if (healthState(); as h) {
-        <dl class="dash-system-grid">
-          <div class="dash-system-row">
-            <dt>API</dt>
-            <dd>{{ h.status }}</dd>
-          </div>
-          <div class="dash-system-row">
-            <dt>MongoDB</dt>
-            <dd>{{ h.checks?.mongo ?? '—' }}</dd>
-          </div>
-          <div class="dash-system-row">
-            <dt>Sürüm</dt>
-            <dd class="dash-system-mono">{{ h.version ?? '—' }}</dd>
-          </div>
-        </dl>
-      } @else {
-        <p class="dash-empty">Sistem durumu yükleniyor...</p>
-      }
-    </section>
-
     <!-- Hızlı linkler -->
     <section class="bento dash-card-quick">
       <header class="bento-header">
@@ -179,26 +193,35 @@
           <h3 class="bento-title">Sık kullanılanlar</h3>
         </div>
       </header>
-      <div class="dash-quick-grid">
-        <a routerLink="/oturumlar" class="dash-quick-tile">
-          <span class="dash-quick-icon">◐</span>
-          <span class="dash-quick-label">Oturumlar</span>
-        </a>
-        <a routerLink="/ozel-raporlar" class="dash-quick-tile">
-          <span class="dash-quick-icon">◫</span>
-          <span class="dash-quick-label">Özel Raporlar</span>
-        </a>
-        <a routerLink="/arkadaslar" class="dash-quick-tile">
-          <span class="dash-quick-icon">☻</span>
-          <span class="dash-quick-label">Arkadaşlar</span>
-        </a>
-        @if (canManage()) {
-          <a routerLink="/firmalar" class="dash-quick-tile">
-            <span class="dash-quick-icon">◇</span>
-            <span class="dash-quick-label">Firmalar</span>
+
+      <ul class="dash-quick-list">
+        <li>
+          <a routerLink="/oturumlar" class="dash-quick-row">
+            <span class="dash-quick-label">Oturumlar</span>
+            <span class="dash-quick-arrow" aria-hidden="true">→</span>
           </a>
+        </li>
+        <li>
+          <a routerLink="/ozel-raporlar" class="dash-quick-row">
+            <span class="dash-quick-label">Özel Raporlar</span>
+            <span class="dash-quick-arrow" aria-hidden="true">→</span>
+          </a>
+        </li>
+        <li>
+          <a routerLink="/arkadaslar" class="dash-quick-row">
+            <span class="dash-quick-label">Arkadaşlar</span>
+            <span class="dash-quick-arrow" aria-hidden="true">→</span>
+          </a>
+        </li>
+        @if (canManage()) {
+          <li>
+            <a routerLink="/firmalar" class="dash-quick-row">
+              <span class="dash-quick-label">Firmalar</span>
+              <span class="dash-quick-arrow" aria-hidden="true">→</span>
+            </a>
+          </li>
         }
-      </div>
+      </ul>
     </section>
   </div>
 </div>

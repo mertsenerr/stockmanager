@@ -34,7 +34,7 @@
               [class.text-text-primary]="view() === 'map'"
               [class.text-text-muted]="view() !== 'map'">Harita</button>
     </div>
-    <button (click)="openCreate()" class="pill-btn pill-btn-violet">
+    <button (click)="openCreate()" class="pill-btn pill-btn-accent">
       <span aria-hidden="true">+</span> Yeni mağaza
     </button>
   </div>
@@ -67,9 +67,9 @@
               <td class="px-4 py-2.5 text-text-secondary text-xs">{{ m.muduruAdSoyad ?? '—' }}</td>
               <td class="px-4 py-2.5">
                 @if (m.aktifMi) {
-                  <span class="chip-status is-green">aktif</span>
+                  <span class="chip-status is-green">Aktif</span>
                 } @else {
-                  <span class="chip-status">pasif</span>
+                  <span class="chip-status">Pasif</span>
                 }
               </td>
               <td class="px-4 py-2.5 text-right">
@@ -115,6 +115,11 @@
         <input type="text" formControlName="ad"
                class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm placeholder:text-text-muted"
                placeholder="Forum AVM" />
+        @if (form.controls.ad.touched && form.controls.ad.errors?.['required']) {
+          <p class="text-xs text-accent-danger mt-1.5">Mağaza adı zorunludur.</p>
+        } @else if (form.controls.ad.touched && form.controls.ad.errors?.['maxlength']) {
+          <p class="text-xs text-accent-danger mt-1.5">Mağaza adı en fazla 120 karakter olabilir.</p>
+        }
       </div>
     </div>
 
@@ -123,11 +128,17 @@
         <label class="block text-xs text-text-secondary mb-1.5">Şehir</label>
         <input type="text" formControlName="sehir"
                class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm" />
+        @if (form.controls.sehir.touched && form.controls.sehir.errors?.['required']) {
+          <p class="text-xs text-accent-danger mt-1.5">Şehir zorunludur.</p>
+        }
       </div>
       <div>
         <label class="block text-xs text-text-secondary mb-1.5">İlçe</label>
         <input type="text" formControlName="ilce"
                class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm" />
+        @if (form.controls.ilce.touched && form.controls.ilce.errors?.['required']) {
+          <p class="text-xs text-accent-danger mt-1.5">İlçe zorunludur.</p>
+        }
       </div>
     </div>
 
@@ -135,6 +146,9 @@
       <label class="block text-xs text-text-secondary mb-1.5">Adres</label>
       <input type="text" formControlName="adres"
              class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm" />
+      @if (form.controls.adres.touched && form.controls.adres.errors?.['required']) {
+        <p class="text-xs text-accent-danger mt-1.5">Adres zorunludur.</p>
+      }
     </div>
 
     <label class="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
@@ -154,7 +168,7 @@
               class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors">
         Vazgeç
       </button>
-      <button type="submit" [disabled]="saving()" class="pill-btn pill-btn-violet">
+      <button type="submit" [disabled]="saving()" class="pill-btn pill-btn-accent">
         {{ saving() ? 'Kaydediliyor...' : (editing() ? 'Güncelle' : 'Oluştur') }}
       </button>
     </div>

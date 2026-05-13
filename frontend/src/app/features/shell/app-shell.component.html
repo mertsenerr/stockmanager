@@ -7,7 +7,7 @@
   <!-- ─── Icon rail ───────────────────────────────────────────────────── -->
   <aside class="orbix-rail" [class.is-open]="mobileNavOpen()">
     <a routerLink="/" class="orbix-rail-brand" aria-label="SayımLink anasayfa">
-      <span class="orbix-rail-brand-mark">SL</span>
+      <img src="/assets/images/sc.png" alt="SayımLink" class="orbix-rail-brand-mark" />
     </a>
 
     <nav class="orbix-rail-nav">
@@ -20,7 +20,11 @@
           [attr.aria-label]="g.label"
           [title]="g.label"
         >
-          <span class="orbix-rail-icon" aria-hidden="true">{{ g.icon }}</span>
+          @if (g.iconImg) {
+            <img [src]="g.iconImg" alt="" class="orbix-rail-icon-img" aria-hidden="true" />
+          } @else {
+            <span class="orbix-rail-icon" aria-hidden="true">{{ g.icon }}</span>
+          }
         </button>
       }
     </nav>
@@ -93,11 +97,16 @@
       >
         <span></span><span></span><span></span>
       </button>
-      <div class="orbix-topbar-search">
+      <button
+        type="button"
+        class="orbix-topbar-search"
+        (click)="openPalette()"
+        aria-label="Hızlı arama aç (Cmd+K)"
+      >
         <span class="orbix-topbar-search-icon" aria-hidden="true">⌕</span>
-        <input type="search" placeholder="Ara: oturum, mağaza, kullanıcı..." />
+        <span class="orbix-topbar-search-text">Ara: oturum, mağaza, kullanıcı…</span>
         <span class="orbix-topbar-search-kbd">⌘ K</span>
-      </div>
+      </button>
       <div class="orbix-topbar-right">
         @if (user(); as u) {
           <span class="orbix-topbar-user">
@@ -119,4 +128,5 @@
   <app-toast-host />
   <app-confirm-host />
   <app-incoming-call-host />
+  <app-command-palette [open]="paletteOpen()" (closed)="closePalette()" />
 </div>

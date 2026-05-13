@@ -1,20 +1,19 @@
 <app-auth-shell variant="register">
-  <header class="mb-7">
+  <header class="mb-4">
     <h2 class="auth-card-heading">Hesap Aç</h2>
     <p class="auth-card-subheading">Sayım Başkanı olarak yeni firma aç ya da mevcut firmaya kullanıcı olarak katıl.</p>
   </header>
 
-  <div class="flex gap-2 mb-5 p-1 rounded-lg border-[1.5px] border-ink bg-surface-elevated">
+  <div class="auth-tab-group" [attr.data-active]="tab()">
+    <span class="auth-tab-indicator" aria-hidden="true"></span>
     <button type="button" (click)="setTab('baskani')"
-            class="flex-1 text-xs font-mono uppercase tracking-wider py-2 rounded-md transition-colors"
-            [class.bg-lime]="tab() === 'baskani'"
-            [class.font-bold]="tab() === 'baskani'">
+            class="auth-tab-pill"
+            [class.is-active]="tab() === 'baskani'">
       Sayım Başkanı
     </button>
     <button type="button" (click)="setTab('kullanici')"
-            class="flex-1 text-xs font-mono uppercase tracking-wider py-2 rounded-md transition-colors"
-            [class.bg-lime]="tab() === 'kullanici'"
-            [class.font-bold]="tab() === 'kullanici'">
+            class="auth-tab-pill"
+            [class.is-active]="tab() === 'kullanici'">
       Kullanıcı
     </button>
   </div>
@@ -24,7 +23,7 @@
   }
 
   @if (tab() === 'baskani') {
-    <form [formGroup]="baskaniForm" (ngSubmit)="submit()" class="space-y-4" novalidate>
+    <form [formGroup]="baskaniForm" (ngSubmit)="submit()" class="space-y-3" novalidate>
       <div>
         <label class="auth-label">Ad Soyad</label>
         <input type="text" formControlName="adSoyad" class="auth-input"
@@ -77,7 +76,7 @@
       </button>
     </form>
   } @else {
-    <form [formGroup]="kullaniciForm" (ngSubmit)="submit()" class="space-y-4" novalidate>
+    <form [formGroup]="kullaniciForm" (ngSubmit)="submit()" class="space-y-3" novalidate>
       <div>
         <label class="auth-label">Ad Soyad</label>
         <input type="text" formControlName="adSoyad" class="auth-input"
@@ -122,7 +121,7 @@
     </form>
   }
 
-  <p class="text-center text-xs text-ink-secondary mt-6">
+  <p class="text-center text-xs text-ink-secondary mt-4">
     Hesabın var mı? <a routerLink="/login" class="auth-link">Giriş yap</a>
   </p>
 </app-auth-shell>

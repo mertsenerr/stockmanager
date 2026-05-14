@@ -7,6 +7,7 @@ import {
   ApiValidationProblem,
   AuthFailureBody,
   AuthFailureCode,
+  isTwoFactorRequired,
 } from '../../../core/auth/auth.models';
 import { AuthShellComponent } from '../auth-shell/auth-shell.component';
 
@@ -97,7 +98,7 @@ export class LoginComponent {
     this.submitting.set(true);
     const payload = this.form.getRawValue();
     this.auth.login(payload).subscribe({
-      next: () => {
+      next: (res) => {
         this.submitting.set(false);
         // Persist email locally for next visit only when user opted in via the
         // "Beni 30 gün hatırla" checkbox. Toggling off explicitly forgets it.
@@ -106,6 +107,20 @@ export class LoginComponent {
         } else {
           clearRememberedEmail();
         }
+
+        if (isTwoFactorRequired(res)) {
+          // Hand off the pending token to the 2FA verification screen via router state —
+          // we don't put it in the URL because it's a short-lived bearer.
+          this.router.navigate(['/two-factor'], {
+            state: {
+              pendingToken: res.pendingToken,
+              availableMethods: res.availableMethods,
+              redirect: new URLSearchParams(window.location.search).get('redirect') ?? '/',
+            },
+          });
+          return;
+        }
+
         const redirect = new URLSearchParams(window.location.search).get('redirect') ?? '/';
         this.router.navigateByUrl(redirect);
       },

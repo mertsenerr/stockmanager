@@ -5,6 +5,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ROLE_LABELS, UserRole } from '../../core/auth/auth.models';
 import { ThemeService } from '../../core/theme/theme.service';
 import { ToastHostComponent } from '../../shared/ui/toast/toast-host.component';
+import { ToastService } from '../../shared/ui/toast/toast.service';
 import { ConfirmHostComponent } from '../../shared/ui/confirm/confirm-host.component';
 import { IncomingCallService } from '../../core/realtime/incoming-call.service';
 import { IncomingCallHostComponent } from '../../core/realtime/incoming-call-host.component';
@@ -43,6 +44,7 @@ export class AppShellComponent {
   private readonly router = inject(Router);
   private readonly incomingCalls = inject(IncomingCallService);
   private readonly themeSvc = inject(ThemeService);
+  private readonly toast = inject(ToastService);
 
   readonly theme = this.themeSvc.theme;
   readonly toggleTheme = () => this.themeSvc.toggle();
@@ -67,6 +69,7 @@ export class AppShellComponent {
   readonly currentPath = signal<string>(this.router.url);
   readonly paletteOpen = signal(false);
   readonly hoveredGroupId = signal<string | null>(null);
+  readonly profileMenuOpen = signal(false);
 
   isGif(url: string | undefined): boolean {
     return !!url && url.toLowerCase().endsWith('.gif');
@@ -75,12 +78,24 @@ export class AppShellComponent {
   openPalette(): void { this.paletteOpen.set(true); }
   closePalette(): void { this.paletteOpen.set(false); }
 
+  toggleProfileMenu(): void { this.profileMenuOpen.update((v) => !v); }
+  closeProfileMenu(): void { this.profileMenuOpen.set(false); }
+
+  /** Placeholder handler — settings pages aren't built yet. */
+  notYetImplemented(label: string): void {
+    this.closeProfileMenu();
+    this.toast.info(`${label} — yakında.`);
+  }
+
   @HostListener('document:keydown', ['$event'])
   onGlobalKeydown(ev: KeyboardEvent): void {
     // Cmd+K (macOS) or Ctrl+K (Win/Linux) opens the command palette
     if ((ev.metaKey || ev.ctrlKey) && (ev.key === 'k' || ev.key === 'K')) {
       ev.preventDefault();
       this.paletteOpen.update((v) => !v);
+    }
+    if (ev.key === 'Escape' && this.profileMenuOpen()) {
+      this.closeProfileMenu();
     }
   }
 

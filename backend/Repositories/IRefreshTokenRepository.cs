@@ -10,6 +10,9 @@ public interface IRefreshTokenRepository
     Task<RefreshToken?> FindByHashAsync(string hash, CancellationToken ct = default);
     Task ReplaceAsync(RefreshToken token, CancellationToken ct = default);
     Task RevokeAllForUserAsync(string userId, string reason, CancellationToken ct = default);
+    Task<long> RevokeAllForUserExceptAsync(string userId, string keepHash, string reason, CancellationToken ct = default);
+    Task<IReadOnlyList<RefreshToken>> ListActiveForUserAsync(string userId, CancellationToken ct = default);
+    Task<bool> RevokeOneByIdAsync(string tokenId, string userId, string reason, CancellationToken ct = default);
 }
 
 public sealed class RefreshTokenRepository : IRefreshTokenRepository
@@ -55,5 +58,38 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
             t => t.UserId == userId && t.RevokedAt == null,
             update,
             cancellationToken: ct);
+    }
+
+    public async Task<long> RevokeAllForUserExceptAsync(string userId, string keepHash, string reason, CancellationToken ct = default)
+    {
+        var update = Builders<RefreshToken>.Update
+            .Set(t => t.RevokedAt, DateTime.UtcNow)
+            .Set(t => t.RevokedReason, reason);
+        var result = await _tokens.UpdateManyAsync(
+            t => t.UserId == userId && t.RevokedAt == null && t.TokenHash != keepHash,
+            update,
+            cancellationToken: ct);
+        return result.ModifiedCount;
+    }
+
+    public async Task<IReadOnlyList<RefreshToken>> ListActiveForUserAsync(string userId, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        return await _tokens
+            .Find(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > now)
+            .SortByDescending(t => t.CreatedAt)
+            .ToListAsync(ct);
+    }
+
+    public async Task<bool> RevokeOneByIdAsync(string tokenId, string userId, string reason, CancellationToken ct = default)
+    {
+        var update = Builders<RefreshToken>.Update
+            .Set(t => t.RevokedAt, DateTime.UtcNow)
+            .Set(t => t.RevokedReason, reason);
+        var result = await _tokens.UpdateOneAsync(
+            t => t.Id == tokenId && t.UserId == userId && t.RevokedAt == null,
+            update,
+            cancellationToken: ct);
+        return result.ModifiedCount > 0;
     }
 }

@@ -6,10 +6,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Fido2NetLib;
 using SayimLink.Api.Configuration;
 using SayimLink.Api.Hubs;
 using SayimLink.Api.Repositories;
 using SayimLink.Api.Services;
+using SayimLink.Api.Services.TwoFactor;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,6 +36,8 @@ builder.Services.Configure<SeedSettings>(
     builder.Configuration.GetSection(SeedSettings.SectionName));
 builder.Services.Configure<OzelRaporSettings>(
     builder.Configuration.GetSection(OzelRaporSettings.SectionName));
+builder.Services.Configure<Fido2Settings>(
+    builder.Configuration.GetSection("Fido2"));
 
 // ─── Application services ────────────────────────────────────────────────────
 builder.Services.AddSingleton<IMongoDbService, MongoDbService>();
@@ -55,6 +59,24 @@ builder.Services.AddSingleton<IEmailService, ResendEmailService>();
 builder.Services.AddSingleton<ICellLockService, CellLockService>();
 builder.Services.AddSingleton<ICallRegistry, CallRegistry>();
 builder.Services.AddHttpClient();
+
+// ─── 2FA stack ───────────────────────────────────────────────────────────────
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<IRecoveryCodeService, RecoveryCodeService>();
+builder.Services.AddSingleton<ITotpService, TotpService>();
+builder.Services.AddSingleton<IEmailOtpService, EmailOtpService>();
+builder.Services.AddScoped<IWebAuthnService, WebAuthnService>();
+builder.Services.AddSingleton<IFido2>(_ =>
+{
+    var fido = builder.Configuration.GetSection("Fido2").Get<Fido2Settings>() ?? new Fido2Settings();
+    return new Fido2(new Fido2Configuration
+    {
+        ServerDomain = fido.ServerDomain,
+        ServerName   = fido.ServerName,
+        Origins      = new HashSet<string>(fido.Origins),
+        TimestampDriftTolerance = 300_000,
+    });
+});
 
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddHostedService<AdminSeederHostedService>();

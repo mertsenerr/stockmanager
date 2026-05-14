@@ -9,6 +9,7 @@ public interface IEmailService
 {
     Task SendPasswordResetAsync(string toEmail, string toName, string resetUrl, CancellationToken ct = default);
     Task SendEmailVerificationAsync(string toEmail, string toName, string verifyUrl, CancellationToken ct = default);
+    Task SendTwoFactorCodeAsync(string toEmail, string toName, string code, CancellationToken ct = default);
 }
 
 public sealed class ResendEmailService : IEmailService
@@ -100,6 +101,65 @@ public sealed class ResendEmailService : IEmailService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Resend exception while sending password reset to {Email}", toEmail);
+        }
+    }
+
+    public async Task SendTwoFactorCodeAsync(
+        string toEmail,
+        string toName,
+        string code,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(_settings.ApiKey))
+        {
+            _logger.LogWarning(
+                "Resend API key not configured — 2FA code email skipped. Code for {Email}: {Code}",
+                toEmail, code);
+            return;
+        }
+
+        var client = _httpClientFactory.CreateClient();
+        client.BaseAddress = new Uri("https://api.resend.com/");
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", _settings.ApiKey);
+
+        var html =
+            $"""
+            <div style="font-family: -apple-system, Inter, sans-serif; max-width: 480px; margin: 24px auto; color: #fafafa; background: #111111; padding: 32px; border: 1px solid #1f1f1f; border-radius: 12px;">
+              <h2 style="font-size: 18px; margin: 0 0 16px;">SynCompare — Doğrulama Kodu</h2>
+              <p style="font-size: 14px; color: #a1a1aa; line-height: 1.5;">
+                Merhaba {toName}, giriş işlemini tamamlamak için doğrulama kodu:
+              </p>
+              <p style="font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; letter-spacing: 0.32em; text-align: center; padding: 18px; background: #0a0a0a; border-radius: 8px; color: #14b8a6; margin: 16px 0;">
+                {code}
+              </p>
+              <p style="font-size: 12px; color: #71717a;">
+                Kod 10 dakika geçerlidir. Bu girişi sen yapmadıysan parolanı hemen değiştir.
+              </p>
+            </div>
+            """;
+
+        var payload = new
+        {
+            from = $"{_settings.FromName} <{_settings.FromEmail}>",
+            to = new[] { toEmail },
+            subject = $"SynCompare doğrulama kodu: {code}",
+            html,
+        };
+        try
+        {
+            var response = await client.PostAsJsonAsync("emails", payload, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(ct);
+                _logger.LogError(
+                    "Resend 2FA code send failed for {Email}: {Status} {Body}",
+                    toEmail, response.StatusCode, body);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Resend exception while sending 2FA code to {Email}", toEmail);
         }
     }
 

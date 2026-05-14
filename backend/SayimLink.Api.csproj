@@ -21,6 +21,10 @@
     <PackageReference Include="MongoDB.Driver" Version="3.8.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.*" />
+    <!-- 2FA stack -->
+    <PackageReference Include="Otp.NET" Version="1.4.0" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+    <PackageReference Include="Fido2" Version="3.0.1" />
   </ItemGroup>
 
 </Project>

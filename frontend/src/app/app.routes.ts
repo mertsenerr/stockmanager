@@ -38,6 +38,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'two-factor',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/two-factor/two-factor.component').then(
+        (m) => m.TwoFactorComponent,
+      ),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () =>
@@ -102,6 +110,34 @@ export const routes: Routes = [
         canActivate: [roleGuard('Sistem')],
         loadComponent: () =>
           import('./features/rapor/audit/audit.component').then((m) => m.AuditComponent),
+      },
+      {
+        path: 'ayarlar',
+        loadComponent: () =>
+          import('./features/ayarlar/ayarlar-shell.component').then((m) => m.AyarlarShellComponent),
+        children: [
+          { path: '', redirectTo: 'profil', pathMatch: 'full' },
+          {
+            path: 'profil',
+            loadComponent: () =>
+              import('./features/ayarlar/profil/profil.component').then((m) => m.ProfilComponent),
+          },
+          {
+            path: 'genel',
+            loadComponent: () =>
+              import('./features/ayarlar/genel/genel.component').then((m) => m.GenelComponent),
+          },
+          {
+            path: 'guvenlik',
+            loadComponent: () =>
+              import('./features/ayarlar/guvenlik/guvenlik.component').then((m) => m.GuvenlikComponent),
+          },
+          {
+            path: 'bildirimler',
+            loadComponent: () =>
+              import('./features/ayarlar/bildirimler/bildirimler.component').then((m) => m.BildirimlerComponent),
+          },
+        ],
       },
     ],
   },

@@ -15,6 +15,18 @@ public interface IAuthService
     Task RequestPasswordResetAsync(string email, CancellationToken ct = default);
     Task<bool> ResetPasswordAsync(string tokenPlaintext, string newPassword, CancellationToken ct = default);
     Task<UserDto?> GetCurrentUserAsync(string userId, CancellationToken ct = default);
+    Task<UserDto?> UpdateProfileAsync(string userId, UpdateProfileRequest request, CancellationToken ct = default);
+    Task<ChangePasswordResult> ChangePasswordAsync(string userId, string currentPassword, string newPassword, string? currentRefreshToken, CancellationToken ct = default);
+    Task<long> RevokeOtherSessionsAsync(string userId, string? currentRefreshToken, CancellationToken ct = default);
+
+    Task<IReadOnlyList<ActiveSessionDto>> ListActiveSessionsAsync(string userId, string? currentRefreshToken, CancellationToken ct = default);
+    Task<bool> RevokeSessionAsync(string userId, string sessionId, string? currentRefreshToken, CancellationToken ct = default);
+
+    /// <summary>Issues real tokens after a successful 2FA verification step.</summary>
+    Task<AuthResult> CompleteTwoFactorLoginAsync(string userId, bool rememberMe, string? ip, string? userAgent, CancellationToken ct = default);
+
+    Task<User?> GetUserAsync(string userId, CancellationToken ct = default);
+    Task ReplaceUserAsync(User user, CancellationToken ct = default);
     Task<RegisterResult> RegisterSayimBaskaniAsync(RegisterSayimBaskaniRequest request, CancellationToken ct = default);
     Task<RegisterResult> RegisterKullaniciAsync(RegisterKullaniciRequest request, CancellationToken ct = default);
     Task<bool> VerifyEmailAsync(string tokenPlaintext, CancellationToken ct = default);
@@ -33,6 +45,10 @@ public sealed record RegisterResult(
     string? FailureReason,
     UserDto? User);
 
+public sealed record ChangePasswordResult(
+    bool Success,
+    string? FailureReason);
+
 public sealed record AuthResult(
     bool Success,
     string? FailureReason,
@@ -40,7 +56,11 @@ public sealed record AuthResult(
     AuthResponse? Response,
     string? RefreshTokenPlaintext,
     DateTime? RefreshTokenExpiresAt,
-    bool RememberMe);
+    bool RememberMe,
+    // When a user has 2FA enabled, LoginAsync returns Success=true with these set instead
+    // of issuing a refresh token. The caller must complete the second factor.
+    string? TwoFactorPendingToken = null,
+    IReadOnlyList<string>? TwoFactorAvailableMethods = null);
 
 public sealed class AuthService : IAuthService
 {
@@ -89,11 +109,41 @@ public sealed class AuthService : IAuthService
         if (!user.IsEmailVerified)
             return new AuthResult(false, "Lütfen önce e-posta adresinizi doğrulayın.", AuthFailureCodes.EmailNotVerified, null, null, null, false);
 
+        // 2FA gate: if any second factor is enabled, do NOT issue refresh tokens yet —
+        // hand back a short-lived "pending" JWT and let the caller finish via /2fa/verify.
+        var methods = new List<string>();
+        if (user.TotpEnabled)                          methods.Add("totp");
+        if (user.WebAuthnCredentials.Count > 0)        methods.Add("webauthn");
+        if (user.EmailOtpEnabled)                      methods.Add("email");
+        if (user.RecoveryCodeHashes.Count > 0)         methods.Add("recovery");
+
+        if (methods.Count > 0 && (user.TotpEnabled || user.EmailOtpEnabled || user.WebAuthnCredentials.Count > 0))
+        {
+            var pending = _jwt.GenerateTwoFactorPendingToken(user, request.RememberMe);
+            return new AuthResult(true, null, null, null, null, null, request.RememberMe, pending, methods);
+        }
+
         user.SonGirisTarihi = DateTime.UtcNow;
         await _users.ReplaceAsync(user, ct);
-
         return await IssueTokensAsync(user, request.RememberMe, ip, userAgent, ct);
     }
+
+    public async Task<AuthResult> CompleteTwoFactorLoginAsync(
+        string userId, bool rememberMe, string? ip, string? userAgent, CancellationToken ct = default)
+    {
+        var user = await _users.FindByIdAsync(userId, ct);
+        if (user is null || !user.AktifMi)
+            return new AuthResult(false, "Kullanıcı bulunamadı.", AuthFailureCodes.InvalidCredentials, null, null, null, false);
+        user.SonGirisTarihi = DateTime.UtcNow;
+        await _users.ReplaceAsync(user, ct);
+        return await IssueTokensAsync(user, rememberMe, ip, userAgent, ct);
+    }
+
+    public Task<User?> GetUserAsync(string userId, CancellationToken ct = default) =>
+        _users.FindByIdAsync(userId, ct);
+
+    public Task ReplaceUserAsync(User user, CancellationToken ct = default) =>
+        _users.ReplaceAsync(user, ct);
 
     public async Task<RegisterResult> RegisterSayimBaskaniAsync(
         RegisterSayimBaskaniRequest request,
@@ -322,6 +372,93 @@ public sealed class AuthService : IAuthService
         var user = await _users.FindByIdAsync(userId, ct);
         if (user is null || !user.AktifMi) return null;
         return await ToDtoEnrichedAsync(user, ct);
+    }
+
+    public async Task<UserDto?> UpdateProfileAsync(string userId, UpdateProfileRequest request, CancellationToken ct = default)
+    {
+        var user = await _users.FindByIdAsync(userId, ct);
+        if (user is null || !user.AktifMi) return null;
+        user.AdSoyad = request.AdSoyad.Trim();
+        await _users.ReplaceAsync(user, ct);
+        return await ToDtoEnrichedAsync(user, ct);
+    }
+
+    public async Task<ChangePasswordResult> ChangePasswordAsync(
+        string userId, string currentPassword, string newPassword,
+        string? currentRefreshToken, CancellationToken ct = default)
+    {
+        var user = await _users.FindByIdAsync(userId, ct);
+        if (user is null || !user.AktifMi)
+            return new ChangePasswordResult(false, "Kullanıcı bulunamadı.");
+
+        if (!_hasher.Verify(currentPassword, user.PasswordHash))
+            return new ChangePasswordResult(false, "Mevcut parola hatalı.");
+
+        user.PasswordHash = _hasher.Hash(newPassword);
+        await _users.ReplaceAsync(user, ct);
+
+        // Security best-practice: invalidate every OTHER session so the password
+        // change kicks intruders out, but the current session keeps working.
+        if (!string.IsNullOrWhiteSpace(currentRefreshToken))
+        {
+            var keepHash = _jwt.HashRefreshToken(currentRefreshToken);
+            await _refreshTokens.RevokeAllForUserExceptAsync(user.Id, keepHash, "password_changed", ct);
+        }
+        else
+        {
+            // No current refresh token (shouldn't happen for an authenticated request) — revoke everything.
+            await _refreshTokens.RevokeAllForUserAsync(user.Id, "password_changed", ct);
+        }
+
+        return new ChangePasswordResult(true, null);
+    }
+
+    public async Task<long> RevokeOtherSessionsAsync(string userId, string? currentRefreshToken, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(currentRefreshToken))
+        {
+            // No current cookie present — refuse rather than nuke the user out of every device.
+            return 0;
+        }
+        var keepHash = _jwt.HashRefreshToken(currentRefreshToken);
+        return await _refreshTokens.RevokeAllForUserExceptAsync(userId, keepHash, "user_revoked_others", ct);
+    }
+
+    public async Task<IReadOnlyList<ActiveSessionDto>> ListActiveSessionsAsync(
+        string userId, string? currentRefreshToken, CancellationToken ct = default)
+    {
+        var tokens = await _refreshTokens.ListActiveForUserAsync(userId, ct);
+        var currentHash = string.IsNullOrWhiteSpace(currentRefreshToken)
+            ? null
+            : _jwt.HashRefreshToken(currentRefreshToken);
+        return tokens.Select(t =>
+        {
+            var (browser, os) = UserAgentParser.Parse(t.UserAgent);
+            return new ActiveSessionDto
+            {
+                Id        = t.Id,
+                Browser   = browser,
+                Os        = os,
+                Ip        = t.CreatedByIp,
+                CreatedAt = t.CreatedAt,
+                ExpiresAt = t.ExpiresAt,
+                IsCurrent = currentHash != null && t.TokenHash == currentHash,
+            };
+        }).ToList();
+    }
+
+    public async Task<bool> RevokeSessionAsync(
+        string userId, string sessionId, string? currentRefreshToken, CancellationToken ct = default)
+    {
+        // Don't let the user accidentally kill their own current session via the
+        // "individual revoke" flow — that's what the explicit logout button is for.
+        if (!string.IsNullOrWhiteSpace(currentRefreshToken))
+        {
+            var currentHash = _jwt.HashRefreshToken(currentRefreshToken);
+            var current = await _refreshTokens.FindByHashAsync(currentHash, ct);
+            if (current is not null && current.Id == sessionId) return false;
+        }
+        return await _refreshTokens.RevokeOneByIdAsync(sessionId, userId, "user_revoked_one", ct);
     }
 
     private async Task<AuthResult> IssueTokensAsync(

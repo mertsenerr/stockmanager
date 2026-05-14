@@ -1166,6 +1166,23 @@
   }
 }
 
+/* User-toggled "Reduce motion" preference (Genel ayarlar) — overrides all
+   custom animations, scoped to a data attribute on <html>. */
+[data-reduce-motion="true"] *,
+[data-reduce-motion="true"] *::before,
+[data-reduce-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+[data-reduce-motion="true"] ::view-transition-old(auth-wave),
+[data-reduce-motion="true"] ::view-transition-new(auth-wave),
+[data-reduce-motion="true"] ::view-transition-old(auth-form-card),
+[data-reduce-motion="true"] ::view-transition-new(auth-form-card) {
+  animation: none !important;
+}
+
 /* Ribbon of parallel wave lines following one master path */
 .auth-waves-ribbon use {
   fill: none;

@@ -3,16 +3,27 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, catchError, map, of, share, tap, throwError, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  ActiveSession,
   AuthResponse,
+  ChangePasswordRequest,
   CurrentUser,
   ForgotPasswordRequest,
+  LoginOutcome,
   LoginRequest,
+  RecoveryCodesResponse,
   RegisterKullaniciRequest,
   RegisterResponse,
   RegisterSayimBaskaniRequest,
   ResendVerificationRequest,
   ResetPasswordRequest,
+  RevokeOtherSessionsResponse,
+  TotpSetupResponse,
+  TwoFactorStatus,
+  TwoFactorVerifyRequest,
+  UpdateProfileRequest,
   VerifyEmailRequest,
+  WebAuthnCredentialDto,
+  isTwoFactorRequired,
 } from './auth.models';
 
 @Injectable({ providedIn: 'root' })
@@ -42,10 +53,74 @@ export class AuthService {
     );
   }
 
-  login(request: LoginRequest): Observable<AuthResponse> {
+  login(request: LoginRequest): Observable<LoginOutcome> {
     return this.http
-      .post<AuthResponse>(`${this.base}/login`, request, { withCredentials: true })
-      .pipe(timeout({ each: 30000 }), tap((res) => this.applyAuth(res)));
+      .post<LoginOutcome>(`${this.base}/login`, request, { withCredentials: true })
+      .pipe(
+        timeout({ each: 30000 }),
+        tap((res) => { if (!isTwoFactorRequired(res)) this.applyAuth(res); }),
+      );
+  }
+
+  // ─── Two-factor authentication ───────────────────────────────────────────
+  twoFactorStatus(): Observable<TwoFactorStatus> {
+    return this.http.get<TwoFactorStatus>(`${this.base}/2fa/status`, { withCredentials: true });
+  }
+
+  totpSetup(): Observable<TotpSetupResponse> {
+    return this.http.post<TotpSetupResponse>(`${this.base}/2fa/totp/setup`, {}, { withCredentials: true });
+  }
+
+  totpEnable(code: string): Observable<RecoveryCodesResponse> {
+    return this.http.post<RecoveryCodesResponse>(`${this.base}/2fa/totp/enable`, { code }, { withCredentials: true });
+  }
+
+  totpDisable(): Observable<void> {
+    return this.http.post<void>(`${this.base}/2fa/totp/disable`, {}, { withCredentials: true });
+  }
+
+  emailOtpEnable(): Observable<void> {
+    return this.http.post<void>(`${this.base}/2fa/email/enable`, {}, { withCredentials: true });
+  }
+
+  emailOtpDisable(): Observable<void> {
+    return this.http.post<void>(`${this.base}/2fa/email/disable`, {}, { withCredentials: true });
+  }
+
+  emailOtpSend(pendingToken: string): Observable<{ sent: boolean }> {
+    return this.http.post<{ sent: boolean }>(`${this.base}/2fa/email/send`, { pendingToken });
+  }
+
+  webAuthnList(): Observable<WebAuthnCredentialDto[]> {
+    return this.http.get<WebAuthnCredentialDto[]>(`${this.base}/2fa/webauthn`, { withCredentials: true });
+  }
+
+  webAuthnRegisterOptions(): Observable<unknown> {
+    return this.http.post<unknown>(`${this.base}/2fa/webauthn/register/options`, {}, { withCredentials: true });
+  }
+
+  webAuthnRegisterComplete(response: unknown, nickname?: string): Observable<{ id: string; nickname?: string }> {
+    return this.http.post<{ id: string; nickname?: string }>(
+      `${this.base}/2fa/webauthn/register/complete`,
+      { response, nickname }, { withCredentials: true });
+  }
+
+  webAuthnDelete(credentialId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/2fa/webauthn/${encodeURIComponent(credentialId)}`, { withCredentials: true });
+  }
+
+  webAuthnAuthOptions(pendingToken: string): Observable<unknown> {
+    return this.http.post<unknown>(`${this.base}/2fa/webauthn/auth/options`, { pendingToken });
+  }
+
+  regenerateRecoveryCodes(): Observable<RecoveryCodesResponse> {
+    return this.http.post<RecoveryCodesResponse>(`${this.base}/2fa/recovery-codes/regenerate`, {}, { withCredentials: true });
+  }
+
+  twoFactorVerify(req: TwoFactorVerifyRequest): Observable<AuthResponse> {
+    return this.http
+      .post<AuthResponse>(`${this.base}/2fa/verify`, req, { withCredentials: true })
+      .pipe(tap((res) => this.applyAuth(res)));
   }
 
   logout(): Observable<void> {
@@ -113,6 +188,30 @@ export class AuthService {
 
   resendVerification(req: ResendVerificationRequest): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.base}/resend-verification`, req);
+  }
+
+  updateProfile(req: UpdateProfileRequest): Observable<CurrentUser> {
+    return this.http
+      .patch<CurrentUser>(`${this.base}/me`, req, { withCredentials: true })
+      .pipe(tap((user) => this._currentUser.set(user)));
+  }
+
+  changePassword(req: ChangePasswordRequest): Observable<void> {
+    return this.http
+      .post<void>(`${this.base}/change-password`, req, { withCredentials: true });
+  }
+
+  revokeOtherSessions(): Observable<RevokeOtherSessionsResponse> {
+    return this.http
+      .post<RevokeOtherSessionsResponse>(`${this.base}/sessions/revoke-others`, {}, { withCredentials: true });
+  }
+
+  listSessions(): Observable<ActiveSession[]> {
+    return this.http.get<ActiveSession[]>(`${this.base}/sessions`, { withCredentials: true });
+  }
+
+  revokeSession(sessionId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/sessions/${encodeURIComponent(sessionId)}`, { withCredentials: true });
   }
 
   hasRole(...roles: CurrentUser['rol'][]): boolean {

@@ -81,3 +81,72 @@ export interface VerifyEmailRequest {
 export interface ResendVerificationRequest {
   email: string;
 }
+
+export interface UpdateProfileRequest {
+  adSoyad: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface RevokeOtherSessionsResponse {
+  revoked: number;
+}
+
+export interface ActiveSession {
+  id: string;
+  browser: string;
+  os: string;
+  ip?: string | null;
+  createdAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
+// ─── Two-factor authentication ───────────────────────────────────────────────
+export type TwoFactorMethod = 'totp' | 'email' | 'webauthn' | 'recovery';
+
+export interface TwoFactorRequiredResponse {
+  requiresTwoFactor: true;
+  pendingToken: string;
+  availableMethods: TwoFactorMethod[];
+}
+
+export type LoginOutcome = AuthResponse | TwoFactorRequiredResponse;
+
+export function isTwoFactorRequired(r: LoginOutcome): r is TwoFactorRequiredResponse {
+  return (r as TwoFactorRequiredResponse).requiresTwoFactor === true;
+}
+
+export interface TwoFactorStatus {
+  totpEnabled: boolean;
+  emailOtpEnabled: boolean;
+  webAuthnEnabled: boolean;
+  webAuthnCredentialCount: number;
+  recoveryCodesRemaining: number;
+}
+
+export interface TotpSetupResponse {
+  secret: string;
+  otpAuthUrl: string;
+  qrPngDataUri: string;
+}
+
+export interface RecoveryCodesResponse {
+  codes: string[];
+}
+
+export interface WebAuthnCredentialDto {
+  id: string;
+  nickname?: string | null;
+  createdAt: string;
+}
+
+export interface TwoFactorVerifyRequest {
+  pendingToken: string;
+  method: TwoFactorMethod;
+  code?: string;
+  assertionResponse?: unknown; // Raw WebAuthn assertion JSON.
+}

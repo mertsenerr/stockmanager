@@ -124,13 +124,96 @@
       </button>
       <div class="orbix-topbar-right">
         @if (user(); as u) {
-          <span class="orbix-topbar-user">
-            <span class="orbix-avatar orbix-avatar-sm">{{ initials() }}</span>
-            <span class="orbix-topbar-user-text">
-              <span class="orbix-topbar-user-name">{{ u.adSoyad }}</span>
-              <span class="orbix-topbar-user-handle">{{ '@' + (u.email.split('@')[0] || '') }}</span>
-            </span>
-          </span>
+          <div class="orbix-profile-anchor">
+            <button
+              type="button"
+              class="orbix-topbar-user"
+              [class.is-open]="profileMenuOpen()"
+              (click)="toggleProfileMenu()"
+              [attr.aria-expanded]="profileMenuOpen()"
+              aria-haspopup="menu"
+              aria-label="Profil menüsünü aç"
+            >
+              <span class="orbix-avatar orbix-avatar-sm">{{ initials() }}</span>
+              <span class="orbix-topbar-user-text">
+                <span class="orbix-topbar-user-name">{{ u.adSoyad }}</span>
+                <span class="orbix-topbar-user-handle">{{ '@' + (u.email.split('@')[0] || '') }}</span>
+              </span>
+              <span class="orbix-profile-chevron" aria-hidden="true">▾</span>
+            </button>
+
+            @if (profileMenuOpen()) {
+              <div class="orbix-profile-backdrop" (click)="closeProfileMenu()"></div>
+              <div class="orbix-profile-menu" role="menu">
+                <header class="orbix-profile-head">
+                  <span class="orbix-avatar">{{ initials() }}</span>
+                  <span class="orbix-profile-head-text">
+                    <span class="orbix-profile-head-name">{{ u.adSoyad }}</span>
+                    <span class="orbix-profile-head-email">{{ u.email }}</span>
+                    <span class="orbix-profile-head-role">{{ roleLabel() }}</span>
+                  </span>
+                </header>
+
+                <div class="orbix-profile-section">
+                  <a routerLink="/ayarlar/profil" role="menuitem" class="orbix-profile-item" (click)="closeProfileMenu()">
+                    <span class="orbix-profile-item-icon" aria-hidden="true">
+                      <img src="/assets/images/avatar-design.png" alt="" />
+                    </span>
+                    <span class="orbix-profile-item-body">
+                      <span class="orbix-profile-item-label">Profilim</span>
+                      <span class="orbix-profile-item-desc">Ad, e-posta, avatar</span>
+                    </span>
+                  </a>
+                  <a routerLink="/ayarlar/genel" role="menuitem" class="orbix-profile-item" (click)="closeProfileMenu()">
+                    <span class="orbix-profile-item-icon" aria-hidden="true">
+                      <img src="/assets/images/gear.png" alt="" />
+                    </span>
+                    <span class="orbix-profile-item-body">
+                      <span class="orbix-profile-item-label">Genel ayarlar</span>
+                      <span class="orbix-profile-item-desc">Dil, bölge, görünüm</span>
+                    </span>
+                  </a>
+                  <a routerLink="/ayarlar/guvenlik" role="menuitem" class="orbix-profile-item" (click)="closeProfileMenu()">
+                    <span class="orbix-profile-item-icon" aria-hidden="true">
+                      <img src="/assets/images/shield.png" alt="" />
+                    </span>
+                    <span class="orbix-profile-item-body">
+                      <span class="orbix-profile-item-label">Gizlilik & güvenlik</span>
+                      <span class="orbix-profile-item-desc">Şifre, oturumlar, 2FA</span>
+                    </span>
+                  </a>
+                  <a routerLink="/ayarlar/bildirimler" role="menuitem" class="orbix-profile-item" (click)="closeProfileMenu()">
+                    <span class="orbix-profile-item-icon" aria-hidden="true">
+                      <img src="/assets/images/notification.png" alt="" />
+                    </span>
+                    <span class="orbix-profile-item-body">
+                      <span class="orbix-profile-item-label">Bildirimler</span>
+                      <span class="orbix-profile-item-desc">E-posta & in-app tercihler</span>
+                    </span>
+                  </a>
+                </div>
+
+                <div class="orbix-profile-section orbix-profile-section-secondary">
+                  <button type="button" role="menuitem" class="orbix-profile-item" (click)="notYetImplemented('Yardım & destek')">
+                    <span class="orbix-profile-item-icon" aria-hidden="true">
+                      <img src="/assets/images/question-mark.png" alt="" />
+                    </span>
+                    <span class="orbix-profile-item-body">
+                      <span class="orbix-profile-item-label">Yardım & destek</span>
+                    </span>
+                  </button>
+                  <button type="button" role="menuitem" class="orbix-profile-item is-danger" (click)="closeProfileMenu(); logout()">
+                    <span class="orbix-profile-item-icon" aria-hidden="true">
+                      <img src="/assets/images/logout.png" alt="" />
+                    </span>
+                    <span class="orbix-profile-item-body">
+                      <span class="orbix-profile-item-label">Çıkış yap</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
         }
       </div>
     </header>

@@ -9,6 +9,7 @@ const SILENT_PATHS = [
   '/api/auth/me',
   '/api/auth/forgot-password',
   '/api/auth/reset-password',
+  '/api/auth/2fa/',
 ];
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {

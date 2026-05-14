@@ -15,6 +15,13 @@ public interface IJwtService
     (string plaintext, string hash, DateTime expiresAt) GenerateRefreshToken(bool rememberMe);
     string HashRefreshToken(string plaintext);
     int AccessTokenSeconds { get; }
+
+    /// <summary>Short-lived (5 min) JWT used between password verification and 2FA verification.
+    /// Carries the user id + a "twofa_pending" purpose claim. Not accepted by the resource APIs.</summary>
+    string GenerateTwoFactorPendingToken(User user, bool rememberMe);
+
+    /// <summary>Returns (userId, rememberMe) on success; null on invalid/expired.</summary>
+    (string userId, bool rememberMe)? ValidateTwoFactorPendingToken(string token);
 }
 
 public sealed class JwtService : IJwtService
@@ -82,5 +89,59 @@ public sealed class JwtService : IJwtService
         var bytes = Encoding.UTF8.GetBytes(plaintext);
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
+    }
+
+    public string GenerateTwoFactorPendingToken(User user, bool rememberMe)
+    {
+        var now = DateTime.UtcNow;
+        var expires = now.AddMinutes(5);
+        // Include both `sub` and ClaimTypes.NameIdentifier so the validator can find
+        // the user id regardless of inbound claim mapping behaviour.
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(ClaimTypes.NameIdentifier, user.Id),
+            new("purpose", "twofa_pending"),
+            new("rm", rememberMe ? "1" : "0"),
+        };
+        var token = new JwtSecurityToken(
+            issuer: _settings.Issuer,
+            audience: _settings.Audience,
+            claims: claims,
+            notBefore: now,
+            expires: expires,
+            signingCredentials: _signingCredentials);
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public (string userId, bool rememberMe)? ValidateTwoFactorPendingToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return null;
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var principal = handler.ValidateToken(token, new TokenValidationParameters
+            {
+                ValidIssuer = _settings.Issuer,
+                ValidateIssuer = true,
+                ValidAudience = _settings.Audience,
+                ValidateAudience = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Secret)),
+                ValidateIssuerSigningKey = true,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromSeconds(10),
+            }, out _);
+
+            var purpose = principal.FindFirst("purpose")?.Value;
+            if (purpose != "twofa_pending") return null;
+            // Default inbound mapping turns `sub` into ClaimTypes.NameIdentifier, so
+            // try both lookups before declaring the token invalid.
+            var sub = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                   ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(sub)) return null;
+            var rm = principal.FindFirst("rm")?.Value == "1";
+            return (sub, rm);
+        }
+        catch { return null; }
     }
 }

@@ -10,7 +10,15 @@ import { Router } from '@angular/router';
 import { Observable, catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 
-const SKIP_REFRESH_PATHS = ['/api/auth/refresh', '/api/auth/login', '/api/auth/forgot-password', '/api/auth/reset-password'];
+const SKIP_REFRESH_PATHS = [
+  '/api/auth/refresh',
+  '/api/auth/login',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+  // 2FA flow lives outside the refresh-on-401 path: a failed verify is a user-input
+  // error, not a session expiry, so the component should handle the 401 inline.
+  '/api/auth/2fa/',
+];
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);

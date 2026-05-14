@@ -485,12 +485,12 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
     .guv-form { max-width: none; }
 
     .guv-gen {
-      display: flex; flex-direction: column; gap: 14px;
-      padding: 16px;
+      display: flex; flex-direction: column; gap: 18px;
+      padding: 24px 18px;
       border-radius: 12px;
       border: 1px dashed rgba(0, 0, 0, 0.10);
       background: var(--color-surface-elevated);
-      align-self: start;
+      justify-content: center;
     }
     :host-context([data-theme="dark"]) .guv-gen {
       border-color: var(--color-border-strong);

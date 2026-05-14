@@ -95,10 +95,11 @@
     </div>
   }
 
-  <div class="grid gap-4" [class.grid-cols-1]="!selectedUrun()" [class.grid-cols-[1fr_320px]]="selectedUrun()">
+  <div class="grid gap-4 grid-cols-1" [class.md:grid-cols-[1fr_320px]]="selectedUrun()">
     <!-- Main grid + activity -->
-    <div class="grid gap-4 min-w-0"
-         [style.gridTemplateColumns]="embedded ? '1fr 480px' : '1fr 240px'">
+    <div class="grid gap-4 min-w-0 grid-cols-1"
+         [class.md:grid-cols-[1fr_480px]]="embedded"
+         [class.md:grid-cols-[1fr_240px]]="!embedded">
       <div class="card-flat overflow-hidden flex flex-col min-w-0">
         <div class="px-3 py-2.5 border-b-[1.5px] border-ink flex items-center gap-2"
              style="background: var(--color-surface-elevated);">

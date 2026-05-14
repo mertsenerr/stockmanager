@@ -6,7 +6,14 @@
 
   <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-5" novalidate>
     <div>
-      <label for="email" class="auth-label">E-posta</label>
+      <div class="flex items-center justify-between mb-1.5">
+        <label for="email" class="auth-label !mb-0">E-posta</label>
+        @if (hasRememberedEmail()) {
+          <button type="button" (click)="forgetEmail()" class="auth-link">
+            Bu ben değilim
+          </button>
+        }
+      </div>
       <input
         id="email"
         type="email"

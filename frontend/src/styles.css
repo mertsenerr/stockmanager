@@ -356,6 +356,31 @@
 }
 .auth-sticker:hover { transform: rotate(-2deg) translate(-1px, -1px); box-shadow: 4px 4px 0 var(--auth-ink); }
 
+.auth-brand-text {
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.038em;
+  line-height: 1;
+  color: var(--auth-ink);
+  font-size: clamp(22px, 2.2vw, 32px);
+  text-decoration: none;
+  display: inline-block;
+  user-select: none;
+}
+.auth-brand-text em {
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 800;
+  color: var(--auth-coral);
+  letter-spacing: -0.022em;
+}
+[data-theme="dark"] .auth-brand-text em {
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 .auth-help-link {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px; font-weight: 600; letter-spacing: 0.14em;
@@ -1056,16 +1081,110 @@
   --auth-ink-muted: #6c6c78;
   background-color: #07070b;
   background-image:
-    linear-gradient(180deg, rgba(7, 7, 11, 0.50) 0%, rgba(7, 7, 11, 0.30) 45%, rgba(7, 7, 11, 0.65) 100%),
-    url('/assets/images/signin_register_2.png');
-  background-size: cover;
-  background-position: center;
+    radial-gradient(ellipse 60% 50% at 78% 12%, rgba(var(--color-accent-rgb), 0.22), transparent 70%),
+    radial-gradient(ellipse 50% 50% at 12% 88%, rgba(20, 184, 166, 0.14), transparent 70%),
+    linear-gradient(180deg, #0a0a12 0%, #07070b 100%);
+  background-size: 100% 100%;
+  background-position: 0 0;
   background-repeat: no-repeat;
-  background-attachment: fixed;
+  background-attachment: scroll;
 }
-/* Hide the decorative blobs in dark mode — the photo already provides atmosphere */
+/* Hide the cream/light decorative blobs in dark mode — gradient covers atmosphere */
 [data-theme="dark"] .auth-page::before,
 [data-theme="dark"] .auth-page::after { display: none; }
+
+/* ─── Diagonal wave decoration (transparent SVG, theme-aware) ────────────── */
+.auth-waves {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+  /* Shared element across auth routes — View Transitions API morphs the wave
+     when navigating between login/register/forgot/reset. */
+  view-transition-name: auth-wave;
+}
+
+/* Layer the view transitions: wave at z=1 (above root background), form card
+   at z=2 (above wave so it never gets covered). Without explicit z-index the
+   form would either be hidden under the wave snapshot OR the wave would be
+   buried under the root background snapshot — both are wrong. */
+.auth-card-transition {
+  view-transition-name: auth-form-card;
+}
+::view-transition-group(auth-wave)      { z-index: 1; }
+::view-transition-group(auth-form-card) { z-index: 2; }
+::view-transition-old(auth-form-card),
+::view-transition-new(auth-form-card) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Custom view-transition animation for the wave: directional slide.
+   Forward (login → register/forgot/reset): wave slides right-to-left.
+   Backward (… → login): wave slides left-to-right.
+   Direction comes from <html data-nav-direction="..."> set in router callback.
+   Slide distance is a large viewport offset so the motion is visibly distinct
+   from a plain cross-fade — opacity is held high until the slide is well underway. */
+:root {
+  --auth-wave-out-x: -55vw;  /* default forward: old slides far left */
+  --auth-wave-in-x:   55vw;  /* default forward: new enters from far right */
+}
+:root[data-nav-direction="backward"] {
+  --auth-wave-out-x:  55vw;
+  --auth-wave-in-x:  -55vw;
+}
+
+::view-transition-old(auth-wave),
+::view-transition-new(auth-wave) {
+  animation-duration: 900ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  mix-blend-mode: normal;
+}
+::view-transition-old(auth-wave) {
+  animation-name: auth-wave-out;
+}
+::view-transition-new(auth-wave) {
+  animation-name: auth-wave-in;
+}
+@keyframes auth-wave-out {
+  0%   { opacity: 1; transform: translateX(0); }
+  70%  { opacity: 0.7; }
+  100% { opacity: 0; transform: translateX(var(--auth-wave-out-x)); }
+}
+@keyframes auth-wave-in {
+  0%   { opacity: 0; transform: translateX(var(--auth-wave-in-x)); }
+  40%  { opacity: 0.7; }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(auth-wave),
+  ::view-transition-new(auth-wave) {
+    animation: none;
+  }
+}
+
+/* Ribbon of parallel wave lines following one master path */
+.auth-waves-ribbon use {
+  fill: none;
+  stroke: url(#auth-wave-grad);
+  stroke-width: 1;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Light mode override — single accent color, no purple/blue (too neon for cream bg) */
+[data-theme="light"] .auth-waves-ribbon use,
+:root:not([data-theme="dark"]) .auth-waves-ribbon use {
+  stroke: rgba(15, 118, 110, 0.30);
+}
+
+/* Mobile: thin the ribbon out so it doesn't overwhelm */
+@media (max-width: 768px) {
+  .auth-waves-ribbon use:nth-child(2n) { display: none; }
+}
 [data-theme="dark"] .auth-sticker {
   background: rgba(var(--color-accent-rgb), 0.10);
   color: var(--color-accent);

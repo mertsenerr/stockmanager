@@ -18,7 +18,7 @@
   </div>
 </app-page-header>
 
-<div class="grid gap-4" [class.grid-cols-1]="!selected()" [class.grid-cols-[1fr_320px]]="selected()">
+<div class="grid gap-4 grid-cols-1" [class.md:grid-cols-[1fr_320px]]="selected()">
   <div class="card p-3">
     <div #calEl class="text-xs"></div>
   </div>
@@ -109,7 +109,7 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-3 gap-3">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
       <div>
         <label class="block text-xs text-text-secondary mb-1.5">Başlangıç <span class="text-text-muted">(ops.)</span></label>
         <input type="time" formControlName="baslangicSaati"

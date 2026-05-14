@@ -10,6 +10,43 @@ import {
 } from '../../../core/auth/auth.models';
 import { AuthShellComponent } from '../auth-shell/auth-shell.component';
 
+/** localStorage key for the remembered email + 30-day expiry timestamp. */
+const REMEMBERED_EMAIL_KEY = 'syncompare.rememberedEmail';
+const REMEMBER_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+interface RememberedEmail {
+  email: string;
+  savedAt: number;
+}
+
+function readRememberedEmail(): string | null {
+  try {
+    const raw = localStorage.getItem(REMEMBERED_EMAIL_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as RememberedEmail;
+    if (Date.now() - parsed.savedAt > REMEMBER_MAX_AGE_MS) {
+      localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+      return null;
+    }
+    return parsed.email || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeRememberedEmail(email: string): void {
+  try {
+    const payload: RememberedEmail = { email, savedAt: Date.now() };
+    localStorage.setItem(REMEMBERED_EMAIL_KEY, JSON.stringify(payload));
+  } catch {
+    // Storage unavailable (private mode quota etc.) — silently ignore.
+  }
+}
+
+function clearRememberedEmail(): void {
+  try { localStorage.removeItem(REMEMBERED_EMAIL_KEY); } catch {}
+}
+
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -22,11 +59,21 @@ export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
+  private readonly rememberedEmail = readRememberedEmail();
+
   readonly form = this.fb.nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
+    email: [this.rememberedEmail ?? '', [Validators.required, Validators.email]],
     password: ['', [Validators.required]],
-    rememberMe: [false],
+    rememberMe: [this.rememberedEmail !== null],
   });
+
+  readonly hasRememberedEmail = signal<boolean>(this.rememberedEmail !== null);
+
+  forgetEmail(): void {
+    clearRememberedEmail();
+    this.hasRememberedEmail.set(false);
+    this.form.patchValue({ email: '', rememberMe: false });
+  }
 
   readonly submitting = signal(false);
   readonly serverError = signal<string | null>(null);
@@ -48,9 +95,17 @@ export class LoginComponent {
     }
 
     this.submitting.set(true);
-    this.auth.login(this.form.getRawValue()).subscribe({
+    const payload = this.form.getRawValue();
+    this.auth.login(payload).subscribe({
       next: () => {
         this.submitting.set(false);
+        // Persist email locally for next visit only when user opted in via the
+        // "Beni 30 gün hatırla" checkbox. Toggling off explicitly forgets it.
+        if (payload.rememberMe) {
+          writeRememberedEmail(payload.email);
+        } else {
+          clearRememberedEmail();
+        }
         const redirect = new URLSearchParams(window.location.search).get('redirect') ?? '/';
         this.router.navigateByUrl(redirect);
       },

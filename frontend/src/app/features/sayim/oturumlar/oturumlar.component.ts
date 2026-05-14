@@ -5,6 +5,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ModalComponent } from '../../../shared/ui/modal/modal.component';
 import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
+import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { FirmaService } from '../../admin/firma.service';
 import { MagazaService } from '../../admin/magaza.service';
@@ -29,6 +30,7 @@ export class OturumlarComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+  private readonly confirm = inject(ConfirmService);
 
   readonly oturumlar = signal<OturumList[]>([]);
   readonly firmalar = signal<Firma[]>([]);
@@ -106,6 +108,51 @@ export class OturumlarComponent implements OnInit {
         || o.firmaAdi.toLowerCase().includes(q);
     });
   });
+
+  /** Bulk-select state — set of oturum ids checked in the table. */
+  readonly selectedIds = signal<Set<string>>(new Set());
+  readonly deleting = signal<string | null>(null);
+  readonly bulkDeleting = signal(false);
+
+  readonly allFilteredSelected = computed(() => {
+    const f = this.filtered();
+    if (f.length === 0) return false;
+    const sel = this.selectedIds();
+    return f.every((o) => sel.has(o.id));
+  });
+
+  readonly someFilteredSelected = computed(() => {
+    const sel = this.selectedIds();
+    return this.filtered().some((o) => sel.has(o.id));
+  });
+
+  isSelected(id: string): boolean { return this.selectedIds().has(id); }
+
+  toggleSelect(id: string, event?: Event): void {
+    event?.stopPropagation();
+    this.selectedIds.update((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  toggleSelectAll(event?: Event): void {
+    event?.stopPropagation();
+    const all = this.allFilteredSelected();
+    this.selectedIds.update((s) => {
+      const next = new Set(s);
+      const ids = this.filtered().map((o) => o.id);
+      if (all) {
+        for (const id of ids) next.delete(id);
+      } else {
+        for (const id of ids) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  clearSelection(): void { this.selectedIds.set(new Set()); }
 
   ngOnInit(): void {
     this.refresh();
@@ -190,6 +237,63 @@ export class OturumlarComponent implements OnInit {
 
   open(o: OturumList): void {
     this.router.navigate(['/oturumlar', o.id]);
+  }
+
+  async deleteOne(o: OturumList, event?: Event): Promise<void> {
+    event?.stopPropagation();
+    if (this.deleting()) return;
+    const ok = await this.confirm.ask({
+      title: 'Oturumu sil',
+      message: `${o.firmaAdi} · ${o.magazaAdi} (${this.formatDate(o.tarih)}) oturumu kalıcı olarak silinecek. Tüm satırlar, yorumlar ve dosyalar gider. Devam edilsin mi?`,
+      confirmLabel: 'Kalıcı sil',
+      cancelLabel: 'Vazgeç',
+      danger: true,
+    });
+    if (!ok) return;
+    this.deleting.set(o.id);
+    this.svc.hardDelete(o.id).subscribe({
+      next: () => {
+        this.deleting.set(null);
+        this.oturumlar.update((list) => list.filter((x) => x.id !== o.id));
+        this.selectedIds.update((s) => {
+          if (!s.has(o.id)) return s;
+          const next = new Set(s); next.delete(o.id); return next;
+        });
+        this.toast.success('Oturum silindi.');
+      },
+      error: (err: HttpErrorResponse) => {
+        this.deleting.set(null);
+        this.toast.error(err.error?.message ?? 'Silme başarısız.');
+      },
+    });
+  }
+
+  async deleteSelected(): Promise<void> {
+    if (this.bulkDeleting()) return;
+    const ids = Array.from(this.selectedIds());
+    if (ids.length === 0) return;
+    const ok = await this.confirm.ask({
+      title: `${ids.length} oturum silinsin mi?`,
+      message: `Seçilen ${ids.length} oturum ve içerikleri kalıcı olarak silinecek. Bu işlem geri alınamaz.`,
+      confirmLabel: 'Kalıcı sil',
+      cancelLabel: 'Vazgeç',
+      danger: true,
+    });
+    if (!ok) return;
+    this.bulkDeleting.set(true);
+    let success = 0;
+    let failure = 0;
+    await Promise.all(ids.map((id) => new Promise<void>((resolve) => {
+      this.svc.hardDelete(id).subscribe({
+        next: () => { success++; resolve(); },
+        error: () => { failure++; resolve(); },
+      });
+    })));
+    this.bulkDeleting.set(false);
+    this.clearSelection();
+    this.refresh();
+    if (failure === 0) this.toast.success(`${success} oturum silindi.`);
+    else this.toast.error(`${success} silindi, ${failure} başarısız.`);
   }
 
   formatDate(iso: string): string { return iso.slice(0, 10); }

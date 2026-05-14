@@ -3,6 +3,7 @@ namespace SayimLink.Api.Dtos.Auth;
 public sealed class ForgotPasswordRequest
 {
     public string Email { get; set; } = string.Empty;
+    public string? TurnstileToken { get; set; }
 }
 
 public sealed class VerifyEmailRequest

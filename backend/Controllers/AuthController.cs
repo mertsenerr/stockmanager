@@ -34,6 +34,7 @@ public sealed class AuthController : ControllerBase
     private readonly IEmailOtpService _emailOtp;
     private readonly IWebAuthnService _webauthn;
     private readonly IRecoveryCodeService _recovery;
+    private readonly ITurnstileService _turnstile;
 
     public AuthController(
         IAuthService auth,
@@ -52,7 +53,8 @@ public sealed class AuthController : ControllerBase
         ITotpService totp,
         IEmailOtpService emailOtp,
         IWebAuthnService webauthn,
-        IRecoveryCodeService recovery)
+        IRecoveryCodeService recovery,
+        ITurnstileService turnstile)
     {
         _auth = auth;
         _audit = audit;
@@ -71,7 +73,17 @@ public sealed class AuthController : ControllerBase
         _emailOtp = emailOtp;
         _webauthn = webauthn;
         _recovery = recovery;
+        _turnstile = turnstile;
     }
+
+    private async Task<bool> CaptchaOkAsync(string? token, CancellationToken ct) =>
+        await _turnstile.VerifyAsync(token, GetIp(), ct);
+
+    /// <summary>Frontend reads this once on bootstrap to know whether to render
+    /// the Turnstile widget on auth pages, and which site key to use.</summary>
+    [HttpGet("captcha/config")]
+    public IActionResult CaptchaConfig() =>
+        Ok(new { enabled = _turnstile.Enabled, siteKey = _turnstile.SiteKey });
 
     private string? AuthedUserId() =>
         User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -81,6 +93,8 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> RegisterSayimBaskani(
         [FromBody] RegisterSayimBaskaniRequest request, CancellationToken ct)
     {
+        if (!await CaptchaOkAsync(request.TurnstileToken, ct))
+            return BadRequest(new { message = "Robot doğrulaması başarısız. Lütfen tekrar deneyin." });
         var validation = await _registerBaskaniValidator.ValidateAsync(request, ct);
         if (!validation.IsValid) return ValidationProblem(validation);
 
@@ -101,6 +115,8 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> RegisterKullanici(
         [FromBody] RegisterKullaniciRequest request, CancellationToken ct)
     {
+        if (!await CaptchaOkAsync(request.TurnstileToken, ct))
+            return BadRequest(new { message = "Robot doğrulaması başarısız. Lütfen tekrar deneyin." });
         var validation = await _registerKullaniciValidator.ValidateAsync(request, ct);
         if (!validation.IsValid) return ValidationProblem(validation);
 
@@ -124,6 +140,8 @@ public sealed class AuthController : ControllerBase
     [EnableRateLimiting("auth-strict")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
+        if (!await CaptchaOkAsync(request.TurnstileToken, ct))
+            return BadRequest(new { message = "Robot doğrulaması başarısız. Lütfen tekrar deneyin." });
         var validation = await _loginValidator.ValidateAsync(request, ct);
         if (!validation.IsValid)
             return ValidationProblem(validation);
@@ -602,6 +620,8 @@ public sealed class AuthController : ControllerBase
     [EnableRateLimiting("auth-strict")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken ct)
     {
+        if (!await CaptchaOkAsync(request.TurnstileToken, ct))
+            return BadRequest(new { message = "Robot doğrulaması başarısız. Lütfen tekrar deneyin." });
         var validation = await _forgotValidator.ValidateAsync(request, ct);
         if (!validation.IsValid)
             return ValidationProblem(validation);

@@ -66,6 +66,8 @@
         }
       </div>
 
+      <app-turnstile (token)="onCaptchaToken($event)" (errored)="onCaptchaError()" />
+
       @if (serverError()) {
         <div class="auth-server-error">{{ serverError() }}</div>
       }
@@ -109,6 +111,8 @@
           </p>
         }
       </div>
+
+      <app-turnstile (token)="onCaptchaToken($event)" (errored)="onCaptchaError()" />
 
       @if (serverError()) {
         <div class="auth-server-error">{{ serverError() }}</div>

@@ -6,6 +6,7 @@ public sealed class RegisterSayimBaskaniRequest
     public string Password { get; set; } = string.Empty;
     public string AdSoyad { get; set; } = string.Empty;
     public string FirmaAdi { get; set; } = string.Empty;
+    public string? TurnstileToken { get; set; }
 }
 
 public sealed class RegisterKullaniciRequest
@@ -13,4 +14,5 @@ public sealed class RegisterKullaniciRequest
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public string AdSoyad { get; set; } = string.Empty;
+    public string? TurnstileToken { get; set; }
 }

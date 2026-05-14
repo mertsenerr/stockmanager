@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ViewChild, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -10,6 +10,7 @@ import {
   isTwoFactorRequired,
 } from '../../../core/auth/auth.models';
 import { AuthShellComponent } from '../auth-shell/auth-shell.component';
+import { TurnstileComponent } from '../../../shared/ui/turnstile/turnstile.component';
 
 /** localStorage key for the remembered email + 30-day expiry timestamp. */
 const REMEMBERED_EMAIL_KEY = 'syncompare.rememberedEmail';
@@ -51,7 +52,7 @@ function clearRememberedEmail(): void {
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, AuthShellComponent],
+  imports: [ReactiveFormsModule, RouterLink, AuthShellComponent, TurnstileComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './login.component.html',
 })
@@ -69,6 +70,12 @@ export class LoginComponent {
   });
 
   readonly hasRememberedEmail = signal<boolean>(this.rememberedEmail !== null);
+  readonly captchaToken = signal<string | null>(null);
+
+  @ViewChild(TurnstileComponent) turnstile?: TurnstileComponent;
+
+  onCaptchaToken(token: string): void { this.captchaToken.set(token); }
+  onCaptchaError(): void { this.captchaToken.set(null); }
 
   forgetEmail(): void {
     clearRememberedEmail();
@@ -96,7 +103,7 @@ export class LoginComponent {
     }
 
     this.submitting.set(true);
-    const payload = this.form.getRawValue();
+    const payload = { ...this.form.getRawValue(), turnstileToken: this.captchaToken() ?? undefined };
     this.auth.login(payload).subscribe({
       next: (res) => {
         this.submitting.set(false);
@@ -126,10 +133,15 @@ export class LoginComponent {
       },
       error: (err: HttpErrorResponse) => {
         this.submitting.set(false);
+        // Reset captcha so the user can try again with a fresh token.
+        this.captchaToken.set(null);
+        this.turnstile?.reset();
         if (err.status === 400 && err.error) {
           const problem = err.error as ApiValidationProblem;
-          this.fieldErrors.set(problem.errors ?? {});
-          return;
+          if (problem.errors) {
+            this.fieldErrors.set(problem.errors);
+            return;
+          }
         }
         const body = err.error as AuthFailureBody | undefined;
         this.errorCode.set(body?.code ?? null);

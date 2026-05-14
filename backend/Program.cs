@@ -38,6 +38,8 @@ builder.Services.Configure<OzelRaporSettings>(
     builder.Configuration.GetSection(OzelRaporSettings.SectionName));
 builder.Services.Configure<Fido2Settings>(
     builder.Configuration.GetSection("Fido2"));
+builder.Services.Configure<TurnstileSettings>(
+    builder.Configuration.GetSection(TurnstileSettings.SectionName));
 
 // ─── Application services ────────────────────────────────────────────────────
 builder.Services.AddSingleton<IMongoDbService, MongoDbService>();
@@ -56,6 +58,7 @@ builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddSingleton<IJwtService, JwtService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton<IEmailService, ResendEmailService>();
+builder.Services.AddSingleton<ITurnstileService, TurnstileService>();
 builder.Services.AddSingleton<ICellLockService, CellLockService>();
 builder.Services.AddSingleton<ICallRegistry, CallRegistry>();
 builder.Services.AddHttpClient();

@@ -63,6 +63,72 @@ export class OzelRaporlarComponent implements OnInit {
       : this.raporlar().filter((r) => r.ad.toLowerCase().includes(q));
   });
 
+  /** Bulk-select state. */
+  readonly selectedIds = signal<Set<string>>(new Set());
+  readonly bulkDeleting = signal(false);
+
+  readonly allFilteredSelected = computed(() => {
+    const f = this.filtered().filter((r) => r.duzenleyebilir);
+    if (f.length === 0) return false;
+    const sel = this.selectedIds();
+    return f.every((r) => sel.has(r.id));
+  });
+
+  isSelected(id: string): boolean { return this.selectedIds().has(id); }
+
+  toggleSelect(id: string, event?: Event): void {
+    event?.stopPropagation();
+    this.selectedIds.update((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  toggleSelectAll(): void {
+    const all = this.allFilteredSelected();
+    this.selectedIds.update((s) => {
+      const next = new Set(s);
+      const ids = this.filtered().filter((r) => r.duzenleyebilir).map((r) => r.id);
+      if (all) {
+        for (const id of ids) next.delete(id);
+      } else {
+        for (const id of ids) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  clearSelection(): void { this.selectedIds.set(new Set()); }
+
+  async deleteSelected(): Promise<void> {
+    if (this.bulkDeleting()) return;
+    const ids = Array.from(this.selectedIds());
+    if (ids.length === 0) return;
+    const ok = await this.confirm.ask({
+      title: `${ids.length} rapor silinsin mi?`,
+      message: `Seçilen ${ids.length} özel rapor ve içindeki tüm dosyalar kalıcı olarak silinecek. Bu işlem geri alınamaz.`,
+      confirmLabel: 'Kalıcı sil',
+      cancelLabel: 'Vazgeç',
+      danger: true,
+    });
+    if (!ok) return;
+    this.bulkDeleting.set(true);
+    let success = 0;
+    let failure = 0;
+    await Promise.all(ids.map((id) => new Promise<void>((resolve) => {
+      this.svc.remove(id).subscribe({
+        next: () => { success++; resolve(); },
+        error: () => { failure++; resolve(); },
+      });
+    })));
+    this.bulkDeleting.set(false);
+    this.clearSelection();
+    this.refresh();
+    if (failure === 0) this.toast.success(`${success} rapor silindi.`);
+    else this.toast.error(`${success} silindi, ${failure} başarısız.`);
+  }
+
   readonly selectedFriends = computed(() => {
     const ids = new Set(this.selectedFriendIds());
     return this.friends().filter((f) => ids.has(f.kullaniciId));

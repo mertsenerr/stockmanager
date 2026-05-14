@@ -16,10 +16,12 @@ export interface LoginRequest {
   email: string;
   password: string;
   rememberMe: boolean;
+  turnstileToken?: string;
 }
 
 export interface ForgotPasswordRequest {
   email: string;
+  turnstileToken?: string;
 }
 
 export interface ResetPasswordRequest {
@@ -51,12 +53,14 @@ export interface RegisterSayimBaskaniRequest {
   password: string;
   adSoyad: string;
   firmaAdi: string;
+  turnstileToken?: string;
 }
 
 export interface RegisterKullaniciRequest {
   email: string;
   password: string;
   adSoyad: string;
+  turnstileToken?: string;
 }
 
 export interface RegisterResponse {

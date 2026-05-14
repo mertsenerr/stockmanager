@@ -20,25 +20,66 @@
   </div>
 </app-page-header>
 
+@if (canCreate() && selectedIds().size > 0) {
+  <div class="bulk-toolbar mb-3 flex items-center justify-between gap-3 px-3 py-2 rounded-sm border border-border bg-surface-elevated">
+    <span class="text-xs text-text-secondary">
+      <strong class="text-text-primary">{{ selectedIds().size }}</strong> oturum seçildi
+    </span>
+    <div class="flex items-center gap-2">
+      <button type="button" (click)="clearSelection()" class="focus-ring text-xs px-2.5 py-1 rounded-sm border border-border text-text-secondary hover:bg-surface transition-colors">
+        Temizle
+      </button>
+      <button type="button" (click)="deleteSelected()" [disabled]="bulkDeleting()"
+              class="focus-ring text-xs font-medium px-3 py-1 rounded-sm bg-accent-danger text-white hover:bg-accent-danger/90 transition-colors disabled:opacity-50">
+        {{ bulkDeleting() ? 'Siliniyor…' : 'Seçilenleri sil' }}
+      </button>
+    </div>
+  </div>
+}
+
 <div class="card overflow-hidden">
   <table class="w-full text-sm">
     <thead class="bg-surface-elevated">
       <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
+        @if (canCreate()) {
+          <th class="px-3 py-2.5 font-medium w-8">
+            <input type="checkbox"
+                   [checked]="allFilteredSelected()"
+                   (change)="toggleSelectAll($event)"
+                   (click)="$event.stopPropagation()"
+                   class="cursor-pointer accent-text-primary"
+                   aria-label="Tümünü seç" />
+          </th>
+        }
         <th class="px-4 py-2.5 font-medium">Tarih</th>
         <th class="px-4 py-2.5 font-medium">Firma · Mağaza</th>
         <th class="px-4 py-2.5 font-medium">Durum</th>
         <th class="px-4 py-2.5 font-medium">Özet</th>
         <th class="px-4 py-2.5 font-medium">Katılımcılar</th>
+        @if (canCreate()) {
+          <th class="px-3 py-2.5 font-medium w-12"></th>
+        }
       </tr>
     </thead>
     <tbody>
       @if (loading()) {
-        <tr><td colspan="5" class="px-4 py-8 text-center text-xs text-text-muted">Yükleniyor...</td></tr>
+        <tr><td [attr.colspan]="canCreate() ? 7 : 5" class="px-4 py-8 text-center text-xs text-text-muted">Yükleniyor...</td></tr>
       } @else if (filtered().length === 0) {
-        <tr><td colspan="5" class="px-4 py-8 text-center text-xs text-text-muted">Oturum yok.</td></tr>
+        <tr><td [attr.colspan]="canCreate() ? 7 : 5" class="px-4 py-8 text-center text-xs text-text-muted">Oturum yok.</td></tr>
       } @else {
         @for (o of filtered(); track o.id) {
-          <tr (click)="open(o)" class="border-t border-border hover:bg-surface-elevated transition-colors duration-150 cursor-pointer">
+          <tr (click)="open(o)"
+              [class.bg-surface-elevated]="isSelected(o.id)"
+              class="border-t border-border hover:bg-surface-elevated transition-colors duration-150 cursor-pointer">
+            @if (canCreate()) {
+              <td class="px-3 py-2.5 w-8" (click)="$event.stopPropagation()">
+                <input type="checkbox"
+                       [checked]="isSelected(o.id)"
+                       (change)="toggleSelect(o.id, $event)"
+                       class="cursor-pointer accent-text-primary"
+                       [attr.aria-label]="o.firmaAdi + ' seç'" />
+              </td>
+            }
             <td class="px-4 py-2.5 font-mono text-xs">{{ formatDate(o.tarih) }}</td>
             <td class="px-4 py-2.5">
               <div class="text-text-primary">{{ o.firmaAdi }}</div>
@@ -60,6 +101,16 @@
               @if (o.katilimcilar.length === 0) { — }
               @else { {{ o.katilimcilar.length }} kişi }
             </td>
+            @if (canCreate()) {
+              <td class="px-3 py-2.5 w-12 text-right" (click)="$event.stopPropagation()">
+                <button type="button" (click)="deleteOne(o, $event)"
+                        [disabled]="deleting() === o.id"
+                        class="focus-ring text-xs text-accent-danger/80 hover:text-accent-danger transition-colors px-2 py-1 disabled:opacity-50"
+                        title="Oturumu sil">
+                  {{ deleting() === o.id ? '…' : 'Sil' }}
+                </button>
+              </td>
+            }
           </tr>
         }
       }

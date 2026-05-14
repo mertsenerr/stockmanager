@@ -1,17 +1,18 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ViewChild, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ApiValidationProblem } from '../../../core/auth/auth.models';
 import { AuthShellComponent } from '../auth-shell/auth-shell.component';
+import { TurnstileComponent } from '../../../shared/ui/turnstile/turnstile.component';
 
 type Tab = 'baskani' | 'kullanici';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, AuthShellComponent],
+  imports: [ReactiveFormsModule, RouterLink, AuthShellComponent, TurnstileComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './register.component.html',
 })
@@ -39,6 +40,11 @@ export class RegisterComponent {
     password: ['', [Validators.required, Validators.minLength(8)]],
   });
 
+  readonly captchaToken = signal<string | null>(null);
+  @ViewChild(TurnstileComponent) turnstile?: TurnstileComponent;
+  onCaptchaToken(token: string): void { this.captchaToken.set(token); }
+  onCaptchaError(): void { this.captchaToken.set(null); }
+
   setTab(t: Tab): void {
     this.tab.set(t);
     this.serverError.set(null);
@@ -57,7 +63,7 @@ export class RegisterComponent {
         return;
       }
       this.submitting.set(true);
-      this.auth.registerSayimBaskani(this.baskaniForm.getRawValue()).subscribe({
+      this.auth.registerSayimBaskani({ ...this.baskaniForm.getRawValue(), turnstileToken: this.captchaToken() ?? undefined }).subscribe({
         next: () => {
           this.submitting.set(false);
           this.successMessage.set(
@@ -72,7 +78,7 @@ export class RegisterComponent {
         return;
       }
       this.submitting.set(true);
-      this.auth.registerKullanici(this.kullaniciForm.getRawValue()).subscribe({
+      this.auth.registerKullanici({ ...this.kullaniciForm.getRawValue(), turnstileToken: this.captchaToken() ?? undefined }).subscribe({
         next: () => {
           this.submitting.set(false);
           this.successMessage.set(
@@ -86,10 +92,14 @@ export class RegisterComponent {
 
   private handleError(err: HttpErrorResponse): void {
     this.submitting.set(false);
+    this.captchaToken.set(null);
+    this.turnstile?.reset();
     if (err.status === 400 && err.error) {
       const problem = err.error as ApiValidationProblem;
-      this.fieldErrors.set(problem.errors ?? {});
-      return;
+      if (problem.errors) {
+        this.fieldErrors.set(problem.errors);
+        return;
+      }
     }
     this.serverError.set(err.error?.message ?? 'Kayıt başarısız. Lütfen tekrar dene.');
   }

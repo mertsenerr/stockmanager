@@ -190,6 +190,10 @@ export class AuthService {
     return this.http.post<{ message: string }>(`${this.base}/resend-verification`, req);
   }
 
+  captchaConfig(): Observable<{ enabled: boolean; siteKey: string }> {
+    return this.http.get<{ enabled: boolean; siteKey: string }>(`${this.base}/captcha/config`);
+  }
+
   updateProfile(req: UpdateProfileRequest): Observable<CurrentUser> {
     return this.http
       .patch<CurrentUser>(`${this.base}/me`, req, { withCredentials: true })

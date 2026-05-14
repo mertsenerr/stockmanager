@@ -62,6 +62,8 @@
       Beni 30 gün hatırla
     </label>
 
+    <app-turnstile (token)="onCaptchaToken($event)" (errored)="onCaptchaError()" />
+
     @if (serverError()) {
       <div class="auth-server-error">
         {{ serverError() }}

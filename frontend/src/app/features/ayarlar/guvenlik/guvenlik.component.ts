@@ -479,7 +479,7 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
     }
     @media (min-width: 1024px) {
       .guv-pwgrid {
-        grid-template-columns: minmax(0, 1fr) 320px;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       }
     }
     .guv-form { max-width: none; }

@@ -9,12 +9,14 @@ import { ConfirmHostComponent } from '../../shared/ui/confirm/confirm-host.compo
 import { IncomingCallService } from '../../core/realtime/incoming-call.service';
 import { IncomingCallHostComponent } from '../../core/realtime/incoming-call-host.component';
 import { CommandPaletteComponent } from './command-palette/command-palette.component';
+import { HoverGifComponent } from './hover-gif.component';
 
 interface SubItem {
   label: string;
   path: string;
   description: string;
   badge?: string;
+  iconImg?: string;
   roles?: UserRole[];
 }
 
@@ -31,7 +33,7 @@ interface NavGroup {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, ToastHostComponent, ConfirmHostComponent, IncomingCallHostComponent, CommandPaletteComponent],
+  imports: [RouterOutlet, RouterLink, ToastHostComponent, ConfirmHostComponent, IncomingCallHostComponent, CommandPaletteComponent, HoverGifComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app-shell.component.html',
   styleUrls: ['./app-shell.component.css'],
@@ -64,6 +66,11 @@ export class AppShellComponent {
   readonly mobileNavOpen = signal(false);
   readonly currentPath = signal<string>(this.router.url);
   readonly paletteOpen = signal(false);
+  readonly hoveredGroupId = signal<string | null>(null);
+
+  isGif(url: string | undefined): boolean {
+    return !!url && url.toLowerCase().endsWith('.gif');
+  }
 
   openPalette(): void { this.paletteOpen.set(true); }
   closePalette(): void { this.paletteOpen.set(false); }
@@ -82,43 +89,43 @@ export class AppShellComponent {
       id: 'home',
       label: 'Anasayfa',
       icon: '◎',
-      iconImg: '/assets/images/house.png',
+      iconImg: '/assets/images/menu.png',
       description: 'Hızlı bakış',
       items: [
-        { label: 'Anasayfa', path: '/', description: 'Hesap & sistem özet' },
+        { label: 'Anasayfa', path: '/', description: 'Hesap & sistem özet', iconImg: '/assets/images/menu%20(2).png' },
       ],
     },
     {
       id: 'compare',
       label: 'Karşılaştırma',
       icon: '◐',
-      iconImg: '/assets/images/online-interview.png',
+      iconImg: '/assets/images/comparison.png',
       description: 'Sayım & raporlar',
       items: [
-        { label: 'Oturumlar', path: '/oturumlar', description: 'Aktif & geçmiş canlı sayımlar' },
-        { label: 'Özel Raporlar', path: '/ozel-raporlar', description: 'Excel/PDF paylaşımlı raporlar' },
+        { label: 'Oturumlar', path: '/oturumlar', description: 'Aktif & geçmiş canlı sayımlar', iconImg: '/assets/images/business.png' },
+        { label: 'Özel Raporlar', path: '/ozel-raporlar', description: 'Excel/PDF paylaşımlı raporlar', iconImg: '/assets/images/document.png' },
       ],
     },
     {
       id: 'data',
       label: 'Veri',
       icon: '◇',
-      iconImg: '/assets/images/office-building.png',
+      iconImg: '/assets/images/data.png',
       description: 'Firmalar & mağazalar',
       roles: ['Sistem', 'SayimBaskani'],
       items: [
-        { label: 'Firmalar', path: '/firmalar', description: 'Müşteri firma listesi' },
-        { label: 'Mağazalar', path: '/magazalar', description: 'Şube ağı' },
+        { label: 'Firmalar', path: '/firmalar', description: 'Müşteri firma listesi', iconImg: '/assets/images/empire-state-building.png' },
+        { label: 'Mağazalar', path: '/magazalar', description: 'Şube ağı', iconImg: '/assets/images/online-shopping.png' },
       ],
     },
     {
       id: 'people',
       label: 'Hesap',
       icon: '☻',
-      iconImg: '/assets/images/community.png',
+      iconImg: '/assets/images/friends.png',
       description: 'Kullanıcılar & arkadaşlar',
       items: [
-        { label: 'Arkadaşlar', path: '/arkadaslar', description: 'Arkadaş listesi & istekler' },
+        { label: 'Arkadaşlar', path: '/arkadaslar', description: 'Arkadaş listesi & istekler', iconImg: '/assets/images/add-user.png' },
         { label: 'Kullanıcılar', path: '/kullanicilar', description: 'Sistem kullanıcı yönetimi', roles: ['Sistem'] },
       ],
     },

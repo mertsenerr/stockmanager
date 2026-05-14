@@ -7,7 +7,7 @@
   <!-- ─── Icon rail ───────────────────────────────────────────────────── -->
   <aside class="orbix-rail" [class.is-open]="mobileNavOpen()">
     <a routerLink="/" class="orbix-rail-brand" aria-label="SayımLink anasayfa">
-      <img src="/assets/images/sc.png" alt="SayımLink" class="orbix-rail-brand-mark" />
+      <img src="/assets/images/logo.png" alt="SynCompare" class="orbix-rail-brand-mark" />
     </a>
 
     <nav class="orbix-rail-nav">
@@ -17,11 +17,21 @@
           class="orbix-rail-item"
           [class.active]="activeGroupId() === g.id"
           (click)="setActiveGroup(g.id)"
+          (mouseenter)="hoveredGroupId.set(g.id)"
+          (mouseleave)="hoveredGroupId.set(null)"
           [attr.aria-label]="g.label"
           [title]="g.label"
         >
           @if (g.iconImg) {
-            <img [src]="g.iconImg" alt="" class="orbix-rail-icon-img" aria-hidden="true" />
+            @if (isGif(g.iconImg)) {
+              <app-hover-gif
+                [src]="g.iconImg"
+                cssClass="orbix-rail-icon-img"
+                [hover]="hoveredGroupId() === g.id"
+              />
+            } @else {
+              <img [src]="g.iconImg" alt="" class="orbix-rail-icon-img" aria-hidden="true" />
+            }
           } @else {
             <span class="orbix-rail-icon" aria-hidden="true">{{ g.icon }}</span>
           }
@@ -37,13 +47,18 @@
         [attr.aria-label]="theme() === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'"
         [title]="theme() === 'dark' ? 'Açık tema' : 'Koyu tema'"
       >
-        <span class="orbix-rail-icon">{{ theme() === 'dark' ? '☼' : '☾' }}</span>
+        <img
+          [src]="theme() === 'dark' ? '/assets/images/lightmode.png' : '/assets/images/night-mode.png'"
+          alt=""
+          class="orbix-rail-icon-img"
+          aria-hidden="true"
+        />
       </button>
     </div>
   </aside>
 
   <!-- ─── Secondary panel ──────────────────────────────────────────────── -->
-  <aside class="orbix-panel" [class.is-open]="mobileNavOpen()">
+  <aside class="orbix-panel" [class.is-open]="mobileNavOpen()" [attr.data-group]="activeGroupId()">
     @if (activeGroup(); as g) {
       <div class="orbix-panel-head">
         <span class="orbix-panel-eyebrow">{{ g.description }}</span>
@@ -58,7 +73,7 @@
             [class.active]="isPathActive(item.path)"
           >
             <span class="orbix-panel-item-body">
-              <span class="orbix-panel-item-label">{{ item.label }}</span>
+              <span class="orbix-panel-item-label">@if (item.iconImg) {<img [src]="item.iconImg" alt="" class="orbix-panel-item-label-icon" aria-hidden="true" />}{{ item.label }}</span>
               <span class="orbix-panel-item-desc">{{ item.description }}</span>
             </span>
             @if (item.badge) {

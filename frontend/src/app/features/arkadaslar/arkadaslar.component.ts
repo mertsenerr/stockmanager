@@ -20,9 +20,12 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
       <!-- Arkadaş ara / ekle -->
       <section class="bento">
         <header class="bento-header">
-          <div>
-            <p class="section-label">Keşfet</p>
-            <h3 class="bento-title">Arkadaş ekle</h3>
+          <div class="flex items-center gap-3">
+            <img src="/assets/images/add-user%20(1).png" alt="" class="w-12 h-12 shrink-0" aria-hidden="true" />
+            <div>
+              <p class="section-label">Keşfet</p>
+              <h3 class="bento-title">Arkadaş ekle</h3>
+            </div>
           </div>
           @if (outgoing().length > 0) {
             <span class="num-badge is-accent">{{ outgoing().length }} bekleyen</span>

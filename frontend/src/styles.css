@@ -356,16 +356,6 @@
 }
 .auth-sticker:hover { transform: rotate(-2deg) translate(-1px, -1px); box-shadow: 4px 4px 0 var(--auth-ink); }
 
-.auth-brand-logo {
-  height: 200px;
-  width: auto;
-  display: block;
-  user-select: none;
-}
-@media (min-width: 1024px) {
-  .auth-brand-logo { height: 280px; }
-}
-
 .auth-help-link {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px; font-weight: 600; letter-spacing: 0.14em;

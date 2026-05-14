@@ -25,7 +25,7 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
       </header>
 
       <!-- Şifre değiştir -->
-      <section class="ayarlar-card">
+      <section class="ayarlar-card guv-pwcard">
         <header class="ayarlar-card-head">
           <h3 class="ayarlar-card-title">Parolayı değiştir</h3>
           <p class="ayarlar-card-desc">
@@ -34,6 +34,8 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
             E-posta adresine de bilgilendirme + 30 dk geçerli "geri al" linki gönderilir.
           </p>
         </header>
+
+        <div class="guv-pwgrid">
 
         <form [formGroup]="form" (ngSubmit)="submit()" class="guv-form" novalidate>
           <div class="guv-row">
@@ -97,6 +99,48 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
             </button>
           </div>
         </form>
+
+        <!-- Şifre üretici (sağ sütun) -->
+        <aside class="guv-gen">
+          <header>
+            <h4 class="guv-gen-title">Güçlü parola üretici</h4>
+            <p class="guv-gen-desc">
+              Kriptografik rastgelelikle her seferinde benzersiz bir parola.
+              Büyük + küçük harf + rakam + sembol garantili.
+            </p>
+          </header>
+
+          <div class="guv-gen-output" [class.empty]="!generatedPassword()">
+            <code class="guv-gen-pw">{{ generatedPassword() || '—' }}</code>
+            <button type="button" (click)="regeneratePassword()" class="guv-gen-roll" title="Yeni üret">
+              ↻
+            </button>
+          </div>
+
+          <div class="guv-gen-len">
+            <label>
+              <span>Uzunluk</span>
+              <strong>{{ generatorLength() }}</strong>
+            </label>
+            <input type="range" min="12" max="16" [value]="generatorLength()"
+                   (input)="setGeneratorLength(+$any($event.target).value)" />
+            <div class="guv-gen-len-scale">
+              <span>12</span><span>13</span><span>14</span><span>15</span><span>16</span>
+            </div>
+          </div>
+
+          <div class="guv-gen-actions">
+            <button type="button" (click)="useGeneratedPassword()"
+                    [disabled]="!generatedPassword()" class="btn btn-primary btn-sm">
+              Forma uygula
+            </button>
+            <button type="button" (click)="copyGeneratedPassword()"
+                    [disabled]="!generatedPassword()" class="btn btn-ghost btn-sm">
+              {{ copied() ? 'Kopyalandı ✓' : 'Kopyala' }}
+            </button>
+          </div>
+        </aside>
+        </div>
       </section>
 
       <!-- Aktif oturumlar -->
@@ -425,6 +469,106 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
       background: rgba(var(--color-accent-rgb), 0.16);
       border-color: rgba(var(--color-accent-rgb), 0.40);
     }
+
+    /* Two-column layout for the password card on lg+ — form on the left,
+       generator on the right. Stacks on smaller screens. */
+    .guv-pwgrid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 24px;
+    }
+    @media (min-width: 1024px) {
+      .guv-pwgrid {
+        grid-template-columns: minmax(0, 1fr) 320px;
+      }
+    }
+    .guv-form { max-width: none; }
+
+    .guv-gen {
+      display: flex; flex-direction: column; gap: 14px;
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px dashed rgba(0, 0, 0, 0.10);
+      background: var(--color-surface-elevated);
+      align-self: start;
+    }
+    :host-context([data-theme="dark"]) .guv-gen {
+      border-color: var(--color-border-strong);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .guv-gen-title {
+      font-family: Inter, system-ui, sans-serif;
+      font-size: 13px; font-weight: 700;
+      color: var(--color-ink);
+    }
+    .guv-gen-desc {
+      font-size: 11.5px; color: var(--color-ink-muted);
+      line-height: 1.5; margin-top: 4px;
+    }
+
+    .guv-gen-output {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 8px;
+      background: var(--color-surface);
+    }
+    .guv-gen-output.empty .guv-gen-pw { color: var(--color-ink-muted); }
+    .guv-gen-pw {
+      flex: 1; min-width: 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px; letter-spacing: 0.05em;
+      color: var(--color-ink);
+      word-break: break-all;
+    }
+    .guv-gen-roll {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      border: 1px solid rgba(0, 0, 0, 0.10);
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+      color: var(--color-ink-secondary);
+      font-size: 14px;
+      transition: background 140ms, color 140ms, transform 200ms;
+    }
+    .guv-gen-roll:hover {
+      color: var(--color-ink);
+      background: var(--color-surface-elevated);
+      transform: rotate(180deg);
+    }
+    :host-context([data-theme="dark"]) .guv-gen-output {
+      border-color: var(--color-border-strong);
+    }
+    :host-context([data-theme="dark"]) .guv-gen-roll {
+      border-color: var(--color-border-strong);
+    }
+
+    .guv-gen-len label {
+      display: flex; justify-content: space-between; align-items: baseline;
+      font-size: 11.5px; color: var(--color-ink-secondary);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .guv-gen-len label strong {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px; color: var(--color-ink);
+    }
+    .guv-gen-len input[type="range"] {
+      width: 100%;
+      accent-color: var(--color-accent, #14b8a6);
+    }
+    .guv-gen-len-scale {
+      display: flex; justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--color-ink-muted);
+      margin-top: 2px;
+    }
+
+    .guv-gen-actions {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .guv-gen-actions .btn { flex: 1; min-width: 100px; }
   `],
 })
 export class GuvenlikComponent implements OnInit {
@@ -455,6 +599,76 @@ export class GuvenlikComponent implements OnInit {
   @ViewChild(TurnstileComponent) turnstile?: TurnstileComponent;
   onCaptchaToken(token: string): void { this.captchaToken.set(token); }
   onCaptchaError(): void { this.captchaToken.set(null); }
+
+  // Password generator state
+  readonly generatorLength = signal<number>(14);
+  readonly generatedPassword = signal<string>('');
+  readonly copied = signal(false);
+
+  setGeneratorLength(n: number): void {
+    const clamped = Math.max(12, Math.min(16, Math.floor(n)));
+    this.generatorLength.set(clamped);
+    this.regeneratePassword();
+  }
+
+  regeneratePassword(): void {
+    this.generatedPassword.set(this.generateStrongPassword(this.generatorLength()));
+    this.copied.set(false);
+  }
+
+  useGeneratedPassword(): void {
+    const pw = this.generatedPassword();
+    if (!pw) return;
+    this.form.patchValue({ newPassword: pw, confirmPassword: pw });
+    this.toast.info('Parola forma uygulandı.');
+  }
+
+  copyGeneratedPassword(): void {
+    const pw = this.generatedPassword();
+    if (!pw) return;
+    navigator.clipboard.writeText(pw).then(
+      () => {
+        this.copied.set(true);
+        setTimeout(() => this.copied.set(false), 2000);
+      },
+      () => this.toast.error('Panoya kopyalanamadı.'),
+    );
+  }
+
+  /**
+   * Crypto-secure password generator. Guarantees at least one char from each
+   * of the four categories (upper / lower / digit / symbol). Uses
+   * crypto.getRandomValues so the entropy is real (not Math.random) — at
+   * 14 chars from a ~78-char pool the keyspace is ~10^26, collisions are
+   * mathematically negligible without keeping any history.
+   */
+  private generateStrongPassword(length: number): string {
+    // Excludes ambiguous look-alikes (0/O/o, 1/l/I) for usability.
+    const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower  = 'abcdefghijkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const symbols = '!@#$%^&*?+-=_';
+    const all = upper + lower + digits + symbols;
+
+    const pickFrom = (set: string): string => {
+      const buf = new Uint32Array(1);
+      crypto.getRandomValues(buf);
+      return set.charAt(buf[0] % set.length);
+    };
+
+    // Seed with one guaranteed char from each class.
+    const chars: string[] = [pickFrom(upper), pickFrom(lower), pickFrom(digits), pickFrom(symbols)];
+    while (chars.length < length) chars.push(pickFrom(all));
+
+    // Fisher-Yates shuffle (with crypto randomness).
+    for (let i = chars.length - 1; i > 0; i--) {
+      const buf = new Uint32Array(1);
+      crypto.getRandomValues(buf);
+      const j = buf[0] % (i + 1);
+      [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+    return chars.join('');
+  }
 
   readonly twoFactorActive = computed(() => {
     const s = this.status();
@@ -500,6 +714,8 @@ export class GuvenlikComponent implements OnInit {
     this.refreshStatus();
     this.refreshWebAuthnList();
     this.refreshSessions();
+    // Seed an initial generated password so the user sees what's possible.
+    this.regeneratePassword();
   }
 
   refreshSessions(): void {

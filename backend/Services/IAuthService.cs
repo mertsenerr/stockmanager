@@ -4,6 +4,7 @@ using SayimLink.Api.Configuration;
 using SayimLink.Api.Dtos.Auth;
 using SayimLink.Api.Models;
 using SayimLink.Api.Repositories;
+using SayimLink.Api.Services.TwoFactor;
 
 namespace SayimLink.Api.Services;
 
@@ -16,7 +17,8 @@ public interface IAuthService
     Task<bool> ResetPasswordAsync(string tokenPlaintext, string newPassword, CancellationToken ct = default);
     Task<UserDto?> GetCurrentUserAsync(string userId, CancellationToken ct = default);
     Task<UserDto?> UpdateProfileAsync(string userId, UpdateProfileRequest request, CancellationToken ct = default);
-    Task<ChangePasswordResult> ChangePasswordAsync(string userId, string currentPassword, string newPassword, string? currentRefreshToken, CancellationToken ct = default);
+    Task<ChangePasswordResult> ChangePasswordAsync(string userId, ChangePasswordRequest request, string? currentRefreshToken, CancellationToken ct = default);
+    Task<bool> UndoPasswordChangeAsync(string token, CancellationToken ct = default);
     Task<long> RevokeOtherSessionsAsync(string userId, string? currentRefreshToken, CancellationToken ct = default);
 
     Task<IReadOnlyList<ActiveSessionDto>> ListActiveSessionsAsync(string userId, string? currentRefreshToken, CancellationToken ct = default);
@@ -72,6 +74,9 @@ public sealed class AuthService : IAuthService
     private readonly IEmailService _email;
     private readonly ResendSettings _resendSettings;
     private readonly ILogger<AuthService> _logger;
+    private readonly ITotpService _totp;
+    private readonly IEmailOtpService _emailOtp;
+    private readonly IRecoveryCodeService _recovery;
 
     private static readonly TimeSpan PasswordResetTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan EmailVerificationTtl = TimeSpan.FromHours(24);
@@ -84,7 +89,10 @@ public sealed class AuthService : IAuthService
         IJwtService jwt,
         IEmailService email,
         IOptions<ResendSettings> resendSettings,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        ITotpService totp,
+        IEmailOtpService emailOtp,
+        IRecoveryCodeService recovery)
     {
         _users = users;
         _firmalar = firmalar;
@@ -94,6 +102,9 @@ public sealed class AuthService : IAuthService
         _email = email;
         _resendSettings = resendSettings.Value;
         _logger = logger;
+        _totp = totp;
+        _emailOtp = emailOtp;
+        _recovery = recovery;
     }
 
     public async Task<AuthResult> LoginAsync(
@@ -384,17 +395,33 @@ public sealed class AuthService : IAuthService
     }
 
     public async Task<ChangePasswordResult> ChangePasswordAsync(
-        string userId, string currentPassword, string newPassword,
+        string userId, ChangePasswordRequest request,
         string? currentRefreshToken, CancellationToken ct = default)
     {
         var user = await _users.FindByIdAsync(userId, ct);
         if (user is null || !user.AktifMi)
             return new ChangePasswordResult(false, "Kullanıcı bulunamadı.");
 
-        if (!_hasher.Verify(currentPassword, user.PasswordHash))
+        if (!_hasher.Verify(request.CurrentPassword, user.PasswordHash))
             return new ChangePasswordResult(false, "Mevcut parola hatalı.");
 
-        user.PasswordHash = _hasher.Hash(newPassword);
+        // Step-up: if any 2FA method is enabled, require a fresh second factor
+        // for this sensitive operation even though the user is already signed in.
+        var has2FA = user.TotpEnabled || user.EmailOtpEnabled || user.WebAuthnCredentials.Count > 0;
+        if (has2FA)
+        {
+            var ok = await VerifyStepUpAsync(user, request.TwoFactorMethod, request.TwoFactorCode, ct);
+            if (!ok) return new ChangePasswordResult(false, "İkinci faktör doğrulaması başarısız. Lütfen geçerli bir kod gir.");
+        }
+
+        // Stash the previous hash + a single-use undo token before overwriting.
+        var previousHash = user.PasswordHash;
+        var undoPlain = GenerateOpaqueToken();
+        user.PasswordChangeUndoTokenHash = _jwt.HashRefreshToken(undoPlain);
+        user.PasswordChangeUndoExpiresAt = DateTime.UtcNow.AddMinutes(30);
+        user.PasswordChangeUndoPreviousHash = previousHash;
+
+        user.PasswordHash = _hasher.Hash(request.NewPassword);
         await _users.ReplaceAsync(user, ct);
 
         // Security best-practice: invalidate every OTHER session so the password
@@ -406,11 +433,85 @@ public sealed class AuthService : IAuthService
         }
         else
         {
-            // No current refresh token (shouldn't happen for an authenticated request) — revoke everything.
             await _refreshTokens.RevokeAllForUserAsync(user.Id, "password_changed", ct);
         }
 
+        // Notify the account owner so an attacker who already controls the session
+        // can't quietly change the password without the real user finding out.
+        var template = _resendSettings.PasswordChangeUndoUrlTemplate;
+        if (!string.IsNullOrWhiteSpace(template) && template.Contains("{token}"))
+        {
+            var undoUrl = template.Replace("{token}", undoPlain);
+            try { await _email.SendPasswordChangedAsync(user.Email, user.AdSoyad, undoUrl, ct); }
+            catch (Exception ex) { _logger.LogError(ex, "Failed to send password-changed notice to {Email}", user.Email); }
+        }
+        else
+        {
+            _logger.LogWarning(
+                "PasswordChangeUndoUrlTemplate not configured — undo email skipped. Token for {Email}: {Token}",
+                user.Email, undoPlain);
+        }
+
         return new ChangePasswordResult(true, null);
+    }
+
+    public async Task<bool> UndoPasswordChangeAsync(string token, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return false;
+        var hash = _jwt.HashRefreshToken(token);
+
+        // Find the user by undo token hash. We don't have a dedicated index for this,
+        // so this is a single-doc lookup via the existing collection.
+        // Mongo: scan by indexed PasswordChangeUndoTokenHash if present, else linear.
+        // For low volume that's fine; add an index later if it grows.
+        var user = await FindUserByUndoHashAsync(hash, ct);
+        if (user is null) return false;
+        if (user.PasswordChangeUndoExpiresAt is null || user.PasswordChangeUndoExpiresAt < DateTime.UtcNow) return false;
+        if (string.IsNullOrEmpty(user.PasswordChangeUndoPreviousHash)) return false;
+
+        user.PasswordHash = user.PasswordChangeUndoPreviousHash;
+        user.PasswordChangeUndoTokenHash = null;
+        user.PasswordChangeUndoExpiresAt = null;
+        user.PasswordChangeUndoPreviousHash = null;
+        await _users.ReplaceAsync(user, ct);
+
+        // Revoke every session — the attacker may still hold one — so they're forced out.
+        await _refreshTokens.RevokeAllForUserAsync(user.Id, "password_change_undone", ct);
+        return true;
+    }
+
+    private async Task<User?> FindUserByUndoHashAsync(string hash, CancellationToken ct)
+    {
+        // Linear scan via repository helper. The user collection is small here —
+        // when it grows, swap for an indexed lookup or a dedicated repo method.
+        var all = await _users.ListAsync(includeInactive: false, ct);
+        return all.FirstOrDefault(u => u.PasswordChangeUndoTokenHash == hash);
+    }
+
+    private Task<bool> VerifyStepUpAsync(User user, string? method, string? code, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(method) || string.IsNullOrWhiteSpace(code))
+            return Task.FromResult(false);
+
+        switch (method)
+        {
+            case "totp":
+                return Task.FromResult(user.TotpEnabled && _totp.Verify(user.TotpSecret ?? "", code));
+            case "email":
+                if (!user.EmailOtpEnabled) return Task.FromResult(false);
+                var ok = _emailOtp.Verify(user.EmailOtpCodeHash, user.EmailOtpExpiresAt, code);
+                if (ok) { user.EmailOtpCodeHash = null; user.EmailOtpExpiresAt = null; }
+                return Task.FromResult(ok);
+            case "recovery":
+                if (_recovery.TryConsume(user.RecoveryCodeHashes, code, out var remaining))
+                {
+                    user.RecoveryCodeHashes = remaining;
+                    return Task.FromResult(true);
+                }
+                return Task.FromResult(false);
+            default:
+                return Task.FromResult(false);
+        }
     }
 
     public async Task<long> RevokeOtherSessionsAsync(string userId, string? currentRefreshToken, CancellationToken ct = default)

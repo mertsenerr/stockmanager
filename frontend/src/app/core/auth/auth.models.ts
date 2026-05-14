@@ -93,6 +93,9 @@ export interface UpdateProfileRequest {
 export interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;
+  /** Required when the user has any 2FA method enabled. */
+  twoFactorMethod?: 'totp' | 'email' | 'recovery';
+  twoFactorCode?: string;
 }
 
 export interface RevokeOtherSessionsResponse {

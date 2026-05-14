@@ -273,7 +273,7 @@ public sealed class AuthController : ControllerBase
             return Unauthorized();
 
         Request.Cookies.TryGetValue(RefreshCookieName, out var currentRefresh);
-        var result = await _auth.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword, currentRefresh, ct);
+        var result = await _auth.ChangePasswordAsync(userId, request, currentRefresh, ct);
         if (!result.Success)
             return BadRequest(new { message = result.FailureReason ?? "Parola değiştirilemedi." });
 
@@ -614,6 +614,15 @@ public sealed class AuthController : ControllerBase
         var (plain, hashes) = _recovery.Generate();
         user.RecoveryCodeHashes = hashes;
         return (plain, hashes);
+    }
+
+    [HttpPost("password-change/undo")]
+    [EnableRateLimiting("auth-strict")]
+    public async Task<IActionResult> UndoPasswordChange([FromBody] PasswordChangeUndoRequest request, CancellationToken ct)
+    {
+        var ok = await _auth.UndoPasswordChangeAsync(request.Token, ct);
+        if (!ok) return BadRequest(new { message = "Geri alma bağlantısı geçersiz veya süresi dolmuş." });
+        return Ok(new { message = "Parola değişikliği geri alındı. Tüm cihazlardan çıkış yapıldı, eski parolanla tekrar giriş yapabilirsin." });
     }
 
     [HttpPost("forgot-password")]

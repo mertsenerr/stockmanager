@@ -46,6 +46,13 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'password-change-undo',
+    loadComponent: () =>
+      import('./features/auth/password-change-undo/password-change-undo.component').then(
+        (m) => m.PasswordChangeUndoComponent,
+      ),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () =>

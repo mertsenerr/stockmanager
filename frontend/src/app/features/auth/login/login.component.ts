@@ -136,6 +136,10 @@ export class LoginComponent {
         // Reset captcha so the user can try again with a fresh token.
         this.captchaToken.set(null);
         this.turnstile?.reset();
+        if (err.status === 429) {
+          this.serverError.set('Çok fazla deneme yaptın. Birkaç dakika bekleyip tekrar dene.');
+          return;
+        }
         if (err.status === 400 && err.error) {
           const problem = err.error as ApiValidationProblem;
           if (problem.errors) {

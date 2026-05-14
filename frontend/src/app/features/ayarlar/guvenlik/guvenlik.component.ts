@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -27,7 +27,11 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
       <section class="ayarlar-card">
         <header class="ayarlar-card-head">
           <h3 class="ayarlar-card-title">Parolayı değiştir</h3>
-          <p class="ayarlar-card-desc">Yeni parolan en az 8 karakter olmalı. Değişiklik sonrası bu cihaz açık kalır, diğer tüm cihazlardan otomatik çıkış yapılır.</p>
+          <p class="ayarlar-card-desc">
+            Yeni parolan en az 8 karakter olmalı. Değişiklik sonrası bu cihaz açık kalır, diğer tüm cihazlardan otomatik çıkış yapılır.
+            @if (twoFactorActive()) { 2FA açık olduğu için ek doğrulama gerekiyor. }
+            E-posta adresine de bilgilendirme + 30 dk geçerli "geri al" linki gönderilir.
+          </p>
         </header>
 
         <form [formGroup]="form" (ngSubmit)="submit()" class="guv-form" novalidate>
@@ -60,6 +64,25 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
               <p class="guv-error">Parolalar eşleşmiyor.</p>
             }
           </div>
+
+          @if (twoFactorActive() && stepUpMethods().length > 0) {
+            <div class="guv-row">
+              <label class="guv-label">İkinci faktör doğrulaması</label>
+              <div class="seg" role="radiogroup">
+                @for (m of stepUpMethods(); track m.value) {
+                  <button type="button" class="seg-item"
+                          [class.is-active]="form.controls.twoFactorMethod.value === m.value"
+                          (click)="setStepUpMethod(m.value)">
+                    {{ m.label }}
+                  </button>
+                }
+              </div>
+              <input type="text" formControlName="twoFactorCode" class="field-input"
+                     [placeholder]="codePlaceholder()"
+                     autocomplete="one-time-code"
+                     style="margin-top: 6px;" />
+            </div>
+          }
 
           @if (serverError()) {
             <p class="guv-error">{{ serverError() }}</p>
@@ -366,6 +389,39 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
       background: var(--color-surface);
       border-radius: 6px;
     }
+
+    .seg {
+      display: inline-flex; flex-wrap: wrap; gap: 4px;
+      padding: 3px;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 10px;
+      background: var(--color-surface-elevated);
+    }
+    :host-context([data-theme="dark"]) .seg {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: var(--color-border);
+    }
+    .seg-item {
+      padding: 6px 12px;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      background: transparent;
+      cursor: pointer;
+      color: var(--color-ink-secondary);
+      font-family: Inter, system-ui, sans-serif;
+      font-size: 12px; font-weight: 600;
+      transition: background 140ms, border-color 140ms, color 140ms;
+    }
+    .seg-item:hover { color: var(--color-ink); }
+    .seg-item.is-active {
+      background: var(--color-surface);
+      border-color: rgba(var(--color-accent-rgb), 0.30);
+      color: var(--color-ink);
+    }
+    :host-context([data-theme="dark"]) .seg-item.is-active {
+      background: rgba(var(--color-accent-rgb), 0.16);
+      border-color: rgba(var(--color-accent-rgb), 0.40);
+    }
   `],
 })
 export class GuvenlikComponent implements OnInit {
@@ -378,6 +434,8 @@ export class GuvenlikComponent implements OnInit {
     currentPassword: ['', [Validators.required]],
     newPassword:     ['', [Validators.required, Validators.minLength(8)]],
     confirmPassword: ['', [Validators.required]],
+    twoFactorMethod: this.fb.nonNullable.control<'totp' | 'email' | 'recovery'>('totp'),
+    twoFactorCode:   [''],
   });
 
   readonly totpForm = this.fb.nonNullable.group({
@@ -387,6 +445,34 @@ export class GuvenlikComponent implements OnInit {
   readonly saving = signal(false);
   readonly revoking = signal(false);
   readonly serverError = signal<string | null>(null);
+  readonly emailOtpSending = signal(false);
+  readonly emailOtpSent = signal(false);
+
+  readonly twoFactorActive = computed(() => {
+    const s = this.status();
+    return !!s && (s.totpEnabled || s.emailOtpEnabled || s.webAuthnEnabled || s.recoveryCodesRemaining > 0);
+  });
+
+  readonly stepUpMethods = computed(() => {
+    const s = this.status();
+    if (!s) return [];
+    const methods: { value: 'totp' | 'recovery'; label: string }[] = [];
+    if (s.totpEnabled) methods.push({ value: 'totp', label: 'Authenticator' });
+    if (s.recoveryCodesRemaining > 0) methods.push({ value: 'recovery', label: 'Recovery kodu' });
+    return methods;
+  });
+
+  codePlaceholder(): string {
+    switch (this.form.controls.twoFactorMethod.value) {
+      case 'recovery': return 'XXXX-XXXX-XXXX';
+      default:         return '6 haneli kod';
+    }
+  }
+
+  setStepUpMethod(m: 'totp' | 'recovery'): void {
+    this.form.controls.twoFactorMethod.setValue(m as 'totp');
+    this.form.controls.twoFactorCode.setValue('');
+  }
 
   // Sessions state
   readonly sessions = signal<ActiveSession[]>([]);
@@ -576,8 +662,16 @@ export class GuvenlikComponent implements OnInit {
     }
     this.serverError.set(null);
     this.saving.set(true);
-    const { currentPassword, newPassword } = this.form.getRawValue();
-    this.auth.changePassword({ currentPassword, newPassword }).subscribe({
+    const v = this.form.getRawValue();
+    const payload = this.twoFactorActive() && this.stepUpMethods().length > 0
+      ? {
+          currentPassword: v.currentPassword,
+          newPassword: v.newPassword,
+          twoFactorMethod: v.twoFactorMethod,
+          twoFactorCode: v.twoFactorCode,
+        }
+      : { currentPassword: v.currentPassword, newPassword: v.newPassword };
+    this.auth.changePassword(payload).subscribe({
       next: () => {
         this.saving.set(false);
         this.form.reset();

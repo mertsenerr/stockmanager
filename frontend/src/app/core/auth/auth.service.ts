@@ -205,6 +205,11 @@ export class AuthService {
       .post<void>(`${this.base}/change-password`, req, { withCredentials: true });
   }
 
+  undoPasswordChange(token: string): Observable<{ message: string }> {
+    return this.http
+      .post<{ message: string }>(`${this.base}/password-change/undo`, { token });
+  }
+
   revokeOtherSessions(): Observable<RevokeOtherSessionsResponse> {
     return this.http
       .post<RevokeOtherSessionsResponse>(`${this.base}/sessions/revoke-others`, {}, { withCredentials: true });

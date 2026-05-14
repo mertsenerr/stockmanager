@@ -12,4 +12,5 @@ public sealed class ResendSettings
     public string FromName { get; set; } = "SayımLink";
     public string PasswordResetUrlTemplate { get; set; } = string.Empty;
     public string EmailVerificationUrlTemplate { get; set; } = string.Empty;
+    public string PasswordChangeUndoUrlTemplate { get; set; } = string.Empty;
 }

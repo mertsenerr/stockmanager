@@ -96,6 +96,7 @@ export interface ChangePasswordRequest {
   /** Required when the user has any 2FA method enabled. */
   twoFactorMethod?: 'totp' | 'email' | 'recovery';
   twoFactorCode?: string;
+  turnstileToken?: string;
 }
 
 export interface RevokeOtherSessionsResponse {

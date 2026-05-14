@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { TurnstileComponent } from '../../../shared/ui/turnstile/turnstile.component';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ActiveSession, TotpSetupResponse, TwoFactorStatus, WebAuthnCredentialDto } from '../../../core/auth/auth.models';
 import {
@@ -14,7 +15,7 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
 @Component({
   selector: 'app-ayarlar-guvenlik',
   standalone: true,
-  imports: [ReactiveFormsModule, DatePipe],
+  imports: [ReactiveFormsModule, DatePipe, TurnstileComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <article class="ayarlar-page">
@@ -83,6 +84,8 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
                      style="margin-top: 6px;" />
             </div>
           }
+
+          <app-turnstile (token)="onCaptchaToken($event)" (errored)="onCaptchaError()" />
 
           @if (serverError()) {
             <p class="guv-error">{{ serverError() }}</p>
@@ -447,6 +450,11 @@ export class GuvenlikComponent implements OnInit {
   readonly serverError = signal<string | null>(null);
   readonly emailOtpSending = signal(false);
   readonly emailOtpSent = signal(false);
+  readonly captchaToken = signal<string | null>(null);
+
+  @ViewChild(TurnstileComponent) turnstile?: TurnstileComponent;
+  onCaptchaToken(token: string): void { this.captchaToken.set(token); }
+  onCaptchaError(): void { this.captchaToken.set(null); }
 
   readonly twoFactorActive = computed(() => {
     const s = this.status();
@@ -663,22 +671,22 @@ export class GuvenlikComponent implements OnInit {
     this.serverError.set(null);
     this.saving.set(true);
     const v = this.form.getRawValue();
+    const base = { currentPassword: v.currentPassword, newPassword: v.newPassword, turnstileToken: this.captchaToken() ?? undefined };
     const payload = this.twoFactorActive() && this.stepUpMethods().length > 0
-      ? {
-          currentPassword: v.currentPassword,
-          newPassword: v.newPassword,
-          twoFactorMethod: v.twoFactorMethod,
-          twoFactorCode: v.twoFactorCode,
-        }
-      : { currentPassword: v.currentPassword, newPassword: v.newPassword };
+      ? { ...base, twoFactorMethod: v.twoFactorMethod, twoFactorCode: v.twoFactorCode }
+      : base;
     this.auth.changePassword(payload).subscribe({
       next: () => {
         this.saving.set(false);
         this.form.reset();
+        this.captchaToken.set(null);
+        this.turnstile?.reset();
         this.toast.success('Parolan güncellendi. Diğer cihazlardan çıkış yapıldı.');
       },
       error: (err: HttpErrorResponse) => {
         this.saving.set(false);
+        this.captchaToken.set(null);
+        this.turnstile?.reset();
         this.serverError.set(err.error?.message ?? 'Parola değiştirilemedi.');
       },
     });

@@ -9,6 +9,10 @@ public sealed class ChangePasswordRequest
     /// "totp" | "email" | "recovery". WebAuthn step-up isn't supported here yet.</summary>
     public string? TwoFactorMethod { get; set; }
     public string? TwoFactorCode { get; set; }
+
+    /// <summary>Cloudflare Turnstile token — verified against /siteverify before
+    /// any password mutation. Required when the backend has Turnstile enabled.</summary>
+    public string? TurnstileToken { get; set; }
 }
 
 public sealed class PasswordChangeUndoRequest

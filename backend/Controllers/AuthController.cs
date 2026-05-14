@@ -264,6 +264,8 @@ public sealed class AuthController : ControllerBase
     [EnableRateLimiting("auth-strict")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken ct)
     {
+        if (!await CaptchaOkAsync(request.TurnstileToken, ct))
+            return BadRequest(new { message = "Robot doğrulaması başarısız. Lütfen tekrar deneyin." });
         var validation = await _changePasswordValidator.ValidateAsync(request, ct);
         if (!validation.IsValid)
             return ValidationProblem(validation);

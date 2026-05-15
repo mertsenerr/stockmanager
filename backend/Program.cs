@@ -300,6 +300,22 @@ var app = builder.Build();
 // Serilog request logging) so they see the real client IP, not Render's LB.
 app.UseForwardedHeaders();
 
+// Cloudflare puts the real client IP in CF-Connecting-IP. X-Forwarded-For
+// can land with Cloudflare's own edge IP (172.70.0.0/13, 104.16.0.0/12, …)
+// at the rightmost position, which is what ForwardedHeaders picks, so the
+// audit log and active-sessions UI end up showing a Cloudflare IP. Prefer
+// CF-Connecting-IP when present — purely cosmetic / observability, not a
+// security control, so unverified upstreams are acceptable here too.
+app.Use(async (ctx, next) =>
+{
+    if (ctx.Request.Headers.TryGetValue("CF-Connecting-IP", out var cfRaw)
+        && System.Net.IPAddress.TryParse(cfRaw.ToString().Trim(), out var cfIp))
+    {
+        ctx.Connection.RemoteIpAddress = cfIp;
+    }
+    await next();
+});
+
 app.UseSerilogRequestLogging();
 
 // Global exception handler — TR-localized 500, traceId, hide stack in prod.

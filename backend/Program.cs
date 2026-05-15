@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -62,6 +63,21 @@ builder.Services.AddSingleton<ITurnstileService, TurnstileService>();
 builder.Services.AddSingleton<ICellLockService, CellLockService>();
 builder.Services.AddSingleton<ICallRegistry, CallRegistry>();
 builder.Services.AddHttpClient();
+
+// ─── Forwarded headers ──────────────────────────────────────────────────────
+// Render (and Cloudflare in front of it) terminate TLS and proxy to the app,
+// so HttpContext.Connection.RemoteIpAddress is always the LB's internal IP.
+// Trust X-Forwarded-For / X-Forwarded-Proto so audit logs, rate limiting and
+// active-sessions show the real client IP. Known proxy lists are cleared
+// because Render's LB IPs are dynamic; the header is only used for audit/UI,
+// not security decisions, so accepting unverified upstreams is acceptable.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+    options.ForwardLimit = 2; // Cloudflare → Render LB → app
+});
 
 // ─── 2FA stack ───────────────────────────────────────────────────────────────
 builder.Services.AddMemoryCache();
@@ -280,6 +296,10 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // ─── Middleware pipeline (order is locked) ───────────────────────────────────
+// MUST run before anything that reads RemoteIpAddress (rate limiter, audit,
+// Serilog request logging) so they see the real client IP, not Render's LB.
+app.UseForwardedHeaders();
+
 app.UseSerilogRequestLogging();
 
 // Global exception handler — TR-localized 500, traceId, hide stack in prod.

@@ -16,6 +16,8 @@ public sealed class AuthController : ControllerBase
 {
     private const string RefreshCookieName = "slk_rt";
     private const string RefreshCookiePath = "/api/auth";
+    private const string DeviceCookieName = "slk_did";
+    private static readonly TimeSpan DeviceCookieLifetime = TimeSpan.FromDays(730);
 
     private readonly IAuthService _auth;
     private readonly IAuditService _audit;
@@ -146,7 +148,8 @@ public sealed class AuthController : ControllerBase
         if (!validation.IsValid)
             return ValidationProblem(validation);
 
-        var result = await _auth.LoginAsync(request, GetIp(), GetUserAgent(), ct);
+        var deviceId = EnsureDeviceCookie();
+        var result = await _auth.LoginAsync(request, GetIp(), GetUserAgent(), deviceId, ct);
 
         // Password verified but 2FA required → return pending token, no cookies issued.
         if (result.Success && result.TwoFactorPendingToken is not null)
@@ -193,7 +196,8 @@ public sealed class AuthController : ControllerBase
 
         try
         {
-            var result = await _auth.RefreshAsync(refreshToken, GetIp(), GetUserAgent(), ct);
+            var deviceId = EnsureDeviceCookie();
+            var result = await _auth.RefreshAsync(refreshToken, GetIp(), GetUserAgent(), deviceId, ct);
             if (!result.Success || result.Response is null || result.RefreshTokenPlaintext is null)
             {
                 ClearRefreshCookie();
@@ -594,7 +598,8 @@ public sealed class AuthController : ControllerBase
         }
 
         await _auth.ReplaceUserAsync(user, ct);
-        var result = await _auth.CompleteTwoFactorLoginAsync(user.Id, pending.Value.rememberMe, GetIp(), GetUserAgent(), ct);
+        var deviceId = EnsureDeviceCookie();
+        var result = await _auth.CompleteTwoFactorLoginAsync(user.Id, pending.Value.rememberMe, GetIp(), GetUserAgent(), deviceId, ct);
         if (!result.Success || result.Response is null || result.RefreshTokenPlaintext is null)
             return Unauthorized(new { message = "Oturum açılamadı." });
 
@@ -701,6 +706,26 @@ public sealed class AuthController : ControllerBase
             SameSite = SameSiteMode.None,
             Path = RefreshCookiePath,
         });
+
+    /// <summary>Reads the long-lived device-id cookie or mints a new one. Always
+    /// (re)sets the cookie so its expiry slides forward on each auth request.
+    /// Not a security control — purely a stable handle to collapse the
+    /// active-sessions UI to one row per browser and let a logout+login cycle
+    /// reuse the same row instead of stacking new ones.</summary>
+    private string EnsureDeviceCookie()
+    {
+        Request.Cookies.TryGetValue(DeviceCookieName, out var existing);
+        var id = string.IsNullOrWhiteSpace(existing) ? Guid.NewGuid().ToString("N") : existing;
+        Response.Cookies.Append(DeviceCookieName, id, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None,
+            Path = "/",
+            Expires = DateTimeOffset.UtcNow.Add(DeviceCookieLifetime),
+        });
+        return id;
+    }
 
     private string? GetIp() =>
         HttpContext.Connection.RemoteIpAddress?.ToString();

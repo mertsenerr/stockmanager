@@ -18,6 +18,11 @@ public sealed class RefreshToken
     public string? CreatedByIp { get; set; }
     public string? UserAgent { get; set; }
 
+    // Stable per-browser identifier persisted via the `slk_did` cookie. Lets the
+    // active-sessions UI collapse multiple rows from the same device into one,
+    // and lets login/refresh revoke prior tokens for the same device.
+    public string? DeviceId { get; set; }
+
     public DateTime? RevokedAt { get; set; }
     public string? RevokedReason { get; set; }
 

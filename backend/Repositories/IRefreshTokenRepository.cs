@@ -13,6 +13,7 @@ public interface IRefreshTokenRepository
     Task<long> RevokeAllForUserExceptAsync(string userId, string keepHash, string reason, CancellationToken ct = default);
     Task<IReadOnlyList<RefreshToken>> ListActiveForUserAsync(string userId, CancellationToken ct = default);
     Task<bool> RevokeOneByIdAsync(string tokenId, string userId, string reason, CancellationToken ct = default);
+    Task<long> RevokeActiveByDeviceAsync(string userId, string deviceId, string reason, CancellationToken ct = default);
 }
 
 public sealed class RefreshTokenRepository : IRefreshTokenRepository
@@ -30,6 +31,11 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
             new CreateIndexModel<RefreshToken>(
                 Builders<RefreshToken>.IndexKeys.Ascending(t => t.UserId),
                 new CreateIndexOptions { Name = "ix_refresh_user" }),
+            new CreateIndexModel<RefreshToken>(
+                Builders<RefreshToken>.IndexKeys
+                    .Ascending(t => t.UserId)
+                    .Ascending(t => t.DeviceId),
+                new CreateIndexOptions { Name = "ix_refresh_user_device" }),
             new CreateIndexModel<RefreshToken>(
                 Builders<RefreshToken>.IndexKeys.Ascending(t => t.ExpiresAt),
                 new CreateIndexOptions
@@ -91,5 +97,17 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
             update,
             cancellationToken: ct);
         return result.ModifiedCount > 0;
+    }
+
+    public async Task<long> RevokeActiveByDeviceAsync(string userId, string deviceId, string reason, CancellationToken ct = default)
+    {
+        var update = Builders<RefreshToken>.Update
+            .Set(t => t.RevokedAt, DateTime.UtcNow)
+            .Set(t => t.RevokedReason, reason);
+        var result = await _tokens.UpdateManyAsync(
+            t => t.UserId == userId && t.DeviceId == deviceId && t.RevokedAt == null,
+            update,
+            cancellationToken: ct);
+        return result.ModifiedCount;
     }
 }

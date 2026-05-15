@@ -10,8 +10,8 @@ namespace SayimLink.Api.Services;
 
 public interface IAuthService
 {
-    Task<AuthResult> LoginAsync(LoginRequest request, string? ip, string? userAgent, CancellationToken ct = default);
-    Task<AuthResult> RefreshAsync(string refreshTokenPlaintext, string? ip, string? userAgent, CancellationToken ct = default);
+    Task<AuthResult> LoginAsync(LoginRequest request, string? ip, string? userAgent, string? deviceId, CancellationToken ct = default);
+    Task<AuthResult> RefreshAsync(string refreshTokenPlaintext, string? ip, string? userAgent, string? deviceId, CancellationToken ct = default);
     Task LogoutAsync(string refreshTokenPlaintext, CancellationToken ct = default);
     Task RequestPasswordResetAsync(string email, CancellationToken ct = default);
     Task<bool> ResetPasswordAsync(string tokenPlaintext, string newPassword, CancellationToken ct = default);
@@ -25,7 +25,7 @@ public interface IAuthService
     Task<bool> RevokeSessionAsync(string userId, string sessionId, string? currentRefreshToken, CancellationToken ct = default);
 
     /// <summary>Issues real tokens after a successful 2FA verification step.</summary>
-    Task<AuthResult> CompleteTwoFactorLoginAsync(string userId, bool rememberMe, string? ip, string? userAgent, CancellationToken ct = default);
+    Task<AuthResult> CompleteTwoFactorLoginAsync(string userId, bool rememberMe, string? ip, string? userAgent, string? deviceId, CancellationToken ct = default);
 
     Task<User?> GetUserAsync(string userId, CancellationToken ct = default);
     Task ReplaceUserAsync(User user, CancellationToken ct = default);
@@ -111,6 +111,7 @@ public sealed class AuthService : IAuthService
         LoginRequest request,
         string? ip,
         string? userAgent,
+        string? deviceId,
         CancellationToken ct = default)
     {
         var user = await _users.FindByEmailAsync(request.Email, ct);
@@ -136,18 +137,18 @@ public sealed class AuthService : IAuthService
 
         user.SonGirisTarihi = DateTime.UtcNow;
         await _users.ReplaceAsync(user, ct);
-        return await IssueTokensAsync(user, request.RememberMe, ip, userAgent, ct);
+        return await IssueTokensAsync(user, request.RememberMe, ip, userAgent, deviceId, ct);
     }
 
     public async Task<AuthResult> CompleteTwoFactorLoginAsync(
-        string userId, bool rememberMe, string? ip, string? userAgent, CancellationToken ct = default)
+        string userId, bool rememberMe, string? ip, string? userAgent, string? deviceId, CancellationToken ct = default)
     {
         var user = await _users.FindByIdAsync(userId, ct);
         if (user is null || !user.AktifMi)
             return new AuthResult(false, "Kullanıcı bulunamadı.", AuthFailureCodes.InvalidCredentials, null, null, null, false);
         user.SonGirisTarihi = DateTime.UtcNow;
         await _users.ReplaceAsync(user, ct);
-        return await IssueTokensAsync(user, rememberMe, ip, userAgent, ct);
+        return await IssueTokensAsync(user, rememberMe, ip, userAgent, deviceId, ct);
     }
 
     public Task<User?> GetUserAsync(string userId, CancellationToken ct = default) =>
@@ -239,6 +240,7 @@ public sealed class AuthService : IAuthService
         string refreshTokenPlaintext,
         string? ip,
         string? userAgent,
+        string? deviceId,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(refreshTokenPlaintext))
@@ -265,9 +267,14 @@ public sealed class AuthService : IAuthService
         if (user is null || !user.AktifMi)
             return new AuthResult(false, "Kullanıcı bulunamadı.", AuthFailureCodes.RefreshInvalid, null, null, null, false);
 
+        // Carry the device identity forward across rotations: if the existing row
+        // already has one, keep it; otherwise adopt whatever the caller supplied.
+        // This lets pre-DeviceId rows pick up an id on first rotation.
+        var effectiveDeviceId = existing.DeviceId ?? deviceId;
+
         // Rotate.
         var rememberMe = (existing.ExpiresAt - existing.CreatedAt).TotalDays > 1;
-        var newResult = await IssueTokensAsync(user, rememberMe, ip, userAgent, ct);
+        var newResult = await IssueTokensAsync(user, rememberMe, ip, userAgent, effectiveDeviceId, ct);
 
         existing.RevokedAt = DateTime.UtcNow;
         existing.RevokedReason = "rotated";
@@ -532,20 +539,34 @@ public sealed class AuthService : IAuthService
         var currentHash = string.IsNullOrWhiteSpace(currentRefreshToken)
             ? null
             : _jwt.HashRefreshToken(currentRefreshToken);
-        return tokens.Select(t =>
+
+        // Collapse rows by DeviceId so a single browser shows as one entry even
+        // if multiple active tokens exist (race conditions, legacy rows). For
+        // rows that predate DeviceId (null), fall back to the row's own Id so
+        // they remain distinct entries.
+        var groups = tokens.GroupBy(t => t.DeviceId ?? $"__row:{t.Id}");
+        var rows = new List<ActiveSessionDto>();
+        foreach (var g in groups)
         {
-            var (browser, os) = UserAgentParser.Parse(t.UserAgent);
-            return new ActiveSessionDto
+            // Pick the row representing this device: prefer the current session
+            // when present, otherwise the most recently created one.
+            var representative = g.OrderByDescending(t => currentHash != null && t.TokenHash == currentHash)
+                                  .ThenByDescending(t => t.CreatedAt)
+                                  .First();
+            var (browser, os) = UserAgentParser.Parse(representative.UserAgent);
+            var isCurrent = currentHash != null && g.Any(t => t.TokenHash == currentHash);
+            rows.Add(new ActiveSessionDto
             {
-                Id        = t.Id,
+                Id        = representative.Id,
                 Browser   = browser,
                 Os        = os,
-                Ip        = t.CreatedByIp,
-                CreatedAt = t.CreatedAt,
-                ExpiresAt = t.ExpiresAt,
-                IsCurrent = currentHash != null && t.TokenHash == currentHash,
-            };
-        }).ToList();
+                Ip        = representative.CreatedByIp,
+                CreatedAt = g.Min(t => t.CreatedAt),
+                ExpiresAt = g.Max(t => t.ExpiresAt),
+                IsCurrent = isCurrent,
+            });
+        }
+        return rows.OrderByDescending(r => r.IsCurrent).ThenByDescending(r => r.CreatedAt).ToList();
     }
 
     public async Task<bool> RevokeSessionAsync(
@@ -553,11 +574,31 @@ public sealed class AuthService : IAuthService
     {
         // Don't let the user accidentally kill their own current session via the
         // "individual revoke" flow — that's what the explicit logout button is for.
+        string? currentDeviceId = null;
         if (!string.IsNullOrWhiteSpace(currentRefreshToken))
         {
             var currentHash = _jwt.HashRefreshToken(currentRefreshToken);
             var current = await _refreshTokens.FindByHashAsync(currentHash, ct);
-            if (current is not null && current.Id == sessionId) return false;
+            if (current is not null)
+            {
+                if (current.Id == sessionId) return false;
+                currentDeviceId = current.DeviceId;
+            }
+        }
+
+        // The UI shows one row per device, but in the DB a device may briefly
+        // own more than one active row (legacy data or rotation races). Look up
+        // the target row's DeviceId and revoke every active row for that device
+        // so "revoke session" empties the whole device, not just one slice.
+        var active = await _refreshTokens.ListActiveForUserAsync(userId, ct);
+        var target = active.FirstOrDefault(t => t.Id == sessionId);
+        if (target is null) return false;
+        if (!string.IsNullOrWhiteSpace(target.DeviceId))
+        {
+            // Belt-and-braces: refuse if the target device is somehow the current device.
+            if (currentDeviceId != null && target.DeviceId == currentDeviceId) return false;
+            var n = await _refreshTokens.RevokeActiveByDeviceAsync(userId, target.DeviceId, "user_revoked_one", ct);
+            return n > 0;
         }
         return await _refreshTokens.RevokeOneByIdAsync(sessionId, userId, "user_revoked_one", ct);
     }
@@ -567,8 +608,18 @@ public sealed class AuthService : IAuthService
         bool rememberMe,
         string? ip,
         string? userAgent,
+        string? deviceId,
         CancellationToken ct)
     {
+        // Per-device single-session invariant: if the caller already has a
+        // device id (i.e., logged in from this browser before), revoke any
+        // lingering active tokens for that device so the new one is the only
+        // active row. Keeps the active-sessions UI to one entry per device.
+        if (!string.IsNullOrWhiteSpace(deviceId))
+        {
+            await _refreshTokens.RevokeActiveByDeviceAsync(user.Id, deviceId, "superseded_same_device", ct);
+        }
+
         var (access, _) = _jwt.GenerateAccessToken(user);
         var (refreshPlain, refreshHash, refreshExp) = _jwt.GenerateRefreshToken(rememberMe);
 
@@ -579,6 +630,7 @@ public sealed class AuthService : IAuthService
             ExpiresAt = refreshExp,
             CreatedByIp = ip,
             UserAgent = userAgent,
+            DeviceId = deviceId,
         }, ct);
 
         return new AuthResult(

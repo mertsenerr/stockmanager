@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { ThemeService } from '../../../core/theme/theme.service';
 
 export type AuthVariant = 'login' | 'forgot' | 'reset' | 'register';
 
@@ -12,6 +13,10 @@ export type AuthVariant = 'login' | 'forgot' | 'reset' | 'register';
 })
 export class AuthShellComponent {
   @Input() variant: AuthVariant = 'login';
+
+  private readonly themeSvc = inject(ThemeService);
+  protected readonly theme = this.themeSvc.theme;
+  protected toggleTheme(): void { this.themeSvc.toggle(); }
 
   /** Vertical offsets for the parallel ribbon lines stacked over the master wave path. */
   protected readonly waveOffsets = Array.from({ length: 28 }, (_, i) => i * 8 - 110);

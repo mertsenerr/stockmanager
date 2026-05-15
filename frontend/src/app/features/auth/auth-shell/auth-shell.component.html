@@ -23,7 +23,20 @@
       Syn<em>Compare</em>
     </a>
   </div>
-  <div class="absolute top-7 right-7 sm:top-10 sm:right-10 flex items-center justify-end z-20">
+  <div class="absolute top-7 right-7 sm:top-10 sm:right-10 flex items-center justify-end gap-3 z-20">
+    <button
+      type="button"
+      (click)="toggleTheme()"
+      class="auth-theme-toggle"
+      [attr.aria-label]="theme() === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'"
+      [title]="theme() === 'dark' ? 'Açık tema' : 'Koyu tema'"
+    >
+      <img
+        [src]="theme() === 'dark' ? '/assets/images/lightmode.png' : '/assets/images/night-mode.png'"
+        alt=""
+        aria-hidden="true"
+      />
+    </button>
     <a routerLink="/forgot-password" class="auth-help-link">Yardım?</a>
   </div>
 

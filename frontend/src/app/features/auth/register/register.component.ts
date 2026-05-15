@@ -41,6 +41,9 @@ export class RegisterComponent {
   });
 
   readonly captchaToken = signal<string | null>(null);
+  readonly showPassword = signal(false);
+  toggleShowPassword(): void { this.showPassword.update((v) => !v); }
+
   @ViewChild(TurnstileComponent) turnstile?: TurnstileComponent;
   onCaptchaToken(token: string): void { this.captchaToken.set(token); }
   onCaptchaError(): void { this.captchaToken.set(null); }

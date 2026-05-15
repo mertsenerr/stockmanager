@@ -40,15 +40,34 @@
         <label for="password" class="auth-label !mb-0">Parola</label>
         <a routerLink="/forgot-password" class="auth-link">Unuttun mu?</a>
       </div>
-      <input
-        id="password"
-        type="password"
-        formControlName="password"
-        autocomplete="current-password"
-        class="auth-input"
-        [class.is-invalid]="(form.controls.password.touched && form.controls.password.invalid) || !!fieldErrors()['Password']"
-        placeholder="••••••••"
-      />
+      <div class="auth-input-wrap">
+        <input
+          id="password"
+          [type]="showPassword() ? 'text' : 'password'"
+          formControlName="password"
+          autocomplete="current-password"
+          class="auth-input"
+          [class.is-invalid]="(form.controls.password.touched && form.controls.password.invalid) || !!fieldErrors()['Password']"
+          placeholder="••••••••"
+        />
+        <button type="button"
+                class="auth-input-toggle"
+                (click)="toggleShowPassword()"
+                [attr.aria-label]="showPassword() ? 'Parolayı gizle' : 'Parolayı göster'"
+                [attr.aria-pressed]="showPassword()">
+          @if (showPassword()) {
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17.94 17.94A10.94 10.94 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A10.94 10.94 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          } @else {
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          }
+        </button>
+      </div>
       @if (form.controls.password.touched && form.controls.password.errors?.['required']) {
         <p class="auth-error">Parola zorunludur.</p>
       }

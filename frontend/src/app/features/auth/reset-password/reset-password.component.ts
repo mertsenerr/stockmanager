@@ -29,6 +29,11 @@ export class ResetPasswordComponent implements OnInit {
   readonly success = signal(false);
   readonly serverError = signal<string | null>(null);
   readonly fieldErrors = signal<Record<string, string[]>>({});
+  readonly showNewPassword = signal(false);
+  readonly showConfirmPassword = signal(false);
+
+  toggleShowNewPassword(): void { this.showNewPassword.update((v) => !v); }
+  toggleShowConfirmPassword(): void { this.showConfirmPassword.update((v) => !v); }
 
   ngOnInit(): void {
     const t = this.route.snapshot.queryParamMap.get('token');

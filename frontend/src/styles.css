@@ -461,6 +461,31 @@
 .auth-input:focus { outline: none; background: #fff; box-shadow: 3px 3px 0 var(--auth-coral); transform: translate(-1px, -1px); }
 .auth-input.is-invalid { box-shadow: 3px 3px 0 var(--auth-coral); }
 
+/* Password input with eye toggle. Wrap an .auth-input inside .auth-input-wrap
+ * and add an .auth-input-toggle button as a sibling — the input gets extra
+ * right padding to make room and the toggle sits center-right. */
+.auth-input-wrap { position: relative; }
+.auth-input-wrap > .auth-input { padding-right: 44px; }
+.auth-input-toggle {
+  position: absolute;
+  top: 50%; right: 6px;
+  transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  border: none; background: transparent;
+  color: var(--auth-ink-muted);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 150ms, background-color 150ms;
+}
+.auth-input-toggle:hover { color: var(--auth-ink); background: rgba(0,0,0,0.05); }
+.auth-input-toggle:focus-visible {
+  outline: 2px solid var(--auth-coral);
+  outline-offset: 1px;
+  color: var(--auth-ink);
+}
+[data-theme="dark"] .auth-input-toggle:hover { background: rgba(255,255,255,0.06); }
+
 .auth-label {
   display: block;
   font-family: 'JetBrains Mono', monospace;

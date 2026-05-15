@@ -71,6 +71,9 @@ export class LoginComponent {
 
   readonly hasRememberedEmail = signal<boolean>(this.rememberedEmail !== null);
   readonly captchaToken = signal<string | null>(null);
+  readonly showPassword = signal(false);
+
+  toggleShowPassword(): void { this.showPassword.update((v) => !v); }
 
   @ViewChild(TurnstileComponent) turnstile?: TurnstileComponent;
 

@@ -148,8 +148,8 @@ public sealed class AuthController : ControllerBase
         if (!validation.IsValid)
             return ValidationProblem(validation);
 
-        var deviceId = EnsureDeviceCookie();
-        var result = await _auth.LoginAsync(request, GetIp(), GetUserAgent(), deviceId, ct);
+        var inboundDeviceId = ReadDeviceCookie();
+        var result = await _auth.LoginAsync(request, GetIp(), GetUserAgent(), inboundDeviceId, ct);
 
         // Password verified but 2FA required → return pending token, no cookies issued.
         if (result.Success && result.TwoFactorPendingToken is not null)
@@ -180,6 +180,7 @@ public sealed class AuthController : ControllerBase
         }
 
         SetRefreshCookie(result.RefreshTokenPlaintext, result.RefreshTokenExpiresAt!.Value);
+        if (!string.IsNullOrWhiteSpace(result.DeviceId)) WriteDeviceCookie(result.DeviceId);
         _audit.Enqueue(_audit.Build(
             AuditAksiyonlari.LoginSuccess,
             result.Response.User.Id, result.Response.User.AdSoyad, result.Response.User.Rol,
@@ -196,8 +197,8 @@ public sealed class AuthController : ControllerBase
 
         try
         {
-            var deviceId = EnsureDeviceCookie();
-            var result = await _auth.RefreshAsync(refreshToken, GetIp(), GetUserAgent(), deviceId, ct);
+            var inboundDeviceId = ReadDeviceCookie();
+            var result = await _auth.RefreshAsync(refreshToken, GetIp(), GetUserAgent(), inboundDeviceId, ct);
             if (!result.Success || result.Response is null || result.RefreshTokenPlaintext is null)
             {
                 ClearRefreshCookie();
@@ -205,6 +206,7 @@ public sealed class AuthController : ControllerBase
             }
 
             SetRefreshCookie(result.RefreshTokenPlaintext, result.RefreshTokenExpiresAt!.Value);
+            if (!string.IsNullOrWhiteSpace(result.DeviceId)) WriteDeviceCookie(result.DeviceId);
             return Ok(result.Response);
         }
         catch (Exception)
@@ -598,12 +600,13 @@ public sealed class AuthController : ControllerBase
         }
 
         await _auth.ReplaceUserAsync(user, ct);
-        var deviceId = EnsureDeviceCookie();
-        var result = await _auth.CompleteTwoFactorLoginAsync(user.Id, pending.Value.rememberMe, GetIp(), GetUserAgent(), deviceId, ct);
+        var inboundDeviceId = ReadDeviceCookie();
+        var result = await _auth.CompleteTwoFactorLoginAsync(user.Id, pending.Value.rememberMe, GetIp(), GetUserAgent(), inboundDeviceId, ct);
         if (!result.Success || result.Response is null || result.RefreshTokenPlaintext is null)
             return Unauthorized(new { message = "Oturum açılamadı." });
 
         SetRefreshCookie(result.RefreshTokenPlaintext, result.RefreshTokenExpiresAt!.Value);
+        if (!string.IsNullOrWhiteSpace(result.DeviceId)) WriteDeviceCookie(result.DeviceId);
         _audit.Enqueue(_audit.Build(
             AuditAksiyonlari.LoginSuccess,
             result.Response.User.Id, result.Response.User.AdSoyad, result.Response.User.Rol,
@@ -707,15 +710,20 @@ public sealed class AuthController : ControllerBase
             Path = RefreshCookiePath,
         });
 
-    /// <summary>Reads the long-lived device-id cookie or mints a new one. Always
-    /// (re)sets the cookie so its expiry slides forward on each auth request.
-    /// Not a security control — purely a stable handle to collapse the
-    /// active-sessions UI to one row per browser and let a logout+login cycle
-    /// reuse the same row instead of stacking new ones.</summary>
-    private string EnsureDeviceCookie()
+    /// <summary>Returns the inbound device-id cookie if present, else null.
+    /// Service-side resolution (UA-match fallback, mint fresh) takes over from
+    /// here so the controller doesn't decide identity by itself.</summary>
+    private string? ReadDeviceCookie()
     {
         Request.Cookies.TryGetValue(DeviceCookieName, out var existing);
-        var id = string.IsNullOrWhiteSpace(existing) ? Guid.NewGuid().ToString("N") : existing;
+        return string.IsNullOrWhiteSpace(existing) ? null : existing;
+    }
+
+    /// <summary>Writes the resolved device id back. Called after an auth flow
+    /// returns its effective DeviceId so the browser stays in sync with the
+    /// server (matters when UA-match fallback kicked in because the cookie
+    /// was dropped by ITP / private mode). Slides expiry forward each time.</summary>
+    private void WriteDeviceCookie(string id) =>
         Response.Cookies.Append(DeviceCookieName, id, new CookieOptions
         {
             HttpOnly = true,
@@ -724,8 +732,6 @@ public sealed class AuthController : ControllerBase
             Path = "/",
             Expires = DateTimeOffset.UtcNow.Add(DeviceCookieLifetime),
         });
-        return id;
-    }
 
     private string? GetIp() =>
         HttpContext.Connection.RemoteIpAddress?.ToString();

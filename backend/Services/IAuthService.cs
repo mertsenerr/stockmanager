@@ -62,7 +62,13 @@ public sealed record AuthResult(
     // When a user has 2FA enabled, LoginAsync returns Success=true with these set instead
     // of issuing a refresh token. The caller must complete the second factor.
     string? TwoFactorPendingToken = null,
-    IReadOnlyList<string>? TwoFactorAvailableMethods = null);
+    IReadOnlyList<string>? TwoFactorAvailableMethods = null,
+    // The DeviceId that was actually stamped on the refresh token. May differ
+    // from the inbound cookie value if the service had to UA-match-fallback
+    // (cookie missing) or carry forward a legacy row's existing DeviceId.
+    // Controller should write this back to the slk_did cookie to keep the
+    // browser in sync with the server's view of "which device am I".
+    string? DeviceId = null);
 
 public sealed class AuthService : IAuthService
 {
@@ -611,14 +617,25 @@ public sealed class AuthService : IAuthService
         string? deviceId,
         CancellationToken ct)
     {
-        // Per-device single-session invariant: if the caller already has a
-        // device id (i.e., logged in from this browser before), revoke any
-        // lingering active tokens for that device so the new one is the only
-        // active row. Keeps the active-sessions UI to one entry per device.
-        if (!string.IsNullOrWhiteSpace(deviceId))
+        // Resolve the effective device id: cookie wins, else try to recover it
+        // from an active token with a matching User-Agent (iOS Safari ITP and
+        // similar privacy features drop our cross-site slk_did cookie, so a
+        // logout+login from the same browser otherwise stacks a new row).
+        // Last resort: mint a fresh id.
+        var effectiveDeviceId = deviceId;
+        if (string.IsNullOrWhiteSpace(effectiveDeviceId))
         {
-            await _refreshTokens.RevokeActiveByDeviceAsync(user.Id, deviceId, "superseded_same_device", ct);
+            var actives = await _refreshTokens.ListActiveForUserAsync(user.Id, ct);
+            var match = actives.FirstOrDefault(t =>
+                !string.IsNullOrWhiteSpace(t.DeviceId)
+                && !string.IsNullOrWhiteSpace(t.UserAgent)
+                && string.Equals(t.UserAgent, userAgent, StringComparison.Ordinal));
+            effectiveDeviceId = match?.DeviceId ?? Guid.NewGuid().ToString("N");
         }
+
+        // Per-device single-session invariant: revoke any lingering active
+        // tokens for this device so the new one is the only active row.
+        await _refreshTokens.RevokeActiveByDeviceAsync(user.Id, effectiveDeviceId, "superseded_same_device", ct);
 
         var (access, _) = _jwt.GenerateAccessToken(user);
         var (refreshPlain, refreshHash, refreshExp) = _jwt.GenerateRefreshToken(rememberMe);
@@ -630,7 +647,7 @@ public sealed class AuthService : IAuthService
             ExpiresAt = refreshExp,
             CreatedByIp = ip,
             UserAgent = userAgent,
-            DeviceId = deviceId,
+            DeviceId = effectiveDeviceId,
         }, ct);
 
         return new AuthResult(
@@ -645,7 +662,8 @@ public sealed class AuthService : IAuthService
             },
             RefreshTokenPlaintext: refreshPlain,
             RefreshTokenExpiresAt: refreshExp,
-            RememberMe: rememberMe);
+            RememberMe: rememberMe,
+            DeviceId: effectiveDeviceId);
     }
 
     private async Task<UserDto> ToDtoEnrichedAsync(User user, CancellationToken ct)

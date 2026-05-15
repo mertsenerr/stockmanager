@@ -3,7 +3,9 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  Injector,
   OnDestroy,
+  afterNextRender,
   inject,
   output,
   signal,
@@ -40,6 +42,7 @@ export class TurnstileComponent implements AfterViewInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly themeSvc = inject(ThemeService);
   private readonly elementRef = inject(ElementRef<HTMLElement>);
+  private readonly injector = inject(Injector);
 
   readonly token = output<string>();
   readonly errored = output<void>();
@@ -55,8 +58,11 @@ export class TurnstileComponent implements AfterViewInit, OnDestroy {
         if (!cfg.enabled || !cfg.siteKey) return;
         this.siteKey = cfg.siteKey;
         this.visible.set(true);
-        // ngAfterViewInit already ran — wait one tick so the @if {} container exists.
-        queueMicrotask(() => this.mount());
+        // Wait for the next render so the @if {} host div is in the DOM.
+        // queueMicrotask isn't enough: on warm visits loadTurnstile() resolves
+        // synchronously and mount() ran before Angular flushed change detection,
+        // so querySelector returned null and the widget never rendered.
+        afterNextRender(() => this.mount(), { injector: this.injector });
       },
       error: () => {/* fail open — user can still submit; backend will reject if it really needed token */},
     });

@@ -95,7 +95,7 @@ public sealed class AuthController : ControllerBase
 
     /// <summary>Same-origin guard for cookie-only endpoints (refresh, logout). The
     /// HttpOnly slk_rt cookie is sent automatically on cross-site POSTs because
-    /// SameSite=None is required for the Netlify→Render setup; without this check
+    /// SameSite=None is required for the Cloudflare Pages→Render setup; without this check
     /// an attacker page could trigger token rotation or sign-out as a blind side
     /// effect. Browsers won't let scripts forge the Origin header, so allow-list
     /// matching is equivalent to a CSRF token here.</summary>

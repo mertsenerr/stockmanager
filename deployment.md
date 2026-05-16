@@ -6,38 +6,58 @@
 ## Topoloji
 
 ```
-[Browser]  →  Netlify (Angular SPA)  →  Render (.NET 9 API + SignalR)  →  MongoDB Atlas
-                                              ↓
-                                          Resend (e-posta)
+[Browser]  →  Cloudflare Pages (Angular SPA)  →  Render (.NET 9 API + SignalR)  →  MongoDB Atlas
+                                                       ↓
+                                                   Resend (e-posta)
 ```
 
 | Katman | Sağlayıcı | URL |
 |---|---|---|
-| Frontend | Netlify | https://&lt;netlify-site&gt;.netlify.app |
+| Frontend | Cloudflare Pages | https://syncompare.com (custom domain) |
 | Backend  | Render (Docker)  | https://stockmanager-d6nm.onrender.com |
 | Database | MongoDB Atlas (M0) | `mongodb+srv://…/sayimlink` |
 | E-posta  | Resend | https://resend.com |
 
 ---
 
-## Frontend — Netlify
+## Frontend — Cloudflare Pages
 
 - **Repo path**: `frontend/`
-- **Config dosyası**: `frontend/netlify.toml`
+- **Framework preset**: Angular (CF Pages dashboard → Build settings)
 - **Build command**: `npm run build`
-- **Publish dir**: `dist/frontend/browser` (`netlify.toml`'a göre, base=`frontend`)
-- **SPA routing**: `frontend/src/_redirects` → build sırasında çıktıya kopyalanır
+- **Build output dir**: `dist/frontend/browser`
+- **Root directory (advanced)**: `frontend`
+- **Node version**: `20` (set via `NODE_VERSION=20` env var in CF Pages dashboard)
+- **SPA routing + .well-known passthrough**: `frontend/public/_redirects`
+  → build sırasında publish dir'in köküne kopyalanır, CF Pages native parse eder
+- **Security headers**: `frontend/public/_headers` → CF Pages publish dir'den
+  okuyup eşleşen response'lara uygular (HSTS, CSP, X-Frame, COOP, CORP, vs.)
+- **`.well-known/security.txt`**: `frontend/public/.well-known/security.txt`
+  (RFC 9116). `_redirects` içindeki passthrough kuralı SPA fallback'tan önce
+  çalışır, dosya gerçek `text/plain` olarak servis edilir.
 - **Production env değerleri**: `frontend/src/environments/environment.ts`
-  içinde gömülü (build-time). Environment variable Netlify'da gerekmez.
+  içinde gömülü (build-time). CF Pages tarafında env var gerekmez.
 
 ### Redeploy
-1. `main` branch'a push → Netlify otomatik build başlatır.
-2. Manuel: Netlify dashboard → Deploys → "Trigger deploy".
+1. `main` branch'a push → CF Pages otomatik build başlatır.
+2. Manuel: Cloudflare dashboard → Workers & Pages → proje → **Create
+   deployment** veya commit'in yanındaki "Retry deployment".
 
 ### URL veya backend değişirse
 1. `frontend/src/environments/environment.ts` içindeki `apiBaseUrl` ve
    `hubBaseUrl`'i güncelle.
-2. Commit + push → Netlify yeniden build alır.
+2. `frontend/public/_headers` içindeki CSP `connect-src` / `frame-src`
+   listesinde backend origin'i geçiyorsa onu da güncelle.
+3. Commit + push → CF Pages yeniden build alır.
+
+### Custom domain
+1. CF Pages projesi → **Custom domains** → "Set up a custom domain"
+2. `syncompare.com` ve `www.syncompare.com` ikisini de ekle (apex ↔ www 301
+   yönlendirmesi otomatik kurulur, böylece eski host kaynaklı 522/SAN
+   problemi kapanır).
+3. DNS otomatik proxy'lenir (turuncu bulut). Bu durumda **CAA** kaydını
+   `CAA 0 issue "letsencrypt.org"` + `CAA 0 issue "pki.goog"` olarak set et
+   (CF Pages bu iki CA'yı kullanıyor).
 
 ---
 
@@ -62,8 +82,8 @@
 | `Jwt__Audience` | `SayimLinkClients` | hayır |
 | `Jwt__AccessTokenMinutes` | `30` | hayır |
 | `Jwt__RefreshTokenDays` | `14` | hayır |
-| `Cors__AllowedOrigins__0` | `https://<netlify-site>.netlify.app` | hayır |
-| `Cors__AllowedOrigins__1` | `https://<custom-domain>` (varsa) | hayır |
+| `Cors__AllowedOrigins__0` | `https://syncompare.com` | hayır |
+| `Cors__AllowedOrigins__1` | `https://<project>.pages.dev` (CF Pages default URL — preview/fallback) | hayır |
 | `Resend__ApiKey` | `re_xxxxxxxxxxxxxxx` | **evet** |
 | `Resend__FromEmail` | `noreply@syncompare.com` (Resend'de doğrulanmış domain üzerinde olmalı) | hayır |
 | `Resend__FromName` | `SayımLink` | hayır |
@@ -110,12 +130,12 @@
 
 | Belirti | Olası neden | Çözüm |
 |---|---|---|
-| Tarayıcıda CORS hatası | `Cors__AllowedOrigins` Netlify URL'ini içermiyor | Render env'e ekle, otomatik restart bekle |
+| Tarayıcıda CORS hatası | `Cors__AllowedOrigins` Cloudflare Pages URL'ini (custom domain veya `*.pages.dev`) içermiyor | Render env'e ekle, otomatik restart bekle |
 | 502/504 ilk istekte | Render free tier soğuk başlangıç (15dk idle sonrası) | 30-60sn bekle veya UptimeRobot ile warm tut |
 | `IDX10503: Signature validation failed` | `Jwt__Secret` env'i değişti | Tüm tokenları geçersiz kıldı, yeniden login |
 | `MongoConnectionException` | Atlas IP whitelist veya conn string | Network Access ve `MongoDb__ConnectionString` kontrol et |
 | Login 500 + Mongo logu yok | `Jwt__Secret` boş veya 32 karakterden kısa | Yeni secret üret, env güncelle |
-| Sayfa F5 → 404 (Netlify) | `_redirects` build çıktısında yok | `angular.json` `assets` listesinde `src/_redirects` mi? |
+| Sayfa F5 → 404 (CF Pages) | `_redirects` build çıktısının kökünde yok | `frontend/public/_redirects` var mı? `public/` zaten `angular.json`'da glob asset olduğu için elle eklemeye gerek yok |
 | SignalR bağlanmıyor | `hubBaseUrl` yanlış veya CORS credentials | `withCredentials: true` set, origin Render'da explicit listede mi? |
 
 ---

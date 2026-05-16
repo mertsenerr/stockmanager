@@ -29,7 +29,7 @@ SayımLink, Excel verisini canlı bir tabloya dönüştürür. Sayım başkanı 
 - **Frontend:** Angular 19 (standalone, signals), TypeScript strict, Tailwind CSS, AG Grid Community, FullCalendar, `@microsoft/signalr`, `xlsx`, Lucide
 - **Backend:** .NET Core 9 Web API, SignalR Hub, MongoDB.Driver, JWT + refresh, BCrypt, Serilog
 - **Veritabanı:** MongoDB Atlas (prod) / local MongoDB (dev)
-- **Deploy:** Netlify (frontend) + Render (backend)
+- **Deploy:** Cloudflare Pages (frontend) + Render (backend)
 
 ### Repo Yapısı
 
@@ -105,7 +105,7 @@ Sırlar Windows'ta `%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json
 - **Render free tier cold-start:** Backend 15dk idle sonrası uyur. `GET /api/health` endpoint'ini cron-job.org / UptimeRobot ile her 10 dakikada bir ping at — uyumayı önler.
 - **MongoDB Atlas IP allowlist:** Render egress IP'lerini ekle ya da development için `0.0.0.0/0` (intranet kullanım için kabul edilir).
 - **JWT secret:** Render env var `Jwt__Secret` (en az 32 karakter, rastgele). `appsettings.Production.json` git ignore'da.
-- **CORS:** Netlify origin'ini `Cors__AllowedOrigins__0` env var'ı ile geç. SignalR + cookies için `AllowCredentials()` zorunlu, wildcard origin yasak.
+- **CORS:** Cloudflare Pages origin'ini `Cors__AllowedOrigins__0` env var'ı ile geç. SignalR + cookies için `AllowCredentials()` zorunlu, wildcard origin yasak.
 - **Audit retention:** 180 günlük TTL index ile otomatik temizlenir; SOX/KVK uyumu için daha uzun istersen `AuditLogRepository` üzerindeki `ExpireAfter` değerini değiştir.
 
 ### Commit Konvansiyonu
@@ -126,7 +126,7 @@ SayımLink turns the Excel into a live table. Count chief (remote), store manage
 
 ### Stack
 
-Same as Turkish section above. Angular 19 + .NET 9 + MongoDB + SignalR. Deployed on Netlify + Render.
+Same as Turkish section above. Angular 19 + .NET 9 + MongoDB + SignalR. Deployed on Cloudflare Pages + Render.
 
 ### Quick Start
 

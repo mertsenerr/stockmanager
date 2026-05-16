@@ -1,0 +1,14 @@
+# Cloudflare Pages reads this file from the publish dir and applies the
+# rewrite/redirect rules in order. See:
+# https://developers.cloudflare.com/pages/configuration/redirects/
+#
+# .well-known files (security.txt, etc.) must bypass the SPA fallback so they
+# return the actual file with text/plain rather than the Angular HTML shell.
+# CF Pages serves real files in publish dir before evaluating redirects, so
+# this rule is defence-in-depth in case a future build ever omits the file
+# (a 404 beats a 200 HTML payload masquerading as security.txt).
+/.well-known/*  /.well-known/:splat  200
+
+# SPA fallback — any unknown path serves the Angular shell so client-side
+# routing takes over.
+/*  /index.html  200

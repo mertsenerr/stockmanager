@@ -1,0 +1,23 @@
+# Cloudflare Pages reads this file from the publish dir and applies the headers
+# to matching responses. See:
+# https://developers.cloudflare.com/pages/configuration/headers/
+#
+# Backend already sets CSP / X-Frame / HSTS on JSON responses, but Cloudflare
+# Pages serves the HTML shell that loads Angular — the same defences need to
+# ride on those responses too, otherwise the SPA host is the soft target
+# (clickjacking, CSP-less script injection if a CDN ever leaks).
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(self), camera=(self), display-capture=(self), payment=()
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-site
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://stockmanager-d6nm.onrender.com wss://stockmanager-d6nm.onrender.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+
+# index.html stays no-cache so deploys are picked up immediately; hashed bundle
+# assets keep CF Pages' default long-cache behaviour.
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate

@@ -7,6 +7,7 @@ import { ThemeService } from '../../core/theme/theme.service';
 import { ToastHostComponent } from '../../shared/ui/toast/toast-host.component';
 import { ToastService } from '../../shared/ui/toast/toast.service';
 import { ConfirmHostComponent } from '../../shared/ui/confirm/confirm-host.component';
+import { StepUpHostComponent } from '../../shared/ui/step-up/step-up-host.component';
 import { IncomingCallService } from '../../core/realtime/incoming-call.service';
 import { IncomingCallHostComponent } from '../../core/realtime/incoming-call-host.component';
 import { CommandPaletteComponent } from './command-palette/command-palette.component';
@@ -34,7 +35,7 @@ interface NavGroup {
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, ToastHostComponent, ConfirmHostComponent, IncomingCallHostComponent, CommandPaletteComponent, HoverGifComponent],
+  imports: [RouterOutlet, RouterLink, ToastHostComponent, ConfirmHostComponent, StepUpHostComponent, IncomingCallHostComponent, CommandPaletteComponent, HoverGifComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app-shell.component.html',
   styleUrls: ['./app-shell.component.css'],

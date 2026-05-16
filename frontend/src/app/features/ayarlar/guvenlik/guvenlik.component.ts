@@ -4,13 +4,20 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TurnstileComponent } from '../../../shared/ui/turnstile/turnstile.component';
 import { AuthService } from '../../../core/auth/auth.service';
-import { ActiveSession, TotpSetupResponse, TwoFactorStatus, WebAuthnCredentialDto } from '../../../core/auth/auth.models';
+import {
+  ActiveSession,
+  TotpSetupResponse,
+  TwoFactorStatus,
+  TwoFactorStepUpProof,
+  WebAuthnCredentialDto,
+} from '../../../core/auth/auth.models';
 import {
   decodeCreationOptions,
   encodeAttestationResponse,
 } from '../../../core/auth/webauthn.util';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
+import { StepUpAvailableMethod, StepUpService } from '../../../shared/ui/step-up/step-up.service';
 
 @Component({
   selector: 'app-ayarlar-guvenlik',
@@ -576,6 +583,18 @@ export class GuvenlikComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
+  private readonly stepUp = inject(StepUpService);
+
+  /** Build the picker list passed to the step-up modal from the current 2FA
+   *  status. Empty when no 2FA is enabled — the modal then asks for password only. */
+  private stepUpMethodsFromStatus(): StepUpAvailableMethod[] {
+    const s = this.status();
+    if (!s) return [];
+    const out: StepUpAvailableMethod[] = [];
+    if (s.totpEnabled) out.push({ value: 'totp', label: 'Authenticator' });
+    if (s.recoveryCodesRemaining > 0) out.push({ value: 'recovery', label: 'Recovery kodu' });
+    return out;
+  }
 
   readonly form = this.fb.nonNullable.group({
     currentPassword: ['', [Validators.required]],
@@ -762,29 +781,50 @@ export class GuvenlikComponent implements OnInit {
   }
 
   // ─── TOTP ────────────────────────────────────────────────────────────────
-  onTotpToggle(checked: boolean): void {
+  async onTotpToggle(checked: boolean): Promise<void> {
     if (checked) {
       // Enabling means starting the setup ceremony — the actual enable happens after code confirm.
       if (this.status()?.totpEnabled) return;
-      this.auth.totpSetup().subscribe({
+      const proof = await this.stepUp.ask({
+        title: 'TOTP kurulumunu başlat',
+        message: 'Authenticator uygulamasını eklemek için kimliğini doğrula.',
+        twoFactorMethods: this.stepUpMethodsFromStatus(),
+        confirmLabel: 'Devam et',
+      });
+      if (!proof) return;
+      this.auth.totpSetup(proof).subscribe({
         next: (s) => { this.totpSetup.set(s); this.totpForm.reset({ code: '' }); },
-        error: () => this.toast.error('TOTP setup başlatılamadı.'),
+        error: (err: HttpErrorResponse) => this.toast.error(err.error?.message ?? 'TOTP setup başlatılamadı.'),
       });
     } else {
-      // Disable directly.
-      this.auth.totpDisable().subscribe({
+      const proof = await this.stepUp.ask({
+        title: 'TOTP\'u kapat',
+        message: 'Authenticator app ile 2FA devre dışı kalacak. Devam etmek için kimliğini doğrula.',
+        twoFactorMethods: this.stepUpMethodsFromStatus(),
+        confirmLabel: 'Kapat',
+        danger: true,
+      });
+      if (!proof) return;
+      this.auth.totpDisable(proof).subscribe({
         next: () => { this.totpSetup.set(null); this.refreshStatus(); this.toast.info('TOTP kapatıldı.'); },
-        error: () => this.toast.error('TOTP kapatılamadı.'),
+        error: (err: HttpErrorResponse) => this.toast.error(err.error?.message ?? 'TOTP kapatılamadı.'),
       });
     }
   }
 
   cancelTotpSetup(): void { this.totpSetup.set(null); }
 
-  confirmTotp(): void {
+  async confirmTotp(): Promise<void> {
     if (this.totpForm.invalid || this.totpEnabling()) return;
+    const proof = await this.stepUp.ask({
+      title: 'TOTP\'u etkinleştir',
+      message: 'Authenticator kodunu kaydetmeden önce kimliğini doğrula.',
+      twoFactorMethods: this.stepUpMethodsFromStatus(),
+      confirmLabel: 'Etkinleştir',
+    });
+    if (!proof) return;
     this.totpEnabling.set(true);
-    this.auth.totpEnable(this.totpForm.controls.code.value).subscribe({
+    this.auth.totpEnable(this.totpForm.controls.code.value, proof).subscribe({
       next: (res) => {
         this.totpEnabling.set(false);
         this.totpSetup.set(null);
@@ -800,14 +840,24 @@ export class GuvenlikComponent implements OnInit {
   }
 
   // ─── Email OTP ───────────────────────────────────────────────────────────
-  onEmailToggle(checked: boolean): void {
-    const op = checked ? this.auth.emailOtpEnable() : this.auth.emailOtpDisable();
+  async onEmailToggle(checked: boolean): Promise<void> {
+    const proof = await this.stepUp.ask({
+      title: checked ? 'E-posta 2FA\'yı aç' : 'E-posta 2FA\'yı kapat',
+      message: checked
+        ? 'Her girişte hesabına bağlı e-postaya 6 haneli kod gönderilecek.'
+        : 'E-posta tabanlı 2FA devre dışı kalacak.',
+      twoFactorMethods: this.stepUpMethodsFromStatus(),
+      confirmLabel: checked ? 'Aç' : 'Kapat',
+      danger: !checked,
+    });
+    if (!proof) return;
+    const op = checked ? this.auth.emailOtpEnable(proof) : this.auth.emailOtpDisable(proof);
     op.subscribe({
       next: () => {
         this.refreshStatus();
         this.toast.info(checked ? 'E-posta 2FA açıldı.' : 'E-posta 2FA kapatıldı.');
       },
-      error: () => this.toast.error('İşlem başarısız.'),
+      error: (err: HttpErrorResponse) => this.toast.error(err.error?.message ?? 'İşlem başarısız.'),
     });
   }
 
@@ -818,16 +868,23 @@ export class GuvenlikComponent implements OnInit {
       this.toast.error('Tarayıcın WebAuthn desteklemiyor.');
       return;
     }
+    const proof = await this.stepUp.ask({
+      title: 'Yeni cihaz ekle',
+      message: 'Cihazını (Touch ID / Windows Hello / passkey) hesabına bağlamak için kimliğini doğrula.',
+      twoFactorMethods: this.stepUpMethodsFromStatus(),
+      confirmLabel: 'Devam et',
+    });
+    if (!proof) return;
     this.passkeyAdding.set(true);
     try {
       const optsJson = await new Promise<any>((resolve, reject) =>
-        this.auth.webAuthnRegisterOptions().subscribe({ next: resolve, error: reject }));
+        this.auth.webAuthnRegisterOptions(proof).subscribe({ next: resolve, error: reject }));
       const opts = decodeCreationOptions(optsJson);
       const cred = (await navigator.credentials.create({ publicKey: opts })) as PublicKeyCredential | null;
       if (!cred) throw new Error('İptal edildi.');
       const payload = encodeAttestationResponse(cred);
       const nickname = window.prompt('Bu cihaza ad ver (örn. "iPhone", "Office laptop"):', '') || undefined;
-      this.auth.webAuthnRegisterComplete(payload, nickname).subscribe({
+      this.auth.webAuthnRegisterComplete(payload, nickname, proof).subscribe({
         next: () => {
           this.passkeyAdding.set(false);
           this.refreshStatus();
@@ -852,24 +909,43 @@ export class GuvenlikComponent implements OnInit {
       confirmLabel: 'Sil', cancelLabel: 'Vazgeç', danger: true,
     });
     if (!ok) return;
-    this.auth.webAuthnDelete(id).subscribe({
+    const proof = await this.stepUp.ask({
+      title: 'Cihazı silmek için doğrula',
+      message: 'Cihaz silinmeden önce kimliğini doğrula.',
+      twoFactorMethods: this.stepUpMethodsFromStatus(),
+      confirmLabel: 'Sil',
+      danger: true,
+    });
+    if (!proof) return;
+    this.auth.webAuthnDelete(id, proof).subscribe({
       next: () => { this.refreshStatus(); this.refreshWebAuthnList(); this.toast.success('Cihaz silindi.'); },
-      error: () => this.toast.error('Silinemedi.'),
+      error: (err: HttpErrorResponse) => this.toast.error(err.error?.message ?? 'Silinemedi.'),
     });
   }
 
   // ─── Recovery codes ──────────────────────────────────────────────────────
-  regenerateCodes(): void {
+  async regenerateCodes(): Promise<void> {
     if (this.regenerating()) return;
+    const proof = await this.stepUp.ask({
+      title: 'Recovery kodlarını yenile',
+      message: 'Eski recovery kodları geçersiz kılınacak ve yenileri üretilecek. Devam etmek için kimliğini doğrula.',
+      twoFactorMethods: this.stepUpMethodsFromStatus(),
+      confirmLabel: 'Yenile',
+      danger: true,
+    });
+    if (!proof) return;
     this.regenerating.set(true);
-    this.auth.regenerateRecoveryCodes().subscribe({
+    this.auth.regenerateRecoveryCodes(proof).subscribe({
       next: (res) => {
         this.regenerating.set(false);
         this.recoveryCodes.set(res.codes);
         this.refreshStatus();
         this.toast.info('Yeni recovery kodları üretildi.');
       },
-      error: () => { this.regenerating.set(false); this.toast.error('Üretilemedi.'); },
+      error: (err: HttpErrorResponse) => {
+        this.regenerating.set(false);
+        this.toast.error(err.error?.message ?? 'Üretilemedi.');
+      },
     });
   }
 

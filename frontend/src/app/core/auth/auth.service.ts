@@ -19,6 +19,7 @@ import {
   RevokeOtherSessionsResponse,
   TotpSetupResponse,
   TwoFactorStatus,
+  TwoFactorStepUpProof,
   TwoFactorVerifyRequest,
   UpdateProfileRequest,
   VerifyEmailRequest,
@@ -67,24 +68,27 @@ export class AuthService {
     return this.http.get<TwoFactorStatus>(`${this.base}/2fa/status`, { withCredentials: true });
   }
 
-  totpSetup(): Observable<TotpSetupResponse> {
-    return this.http.post<TotpSetupResponse>(`${this.base}/2fa/totp/setup`, {}, { withCredentials: true });
+  // 2FA mutate endpoints all require a step-up proof (current password + existing
+  // 2FA proof). Body is { ...proof, ...extras } — backend ignores extra keys it
+  // doesn't recognise on the step-up DTO, so this composition is safe.
+  totpSetup(stepUp: TwoFactorStepUpProof): Observable<TotpSetupResponse> {
+    return this.http.post<TotpSetupResponse>(`${this.base}/2fa/totp/setup`, stepUp, { withCredentials: true });
   }
 
-  totpEnable(code: string): Observable<RecoveryCodesResponse> {
-    return this.http.post<RecoveryCodesResponse>(`${this.base}/2fa/totp/enable`, { code }, { withCredentials: true });
+  totpEnable(code: string, stepUp: TwoFactorStepUpProof): Observable<RecoveryCodesResponse> {
+    return this.http.post<RecoveryCodesResponse>(`${this.base}/2fa/totp/enable`, { ...stepUp, code }, { withCredentials: true });
   }
 
-  totpDisable(): Observable<void> {
-    return this.http.post<void>(`${this.base}/2fa/totp/disable`, {}, { withCredentials: true });
+  totpDisable(stepUp: TwoFactorStepUpProof): Observable<void> {
+    return this.http.post<void>(`${this.base}/2fa/totp/disable`, stepUp, { withCredentials: true });
   }
 
-  emailOtpEnable(): Observable<void> {
-    return this.http.post<void>(`${this.base}/2fa/email/enable`, {}, { withCredentials: true });
+  emailOtpEnable(stepUp: TwoFactorStepUpProof): Observable<void> {
+    return this.http.post<void>(`${this.base}/2fa/email/enable`, stepUp, { withCredentials: true });
   }
 
-  emailOtpDisable(): Observable<void> {
-    return this.http.post<void>(`${this.base}/2fa/email/disable`, {}, { withCredentials: true });
+  emailOtpDisable(stepUp: TwoFactorStepUpProof): Observable<void> {
+    return this.http.post<void>(`${this.base}/2fa/email/disable`, stepUp, { withCredentials: true });
   }
 
   emailOtpSend(pendingToken: string): Observable<{ sent: boolean }> {
@@ -95,26 +99,31 @@ export class AuthService {
     return this.http.get<WebAuthnCredentialDto[]>(`${this.base}/2fa/webauthn`, { withCredentials: true });
   }
 
-  webAuthnRegisterOptions(): Observable<unknown> {
-    return this.http.post<unknown>(`${this.base}/2fa/webauthn/register/options`, {}, { withCredentials: true });
+  webAuthnRegisterOptions(stepUp: TwoFactorStepUpProof): Observable<unknown> {
+    return this.http.post<unknown>(`${this.base}/2fa/webauthn/register/options`, stepUp, { withCredentials: true });
   }
 
-  webAuthnRegisterComplete(response: unknown, nickname?: string): Observable<{ id: string; nickname?: string }> {
+  webAuthnRegisterComplete(response: unknown, nickname: string | undefined, stepUp: TwoFactorStepUpProof): Observable<{ id: string; nickname?: string }> {
     return this.http.post<{ id: string; nickname?: string }>(
       `${this.base}/2fa/webauthn/register/complete`,
-      { response, nickname }, { withCredentials: true });
+      { ...stepUp, response, nickname }, { withCredentials: true });
   }
 
-  webAuthnDelete(credentialId: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/2fa/webauthn/${encodeURIComponent(credentialId)}`, { withCredentials: true });
+  /** Backend moved DELETE → POST /…/{id}/delete so the step-up body can ride
+   *  along (DELETE bodies are widely supported but discouraged by spec). */
+  webAuthnDelete(credentialId: string, stepUp: TwoFactorStepUpProof): Observable<void> {
+    return this.http.post<void>(
+      `${this.base}/2fa/webauthn/${encodeURIComponent(credentialId)}/delete`,
+      stepUp,
+      { withCredentials: true });
   }
 
   webAuthnAuthOptions(pendingToken: string): Observable<unknown> {
     return this.http.post<unknown>(`${this.base}/2fa/webauthn/auth/options`, { pendingToken });
   }
 
-  regenerateRecoveryCodes(): Observable<RecoveryCodesResponse> {
-    return this.http.post<RecoveryCodesResponse>(`${this.base}/2fa/recovery-codes/regenerate`, {}, { withCredentials: true });
+  regenerateRecoveryCodes(stepUp: TwoFactorStepUpProof): Observable<RecoveryCodesResponse> {
+    return this.http.post<RecoveryCodesResponse>(`${this.base}/2fa/recovery-codes/regenerate`, stepUp, { withCredentials: true });
   }
 
   twoFactorVerify(req: TwoFactorVerifyRequest): Observable<AuthResponse> {

@@ -65,17 +65,32 @@ export interface RegisterKullaniciRequest {
 
 export interface RegisterResponse {
   message: string;
-  user: CurrentUser;
+  // Backend no longer echoes the freshly created user — register response is now
+  // a generic acknowledgement so /register doesn't double as an email-existence
+  // oracle. The user object becomes available after email verification + login.
 }
 
 export type AuthFailureCode =
   | 'INVALID_CREDENTIALS'
   | 'EMAIL_NOT_VERIFIED'
-  | 'REFRESH_INVALID';
+  | 'REFRESH_INVALID'
+  | 'ACCOUNT_LOCKED';
 
 export interface AuthFailureBody {
   message: string;
   code?: AuthFailureCode;
+  /** Populated when code = ACCOUNT_LOCKED — seconds until the next try is allowed. */
+  retryAfterSeconds?: number;
+}
+
+/** Body sent with every 2FA enroll/disable/regen call. Backend requires the
+ * caller's current password and, if any 2FA factor is enabled, a fresh proof
+ * for one of them — so a hijacked session can't silently swap the second factor
+ * out from under the real owner. */
+export interface TwoFactorStepUpProof {
+  currentPassword: string;
+  twoFactorMethod?: 'totp' | 'email' | 'recovery';
+  twoFactorCode?: string;
 }
 
 export interface VerifyEmailRequest {

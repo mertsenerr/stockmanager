@@ -56,12 +56,35 @@
   html, body {
     @apply h-full bg-bg text-text-primary font-sans antialiased;
   }
+  /* Global guard: no app surface should ever cause horizontal scroll on the
+     viewport — individual scroll containers (tables, code blocks) get their
+     own overflow:auto and stay inside their card. */
+  html, body {
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+    /* Prevent iOS Safari's bouncy text-resize on landscape rotation; users can
+       still pinch-zoom because the viewport meta keeps user-scalable=yes by
+       default. */
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     background-image: radial-gradient(circle at 1px 1px, rgba(26, 24, 20, 0.06) 1px, transparent 0);
     background-size: 24px 24px;
     background-position: 0 0;
     font-feature-settings: 'cv11', 'ss01', 'ss03';
   }
+
+  /* iOS Safari address-bar bug workaround: 100vh is taller than the visible
+     area when the URL bar is showing. Use dvh / svh where available. */
+  .min-h-screen-safe { min-height: 100vh; min-height: 100dvh; }
+  .h-screen-safe     { height: 100vh; height: 100dvh; }
+
+  /* iOS notch / dynamic island / home indicator. Components opt in via these
+     paddings to avoid clipping under the system chrome. */
+  .pt-safe { padding-top: max(env(safe-area-inset-top), 0px); }
+  .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+  .pl-safe { padding-left: max(env(safe-area-inset-left), 0px); }
+  .pr-safe { padding-right: max(env(safe-area-inset-right), 0px); }
 
   ::selection {
     background-color: var(--color-butter);
@@ -1420,7 +1443,19 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Dashboard — corporate KPI + bento layout (sober, no hover animations)
    ═══════════════════════════════════════════════════════════════════════════ */
-.dash-root { display: flex; flex-direction: column; gap: 24px; max-width: 1400px; }
+.dash-root { display: flex; flex-direction: column; gap: 24px; max-width: 1400px; min-width: 0; }
+
+/* Phone: tighter gap, hero CTA goes full-width under the title so the user
+   never has to look for it. */
+@media (max-width: 640px) {
+  .dash-root { gap: 18px; }
+  .dash-hero { gap: 12px; }
+  .dash-hero-actions { width: 100%; justify-content: flex-start; }
+  .dash-hero-cta { flex: 1 1 auto; justify-content: center; }
+  .dash-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .dash-kpi { padding: 14px 14px 14px 18px; }
+  .dash-kpi-value { font-size: 26px; }
+}
 
 /* Hero */
 .dash-hero {

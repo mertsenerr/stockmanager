@@ -53,6 +53,7 @@ interface AyarKategori {
       grid-template-columns: 260px 1fr;
       gap: 24px;
       align-items: start;
+      min-width: 0;
     }
     .ayarlar-side {
       position: sticky;
@@ -140,8 +141,35 @@ interface AyarKategori {
       min-width: 0;
     }
     @media (max-width: 768px) {
-      .ayarlar-shell { grid-template-columns: 1fr; }
-      .ayarlar-side { position: static; }
+      .ayarlar-shell { grid-template-columns: 1fr; gap: 16px; }
+      .ayarlar-side {
+        position: static;
+        max-height: none;
+        padding: 14px 12px;
+      }
+      /* On phones the side nav becomes a horizontal scroller of compact chips
+         so it doesn't push the actual settings content below the fold. */
+      .ayarlar-side-nav {
+        flex-direction: row;
+        overflow-x: auto;
+        gap: 8px;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .ayarlar-side-nav::-webkit-scrollbar { display: none; }
+      .ayarlar-side-item {
+        flex: 0 0 auto;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 10px;
+        min-width: 80px;
+        text-align: center;
+      }
+      .ayarlar-side-icon { width: 28px; height: 28px; }
+      .ayarlar-side-icon img { width: 22px; height: 22px; }
+      .ayarlar-side-desc { display: none; }
+      .ayarlar-side-label { font-size: 11.5px; }
     }
   `],
 })

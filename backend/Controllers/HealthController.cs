@@ -21,7 +21,13 @@ public sealed class HealthController : ControllerBase
     // no downstream component status. Anything an attacker could fingerprint
     // (build version, framework banner, dependency health) lives behind the
     // admin-only detailed endpoint below.
+    //
+    // HEAD is accepted alongside GET because most uptime monitors (UptimeRobot,
+    // Pingdom, StatusCake) default to HEAD to save bandwidth. ASP.NET Core does
+    // not auto-bind HEAD to [HttpGet] like Express does, so without this the
+    // probe sees a 405 and flags the service as down even when it is healthy.
     [HttpGet]
+    [HttpHead]
     public async Task<IActionResult> Get(CancellationToken cancellationToken)
     {
         var mongoOk = await _mongo.PingAsync(cancellationToken);

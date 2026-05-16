@@ -8,6 +8,14 @@
 # (clickjacking, CSP-less script injection if a CDN ever leaks).
 
 /*
+  # CF Pages injects `Access-Control-Allow-Origin: *` on every static response
+  # by default. Pentest W03 flagged it as latent risk: harmless for the
+  # current all-public asset surface, but if a dynamic / per-user response
+  # is ever served from this origin (an edge function, an SSR page, etc.)
+  # the wildcard would let any site read its body. The SPA only fetches the
+  # same-origin bundle plus the explicit API origin (which sets its own
+  # strict allowlist), so stripping ACAO here breaks nothing.
+  ! Access-Control-Allow-Origin
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin

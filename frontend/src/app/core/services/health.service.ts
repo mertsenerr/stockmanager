@@ -4,11 +4,7 @@ import { Observable, catchError, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 export interface HealthCheckResponse {
-  status: 'healthy' | 'degraded' | 'unreachable';
-  service?: string;
-  version?: string;
-  timestamp?: string;
-  checks?: { mongo?: 'up' | 'down' };
+  status: 'ok' | 'degraded' | 'unreachable';
 }
 
 @Injectable({ providedIn: 'root' })

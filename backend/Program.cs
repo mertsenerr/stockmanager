@@ -114,6 +114,22 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 
+// ProblemDetails customisation — strip W3C trace-context identifiers from
+// every problem+json response. ASP.NET Core's automatic [ApiController]
+// model-validation 400s and `ControllerBase.Problem()` / `ValidationProblem()`
+// helpers inject `traceId` (the W3C `traceparent`: version-trace_id-span_id-flags),
+// which reveals internal distributed-tracing topology to anonymous clients.
+// The traceId stays in server logs (Serilog request logging + the global
+// exception handler), so support workflows are unaffected — only the
+// outbound client payload is sanitised.
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = ctx =>
+    {
+        ctx.ProblemDetails.Extensions.Remove("traceId");
+    };
+});
+
 // ─── Rate limiting ───────────────────────────────────────────────────────────
 // `auth-strict`   → login / register / forgot / reset (credential-stuffing surface)
 // `auth-moderate` → general authenticated endpoints if we ever opt in
@@ -150,7 +166,7 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "SayımLink API",
+        Title = "syncompare API",
         Version = "v1",
         Description = "Canlı, çok kullanıcılı, rol tabanlı sayım karşılaştırma platformu.",
     });
@@ -391,7 +407,11 @@ app.UseSerilogRequestLogging(opts =>
     };
 });
 
-// Global exception handler — TR-localized 500, traceId, hide stack in prod.
+// Global exception handler — TR-localized 500, hide stack in prod.
+// The internal traceId (which can carry the W3C trace-context shape when
+// Activity tracking is on, exposing distributed-trace topology) is logged
+// server-side ONLY; the client receives an opaque short ref instead so
+// users can still report incidents without leaking internal correlation IDs.
 app.UseExceptionHandler(eh =>
 {
     eh.Run(async context =>
@@ -400,17 +420,26 @@ app.UseExceptionHandler(eh =>
         var ex = feature?.Error;
         var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
         var traceId = context.TraceIdentifier;
-        logger.LogError(ex, "Unhandled exception (traceId={TraceId})", traceId);
+        // Eight random base32 chars (~40 bits) — collision-resistant enough
+        // for support tickets within the log retention window, opaque enough
+        // that it reveals nothing about the underlying tracing system.
+        var rngBytes = new byte[5];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(rngBytes);
+        var alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // Crockford-ish, no I/L/O/0/1
+        var sb = new System.Text.StringBuilder(8);
+        for (var i = 0; i < 8; i++) sb.Append(alphabet[rngBytes[i % rngBytes.Length] % alphabet.Length]);
+        var publicRef = sb.ToString();
+        logger.LogError(ex, "Unhandled exception (traceId={TraceId} publicRef={PublicRef})", traceId, publicRef);
 
         context.Response.StatusCode = StatusCodes.Status500InternalServerError;
         context.Response.ContentType = "application/problem+json";
         var payload = new
         {
-            type = "https://sayimlink/errors/internal",
+            type = "about:blank",
             title = "Sunucu hatası",
             status = 500,
             detail = "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
-            traceId,
+            reference = publicRef,
             error = app.Environment.IsDevelopment() ? ex?.Message : null,
         };
         await context.Response.WriteAsJsonAsync(payload);
@@ -433,7 +462,7 @@ app.Use(async (ctx, next) =>
         // subdomains can serve HTTPS, removal can take months.
         headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload";
         // API only serves JSON in production; nothing here should ever load scripts,
-        // styles or framing. Frontend (Angular) ships its own CSP from Netlify.
+        // styles or framing. Frontend (Angular) ships its own CSP from Cloudflare Pages.
         // default-src 'none' is the safest possible policy for a JSON API.
         headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
     }
@@ -453,8 +482,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "SayımLink API v1");
-        c.DocumentTitle = "SayımLink API — Swagger";
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "syncompare API v1");
+        c.DocumentTitle = "syncompare API — Swagger";
         c.DefaultModelsExpandDepth(-1); // collapse the schemas section by default
     });
 }

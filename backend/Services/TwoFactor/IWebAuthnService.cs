@@ -8,19 +8,21 @@ namespace SayimLink.Api.Services.TwoFactor;
 
 public interface IWebAuthnService
 {
-    /// <summary>Build registration options ("creation options") for an authenticated user.</summary>
-    Task<CredentialCreateOptions> StartRegistrationAsync(User user, CancellationToken ct = default);
+    /// <summary>Build registration options ("creation options") for an authenticated user.
+    /// <paramref name="sessionKey"/> isolates parallel enrollments from the same user
+    /// (different browsers) so one tab's challenge doesn't overwrite the other.</summary>
+    Task<CredentialCreateOptions> StartRegistrationAsync(User user, string sessionKey, CancellationToken ct = default);
 
     /// <summary>Verify the attestation response and return the credential to persist.</summary>
-    Task<WebAuthnCredential> CompleteRegistrationAsync(User user, AuthenticatorAttestationRawResponse response, CancellationToken ct = default);
+    Task<WebAuthnCredential> CompleteRegistrationAsync(User user, string sessionKey, AuthenticatorAttestationRawResponse response, CancellationToken ct = default);
 
     /// <summary>Build assertion options for a known user (called during 2FA login step).</summary>
-    AssertionOptions StartAssertion(User user);
+    AssertionOptions StartAssertion(User user, string sessionKey);
 
     /// <summary>Verify the assertion response. Returns the matched credential and the new
     /// signature counter so the caller can persist it.</summary>
     Task<(WebAuthnCredential matched, uint newCounter)> CompleteAssertionAsync(
-        User user, AuthenticatorAssertionRawResponse response, CancellationToken ct = default);
+        User user, string sessionKey, AuthenticatorAssertionRawResponse response, CancellationToken ct = default);
 }
 
 public sealed class WebAuthnService : IWebAuthnService
@@ -34,7 +36,7 @@ public sealed class WebAuthnService : IWebAuthnService
         _cache = cache;
     }
 
-    public Task<CredentialCreateOptions> StartRegistrationAsync(User user, CancellationToken ct = default)
+    public Task<CredentialCreateOptions> StartRegistrationAsync(User user, string sessionKey, CancellationToken ct = default)
     {
         var fido2User = ToFido2User(user);
         var existing = user.WebAuthnCredentials
@@ -49,13 +51,13 @@ public sealed class WebAuthnService : IWebAuthnService
             AttestationConveyancePreference.None,
             new AuthenticationExtensionsClientInputs());
 
-        _cache.Set(RegKey(user.Id), options.ToJson(), TimeSpan.FromMinutes(5));
+        _cache.Set(RegKey(user.Id, sessionKey), options.ToJson(), TimeSpan.FromMinutes(5));
         return Task.FromResult(options);
     }
 
-    public async Task<WebAuthnCredential> CompleteRegistrationAsync(User user, AuthenticatorAttestationRawResponse response, CancellationToken ct = default)
+    public async Task<WebAuthnCredential> CompleteRegistrationAsync(User user, string sessionKey, AuthenticatorAttestationRawResponse response, CancellationToken ct = default)
     {
-        if (!_cache.TryGetValue(RegKey(user.Id), out string? optionsJson) || optionsJson is null)
+        if (!_cache.TryGetValue(RegKey(user.Id, sessionKey), out string? optionsJson) || optionsJson is null)
             throw new InvalidOperationException("Registration challenge not found or expired.");
         var options = CredentialCreateOptions.FromJson(optionsJson);
 
@@ -64,7 +66,7 @@ public sealed class WebAuthnService : IWebAuthnService
         if (result.Status != "ok" || result.Result is null)
             throw new InvalidOperationException(result.ErrorMessage ?? "Registration failed.");
 
-        _cache.Remove(RegKey(user.Id));
+        _cache.Remove(RegKey(user.Id, sessionKey));
 
         return new WebAuthnCredential
         {
@@ -78,21 +80,21 @@ public sealed class WebAuthnService : IWebAuthnService
         };
     }
 
-    public AssertionOptions StartAssertion(User user)
+    public AssertionOptions StartAssertion(User user, string sessionKey)
     {
         var allow = user.WebAuthnCredentials
             .Select(c => new PublicKeyCredentialDescriptor(Convert.FromBase64String(c.CredentialId)))
             .ToList();
 
         var options = _fido2.GetAssertionOptions(allow, UserVerificationRequirement.Preferred);
-        _cache.Set(AuthKey(user.Id), options.ToJson(), TimeSpan.FromMinutes(5));
+        _cache.Set(AuthKey(user.Id, sessionKey), options.ToJson(), TimeSpan.FromMinutes(5));
         return options;
     }
 
     public async Task<(WebAuthnCredential matched, uint newCounter)> CompleteAssertionAsync(
-        User user, AuthenticatorAssertionRawResponse response, CancellationToken ct = default)
+        User user, string sessionKey, AuthenticatorAssertionRawResponse response, CancellationToken ct = default)
     {
-        if (!_cache.TryGetValue(AuthKey(user.Id), out string? optionsJson) || optionsJson is null)
+        if (!_cache.TryGetValue(AuthKey(user.Id, sessionKey), out string? optionsJson) || optionsJson is null)
             throw new InvalidOperationException("Assertion challenge not found or expired.");
         var options = AssertionOptions.FromJson(optionsJson);
 
@@ -110,7 +112,7 @@ public sealed class WebAuthnService : IWebAuthnService
         if (result.Status != "ok")
             throw new InvalidOperationException(result.ErrorMessage ?? "Assertion failed.");
 
-        _cache.Remove(AuthKey(user.Id));
+        _cache.Remove(AuthKey(user.Id, sessionKey));
         return (stored, result.Counter);
     }
 
@@ -121,6 +123,10 @@ public sealed class WebAuthnService : IWebAuthnService
         DisplayName = user.AdSoyad,
     };
 
-    private static string RegKey(string uid)  => $"webauthn:reg:{uid}";
-    private static string AuthKey(string uid) => $"webauthn:auth:{uid}";
+    // SessionKey is normally the slk_did device-id cookie; falls back to the user
+    // id when the caller hasn't got one yet (e.g. first registration on a fresh
+    // browser). Two simultaneous registrations from different browsers under one
+    // account no longer overwrite each other's challenge.
+    private static string RegKey(string uid, string sessionKey)  => $"webauthn:reg:{uid}:{sessionKey}";
+    private static string AuthKey(string uid, string sessionKey) => $"webauthn:auth:{uid}:{sessionKey}";
 }

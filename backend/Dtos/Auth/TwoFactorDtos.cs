@@ -27,7 +27,19 @@ public sealed class TotpSetupResponse
     public string QrPngDataUri { get; set; } = string.Empty;
 }
 
-public sealed class TotpEnableRequest
+/// <summary>Step-up proof attached to every 2FA mutate request. Current password
+/// is mandatory; if the user already has 2FA enabled, the appropriate second-
+/// factor code must accompany it. Without this an attacker who stole a session
+/// (or knows the password and logged in from a new device) could silently
+/// re-enroll 2FA or rotate recovery codes and lock the rightful owner out.</summary>
+public class TwoFactorStepUpRequest
+{
+    public string CurrentPassword { get; set; } = string.Empty;
+    public string? TwoFactorMethod { get; set; }
+    public string? TwoFactorCode { get; set; }
+}
+
+public sealed class TotpEnableRequest : TwoFactorStepUpRequest
 {
     public string Code { get; set; } = string.Empty;
 }
@@ -52,7 +64,7 @@ public sealed class TwoFactorVerifyRequest
     public AuthenticatorAssertionRawResponse? AssertionResponse { get; set; }
 }
 
-public sealed class WebAuthnRegisterCompleteRequest
+public sealed class WebAuthnRegisterCompleteRequest : TwoFactorStepUpRequest
 {
     public AuthenticatorAttestationRawResponse Response { get; set; } = null!;
     public string? Nickname { get; set; }

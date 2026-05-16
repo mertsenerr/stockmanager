@@ -3,8 +3,12 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
+using SayimLink.Api.Common;
+using SayimLink.Api.Configuration;
 using SayimLink.Api.Dtos.Auth;
 using SayimLink.Api.Models;
+using SayimLink.Api.Repositories;
 using SayimLink.Api.Services;
 using SayimLink.Api.Services.TwoFactor;
 
@@ -20,6 +24,7 @@ public sealed class AuthController : ControllerBase
     private static readonly TimeSpan DeviceCookieLifetime = TimeSpan.FromDays(730);
 
     private readonly IAuthService _auth;
+    private readonly IUserRepository _users;
     private readonly IAuditService _audit;
     private readonly IValidator<LoginRequest> _loginValidator;
     private readonly IValidator<ForgotPasswordRequest> _forgotValidator;
@@ -37,9 +42,12 @@ public sealed class AuthController : ControllerBase
     private readonly IWebAuthnService _webauthn;
     private readonly IRecoveryCodeService _recovery;
     private readonly ITurnstileService _turnstile;
+    private readonly ITotpSecretProtector _totpProtector;
+    private readonly HashSet<string> _allowedOrigins;
 
     public AuthController(
         IAuthService auth,
+        IUserRepository users,
         IAuditService audit,
         IValidator<LoginRequest> loginValidator,
         IValidator<ForgotPasswordRequest> forgotValidator,
@@ -56,9 +64,12 @@ public sealed class AuthController : ControllerBase
         IEmailOtpService emailOtp,
         IWebAuthnService webauthn,
         IRecoveryCodeService recovery,
-        ITurnstileService turnstile)
+        ITurnstileService turnstile,
+        ITotpSecretProtector totpProtector,
+        IOptions<CorsSettings> corsOptions)
     {
         _auth = auth;
+        _users = users;
         _audit = audit;
         _loginValidator = loginValidator;
         _forgotValidator = forgotValidator;
@@ -76,6 +87,32 @@ public sealed class AuthController : ControllerBase
         _webauthn = webauthn;
         _recovery = recovery;
         _turnstile = turnstile;
+        _totpProtector = totpProtector;
+        _allowedOrigins = new HashSet<string>(
+            corsOptions.Value.AllowedOrigins.Select(o => o.TrimEnd('/')),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Same-origin guard for cookie-only endpoints (refresh, logout). The
+    /// HttpOnly slk_rt cookie is sent automatically on cross-site POSTs because
+    /// SameSite=None is required for the Netlify→Render setup; without this check
+    /// an attacker page could trigger token rotation or sign-out as a blind side
+    /// effect. Browsers won't let scripts forge the Origin header, so allow-list
+    /// matching is equivalent to a CSRF token here.</summary>
+    private bool IsAllowedOrigin()
+    {
+        // Empty allow-list means start-up guard already rejected boot — defensive.
+        if (_allowedOrigins.Count == 0) return false;
+        var origin = Request.Headers.Origin.ToString();
+        if (string.IsNullOrEmpty(origin))
+        {
+            // Some Same-origin browsers omit Origin on POST; fall back to Referer.
+            var referer = Request.Headers.Referer.ToString();
+            if (string.IsNullOrEmpty(referer)) return false;
+            if (!Uri.TryCreate(referer, UriKind.Absolute, out var refUri)) return false;
+            origin = $"{refUri.Scheme}://{refUri.Authority}";
+        }
+        return _allowedOrigins.Contains(origin.TrimEnd('/'));
     }
 
     private async Task<bool> CaptchaOkAsync(string? token, CancellationToken ct) =>
@@ -101,15 +138,19 @@ public sealed class AuthController : ControllerBase
         if (!validation.IsValid) return ValidationProblem(validation);
 
         var result = await _auth.RegisterSayimBaskaniAsync(request, ct);
-        if (!result.Success || result.User is null)
+        if (!result.Success)
             return Conflict(new { message = result.FailureReason ?? "Kayıt başarısız." });
 
-        _audit.Enqueue(_audit.Build(
-            AuditAksiyonlari.KullaniciCreate, kullaniciId: result.User.Id,
-            kullaniciAdi: result.User.AdSoyad, rol: result.User.Rol,
-            hedef: "user", hedefId: result.User.Id, ip: GetIp(), userAgent: GetUserAgent(),
-            yeniDeger: $"sayim-baskani register · {result.User.Email}"));
-        return Ok(new { message = "Kayıt tamamlandı. Giriş yapabilirsiniz.", user = result.User });
+        if (result.User is not null)
+        {
+            _audit.Enqueue(_audit.Build(
+                AuditAksiyonlari.KullaniciCreate, kullaniciId: result.User.Id,
+                kullaniciAdi: result.User.AdSoyad, rol: result.User.Rol,
+                hedef: "user", hedefId: result.User.Id, ip: GetIp(), userAgent: GetUserAgent(),
+                yeniDeger: $"sayim-baskani register · {result.User.Email}"));
+        }
+        // Generic response — never tell the caller whether the address was new.
+        return Ok(new { message = "Kayıt isteğiniz alındı. Devam etmek için e-postanı kontrol et." });
     }
 
     [HttpPost("register/kullanici")]
@@ -123,18 +164,20 @@ public sealed class AuthController : ControllerBase
         if (!validation.IsValid) return ValidationProblem(validation);
 
         var result = await _auth.RegisterKullaniciAsync(request, ct);
-        if (!result.Success || result.User is null)
+        if (!result.Success)
             return Conflict(new { message = result.FailureReason ?? "Kayıt başarısız." });
 
-        _audit.Enqueue(_audit.Build(
-            AuditAksiyonlari.KullaniciCreate, kullaniciId: result.User.Id,
-            kullaniciAdi: result.User.AdSoyad, rol: result.User.Rol,
-            hedef: "user", hedefId: result.User.Id, ip: GetIp(), userAgent: GetUserAgent(),
-            yeniDeger: $"kullanici register · {result.User.Email}"));
+        if (result.User is not null)
+        {
+            _audit.Enqueue(_audit.Build(
+                AuditAksiyonlari.KullaniciCreate, kullaniciId: result.User.Id,
+                kullaniciAdi: result.User.AdSoyad, rol: result.User.Rol,
+                hedef: "user", hedefId: result.User.Id, ip: GetIp(), userAgent: GetUserAgent(),
+                yeniDeger: $"kullanici register · {result.User.Email}"));
+        }
         return Ok(new
         {
-            message = "Kayıt tamamlandı. E-posta adresinizi doğruladıktan sonra giriş yapabilirsiniz.",
-            user = result.User,
+            message = "Kayıt isteğiniz alındı. E-posta adresinizi doğruladıktan sonra giriş yapabilirsiniz.",
         });
     }
 
@@ -169,6 +212,18 @@ public sealed class AuthController : ControllerBase
                 kullaniciId: null, kullaniciAdi: request.Email, rol: null,
                 hedef: "auth", ip: GetIp(), userAgent: GetUserAgent(), basarili: false));
 
+            if (result.FailureCode is AuthFailureCodes.AccountLocked)
+            {
+                var retryAfter = result.LockedRetryAfterSeconds ?? 60;
+                Response.Headers["Retry-After"] = retryAfter.ToString();
+                return StatusCode(StatusCodes.Status429TooManyRequests, new
+                {
+                    message = result.FailureReason ?? "Hesap geçici olarak kilitli.",
+                    code = AuthFailureCodes.AccountLocked,
+                    retryAfterSeconds = retryAfter,
+                });
+            }
+
             var body = new
             {
                 message = result.FailureReason ?? "Giriş başarısız.",
@@ -191,6 +246,9 @@ public sealed class AuthController : ControllerBase
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh(CancellationToken ct)
     {
+        if (!IsAllowedOrigin())
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Geçersiz origin." });
+
         if (!Request.Cookies.TryGetValue(RefreshCookieName, out var refreshToken)
             || string.IsNullOrWhiteSpace(refreshToken))
             return Unauthorized(new { message = "Refresh token bulunamadı." });
@@ -221,6 +279,9 @@ public sealed class AuthController : ControllerBase
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(CancellationToken ct)
     {
+        if (!IsAllowedOrigin())
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Geçersiz origin." });
+
         if (Request.Cookies.TryGetValue(RefreshCookieName, out var refreshToken)
             && !string.IsNullOrWhiteSpace(refreshToken))
         {
@@ -360,20 +421,37 @@ public sealed class AuthController : ControllerBase
         });
     }
 
+    /// <summary>Step-up guard for every 2FA enroll/disable/regen endpoint.
+    /// Re-verifies password plus the existing 2FA factor (if any) so an attacker
+    /// who only stole a session can't silently rotate the second-factor scheme
+    /// out from under the real owner. Returns the post-verify User on success
+    /// (the caller persists), or an IActionResult to short-circuit with.</summary>
+    private async Task<(User? user, IActionResult? error)> RequireStepUpAsync(
+        TwoFactorStepUpRequest req, CancellationToken ct)
+    {
+        var uid = AuthedUserId();
+        if (uid is null) return (null, Unauthorized());
+        var (ok, user) = await _auth.VerifyStepUpForUserAsync(
+            uid, req.CurrentPassword, req.TwoFactorMethod, req.TwoFactorCode, ct);
+        if (!ok)
+            return (null, BadRequest(new { message = "Mevcut parola veya ikinci faktör doğrulaması hatalı." }));
+        return (user, null);
+    }
+
     // ─── 2FA: TOTP ────────────────────────────────────────────────────────────
     [HttpPost("2fa/totp/setup")]
     [Authorize]
-    public async Task<IActionResult> TotpSetup(CancellationToken ct)
+    public async Task<IActionResult> TotpSetup([FromBody] TwoFactorStepUpRequest req, CancellationToken ct)
     {
-        var uid = AuthedUserId();
-        if (uid is null) return Unauthorized();
-        var user = await _auth.GetUserAsync(uid, ct);
+        var (user, err) = await RequireStepUpAsync(req, ct);
+        if (err is not null) return err;
         if (user is null) return Unauthorized();
 
         var (secret, url, qr) = _totp.GenerateSecret("SynCompare", user.Email);
         // Stage the secret on the user record but do NOT enable until the user proves they
-        // can read codes from it via /enable.
-        user.TotpSecret = secret;
+        // can read codes from it via /enable. Stored encrypted so a DB dump alone is not
+        // enough to clone the authenticator.
+        user.TotpSecret = _totpProtector.Protect(secret);
         user.TotpEnabled = false;
         await _auth.ReplaceUserAsync(user, ct);
         return Ok(new TotpSetupResponse { Secret = secret, OtpAuthUrl = url, QrPngDataUri = qr });
@@ -383,13 +461,17 @@ public sealed class AuthController : ControllerBase
     [Authorize]
     public async Task<IActionResult> TotpEnable([FromBody] TotpEnableRequest req, CancellationToken ct)
     {
-        var uid = AuthedUserId();
-        if (uid is null) return Unauthorized();
-        var user = await _auth.GetUserAsync(uid, ct);
+        var (user, err) = await RequireStepUpAsync(req, ct);
+        if (err is not null) return err;
         if (user is null || string.IsNullOrEmpty(user.TotpSecret))
             return BadRequest(new { message = "Önce setup adımını çalıştırın." });
-        if (!_totp.Verify(user.TotpSecret, req.Code))
+        var plainSecret = _totpProtector.Unprotect(user.TotpSecret);
+        if (!_totp.Verify(plainSecret, req.Code))
             return BadRequest(new { message = "Kod hatalı." });
+        // Opportunistic migration: if the stored value was legacy plaintext, re-write it
+        // encrypted now that we know it verifies cleanly.
+        if (_totpProtector.IsLegacy(user.TotpSecret))
+            user.TotpSecret = _totpProtector.Protect(plainSecret);
         user.TotpEnabled = true;
         var (codes, hashes) = EnsureRecoveryCodes(user);
         await _auth.ReplaceUserAsync(user, ct);
@@ -398,11 +480,10 @@ public sealed class AuthController : ControllerBase
 
     [HttpPost("2fa/totp/disable")]
     [Authorize]
-    public async Task<IActionResult> TotpDisable(CancellationToken ct)
+    public async Task<IActionResult> TotpDisable([FromBody] TwoFactorStepUpRequest req, CancellationToken ct)
     {
-        var uid = AuthedUserId();
-        if (uid is null) return Unauthorized();
-        var user = await _auth.GetUserAsync(uid, ct);
+        var (user, err) = await RequireStepUpAsync(req, ct);
+        if (err is not null) return err;
         if (user is null) return Unauthorized();
         user.TotpEnabled = false;
         user.TotpSecret = null;
@@ -413,11 +494,10 @@ public sealed class AuthController : ControllerBase
     // ─── 2FA: Email OTP ───────────────────────────────────────────────────────
     [HttpPost("2fa/email/enable")]
     [Authorize]
-    public async Task<IActionResult> EmailOtpEnable(CancellationToken ct)
+    public async Task<IActionResult> EmailOtpEnable([FromBody] TwoFactorStepUpRequest req, CancellationToken ct)
     {
-        var uid = AuthedUserId();
-        if (uid is null) return Unauthorized();
-        var user = await _auth.GetUserAsync(uid, ct);
+        var (user, err) = await RequireStepUpAsync(req, ct);
+        if (err is not null) return err;
         if (user is null) return Unauthorized();
         user.EmailOtpEnabled = true;
         EnsureRecoveryCodes(user);
@@ -427,11 +507,10 @@ public sealed class AuthController : ControllerBase
 
     [HttpPost("2fa/email/disable")]
     [Authorize]
-    public async Task<IActionResult> EmailOtpDisable(CancellationToken ct)
+    public async Task<IActionResult> EmailOtpDisable([FromBody] TwoFactorStepUpRequest req, CancellationToken ct)
     {
-        var uid = AuthedUserId();
-        if (uid is null) return Unauthorized();
-        var user = await _auth.GetUserAsync(uid, ct);
+        var (user, err) = await RequireStepUpAsync(req, ct);
+        if (err is not null) return err;
         if (user is null) return Unauthorized();
         user.EmailOtpEnabled = false;
         user.EmailOtpCodeHash = null;
@@ -452,10 +531,44 @@ public sealed class AuthController : ControllerBase
         if (user is null || !user.EmailOtpEnabled)
             return BadRequest(new { message = "E-posta OTP açık değil." });
 
+        // Per-user throttling. The IP rate limiter alone is not enough because the
+        // pending-token holder can rotate IPs to keep generating OTPs — every fresh
+        // code overwrites the previous one, so the legitimate user's inbox fills up
+        // with stale codes and they can't tell which is the live one. Also caps
+        // Resend quota burn.
+        const int CooldownSeconds = 60;
+        const int DailyCap = 10;
+        var now = DateTime.UtcNow;
+        if (user.EmailOtpLastSentAt is not null &&
+            (now - user.EmailOtpLastSentAt.Value).TotalSeconds < CooldownSeconds)
+        {
+            var retry = (int)Math.Ceiling(CooldownSeconds - (now - user.EmailOtpLastSentAt.Value).TotalSeconds);
+            Response.Headers["Retry-After"] = retry.ToString();
+            return StatusCode(StatusCodes.Status429TooManyRequests, new
+            {
+                message = "Çok sık istek. Lütfen birkaç saniye sonra tekrar deneyin.",
+                retryAfterSeconds = retry,
+            });
+        }
+
+        // 24-hour rolling window cap so even a slow drip (one per minute for hours)
+        // hits a ceiling.
+        var windowStart = user.EmailOtpDayWindowStart ?? now;
+        var dayCount = user.EmailOtpDayCount;
+        if ((now - windowStart).TotalHours >= 24)
+        {
+            windowStart = now;
+            dayCount = 0;
+        }
+        if (dayCount >= DailyCap)
+            return StatusCode(StatusCodes.Status429TooManyRequests, new
+            {
+                message = "Bugünkü 2FA e-posta kotası doldu. Lütfen başka bir 2FA yöntemi deneyin.",
+            });
+
         var (plain, hash, expires) = _emailOtp.Generate();
-        user.EmailOtpCodeHash = hash;
-        user.EmailOtpExpiresAt = expires;
-        await _auth.ReplaceUserAsync(user, ct);
+        await _users.SetEmailOtpAsync(user.Id, hash, expires, ct);
+        await _users.RecordEmailOtpSendAsync(user.Id, now, windowStart, dayCount + 1, ct);
 
         await _email.SendTwoFactorCodeAsync(user.Email, user.AdSoyad, plain, ct);
         return Ok(new { sent = true });
@@ -464,13 +577,12 @@ public sealed class AuthController : ControllerBase
     // ─── 2FA: WebAuthn ────────────────────────────────────────────────────────
     [HttpPost("2fa/webauthn/register/options")]
     [Authorize]
-    public async Task<IActionResult> WebAuthnRegisterOptions(CancellationToken ct)
+    public async Task<IActionResult> WebAuthnRegisterOptions([FromBody] TwoFactorStepUpRequest req, CancellationToken ct)
     {
-        var uid = AuthedUserId();
-        if (uid is null) return Unauthorized();
-        var user = await _auth.GetUserAsync(uid, ct);
+        var (user, err) = await RequireStepUpAsync(req, ct);
+        if (err is not null) return err;
         if (user is null) return Unauthorized();
-        var opts = await _webauthn.StartRegistrationAsync(user, ct);
+        var opts = await _webauthn.StartRegistrationAsync(user, WebAuthnSessionKey(user.Id), ct);
         return Content(opts.ToJson(), "application/json");
     }
 
@@ -478,14 +590,17 @@ public sealed class AuthController : ControllerBase
     [Authorize]
     public async Task<IActionResult> WebAuthnRegisterComplete([FromBody] WebAuthnRegisterCompleteRequest req, CancellationToken ct)
     {
-        var uid = AuthedUserId();
-        if (uid is null) return Unauthorized();
-        var user = await _auth.GetUserAsync(uid, ct);
+        // Re-check step-up here too — the options endpoint already verified it,
+        // but the WebAuthn challenge cache is keyed by user id, so a leaked
+        // session that races to /complete (with the original user's authenticator
+        // proof) shouldn't be able to skip the password gate.
+        var (user, err) = await RequireStepUpAsync(req, ct);
+        if (err is not null) return err;
         if (user is null) return Unauthorized();
 
         try
         {
-            var cred = await _webauthn.CompleteRegistrationAsync(user, req.Response, ct);
+            var cred = await _webauthn.CompleteRegistrationAsync(user, WebAuthnSessionKey(user.Id), req.Response, ct);
             cred.Nickname = string.IsNullOrWhiteSpace(req.Nickname) ? null : req.Nickname.Trim();
             user.WebAuthnCredentials.Add(cred);
             EnsureRecoveryCodes(user);
@@ -507,17 +622,18 @@ public sealed class AuthController : ControllerBase
         var user = await _auth.GetUserAsync(pending.Value.userId, ct);
         if (user is null || user.WebAuthnCredentials.Count == 0)
             return BadRequest(new { message = "WebAuthn açık değil." });
-        var opts = _webauthn.StartAssertion(user);
+        var opts = _webauthn.StartAssertion(user, WebAuthnSessionKey(user.Id));
         return Content(opts.ToJson(), "application/json");
     }
 
-    [HttpDelete("2fa/webauthn/{credentialId}")]
+    [HttpPost("2fa/webauthn/{credentialId}/delete")]
     [Authorize]
-    public async Task<IActionResult> WebAuthnDelete(string credentialId, CancellationToken ct)
+    public async Task<IActionResult> WebAuthnDelete(string credentialId, [FromBody] TwoFactorStepUpRequest req, CancellationToken ct)
     {
-        var uid = AuthedUserId();
-        if (uid is null) return Unauthorized();
-        var user = await _auth.GetUserAsync(uid, ct);
+        // Switched DELETE → POST so the step-up body fits cleanly. Removing a
+        // passkey shouldn't bypass the same enroll/disable gate.
+        var (user, err) = await RequireStepUpAsync(req, ct);
+        if (err is not null) return err;
         if (user is null) return Unauthorized();
         var removed = user.WebAuthnCredentials.RemoveAll(c => c.CredentialId == credentialId);
         if (removed == 0) return NotFound();
@@ -542,11 +658,10 @@ public sealed class AuthController : ControllerBase
     // ─── 2FA: Recovery codes ──────────────────────────────────────────────────
     [HttpPost("2fa/recovery-codes/regenerate")]
     [Authorize]
-    public async Task<IActionResult> RegenerateRecoveryCodes(CancellationToken ct)
+    public async Task<IActionResult> RegenerateRecoveryCodes([FromBody] TwoFactorStepUpRequest req, CancellationToken ct)
     {
-        var uid = AuthedUserId();
-        if (uid is null) return Unauthorized();
-        var user = await _auth.GetUserAsync(uid, ct);
+        var (user, err) = await RequireStepUpAsync(req, ct);
+        if (err is not null) return err;
         if (user is null) return Unauthorized();
         var (codes, hashes) = _recovery.Generate();
         user.RecoveryCodeHashes = hashes;
@@ -564,20 +679,47 @@ public sealed class AuthController : ControllerBase
         var user = await _auth.GetUserAsync(pending.Value.userId, ct);
         if (user is null || !user.AktifMi) return Unauthorized();
 
+        // Per-user lockout: rotating-IP brute-force on the OTP space is the realistic
+        // post-password-leak attack vector; the IP rate limiter alone doesn't stop it.
+        if (user.TwoFactorLockedUntil is not null && user.TwoFactorLockedUntil > DateTime.UtcNow)
+        {
+            var retryAfter = (int)Math.Ceiling((user.TwoFactorLockedUntil.Value - DateTime.UtcNow).TotalSeconds);
+            Response.Headers["Retry-After"] = retryAfter.ToString();
+            return StatusCode(StatusCodes.Status429TooManyRequests, new
+            {
+                message = "Çok fazla hatalı 2FA denemesi. Lütfen biraz sonra tekrar deneyin.",
+                retryAfterSeconds = retryAfter,
+            });
+        }
+
+        // Track side-effects that need a full ReplaceUserAsync (TOTP secret re-encrypt
+        // after legacy decrypt; WebAuthn counter bump). Everything else is now done with
+        // atomic Mongo updates so concurrent flows don't clobber each other.
         var ok = false;
+        var needsFullReplace = false;
+        string? consumedRecoveryHash = null;
+
         switch (req.Method)
         {
             case TwoFactorMethods.Totp:
-                ok = user.TotpEnabled && _totp.Verify(user.TotpSecret ?? "", req.Code ?? "");
+                if (user.TotpEnabled && !string.IsNullOrEmpty(user.TotpSecret))
+                {
+                    var totpPlain = _totpProtector.Unprotect(user.TotpSecret);
+                    ok = _totp.Verify(totpPlain, req.Code ?? "");
+                    if (ok && _totpProtector.IsLegacy(user.TotpSecret))
+                    {
+                        user.TotpSecret = _totpProtector.Protect(totpPlain);
+                        needsFullReplace = true;
+                    }
+                }
                 break;
             case TwoFactorMethods.Email:
                 ok = user.EmailOtpEnabled && _emailOtp.Verify(user.EmailOtpCodeHash, user.EmailOtpExpiresAt, req.Code ?? "");
-                if (ok) { user.EmailOtpCodeHash = null; user.EmailOtpExpiresAt = null; }
                 break;
             case TwoFactorMethods.Recovery:
-                if (_recovery.TryConsume(user.RecoveryCodeHashes, req.Code ?? "", out var remaining))
+                if (_recovery.TryMatch(user.RecoveryCodeHashes, req.Code ?? "", out var matchedHash) && matchedHash is not null)
                 {
-                    user.RecoveryCodeHashes = remaining;
+                    consumedRecoveryHash = matchedHash;
                     ok = true;
                 }
                 break;
@@ -585,8 +727,10 @@ public sealed class AuthController : ControllerBase
                 if (req.AssertionResponse is null || user.WebAuthnCredentials.Count == 0) break;
                 try
                 {
-                    var (matched, newCounter) = await _webauthn.CompleteAssertionAsync(user, req.AssertionResponse, ct);
+                    var (matched, newCounter) = await _webauthn.CompleteAssertionAsync(
+                        user, WebAuthnSessionKey(user.Id), req.AssertionResponse, ct);
                     matched.SignatureCounter = newCounter;
+                    needsFullReplace = true;
                     ok = true;
                 }
                 catch { ok = false; }
@@ -595,11 +739,23 @@ public sealed class AuthController : ControllerBase
 
         if (!ok)
         {
-            await _auth.ReplaceUserAsync(user, ct);
+            // Atomic $inc — two parallel guesses can't both miss the threshold check.
+            var newCount = await _users.IncrementTwoFactorFailedAttemptsAsync(user.Id, ct);
+            if (newCount >= 5)
+                await _users.ApplyTwoFactorLockoutAsync(user.Id, DateTime.UtcNow.AddMinutes(15), ct);
             return Unauthorized(new { message = "İkinci faktör doğrulaması başarısız." });
         }
 
-        await _auth.ReplaceUserAsync(user, ct);
+        // Success path: apply side-effects atomically where we can. WebAuthn counter
+        // and TOTP re-encrypt still need the full replace because they mutate nested
+        // structures the driver can't path-set without bespoke filters.
+        if (req.Method == TwoFactorMethods.Email)
+            await _users.ClearEmailOtpAsync(user.Id, ct);
+        if (consumedRecoveryHash is not null)
+            await _users.ConsumeRecoveryCodeAsync(user.Id, consumedRecoveryHash, ct);
+        await _users.ClearTwoFactorFailureStateAsync(user.Id, ct);
+        if (needsFullReplace)
+            await _auth.ReplaceUserAsync(user, ct);
         var inboundDeviceId = ReadDeviceCookie();
         var result = await _auth.CompleteTwoFactorLoginAsync(user.Id, pending.Value.rememberMe, GetIp(), GetUserAgent(), inboundDeviceId, ct);
         if (!result.Success || result.Response is null || result.RefreshTokenPlaintext is null)
@@ -719,6 +875,12 @@ public sealed class AuthController : ControllerBase
         return string.IsNullOrWhiteSpace(existing) ? null : existing;
     }
 
+    /// <summary>Isolation key for cached WebAuthn challenges so two browsers (or
+    /// two tabs without the device cookie set yet) under the same user account
+    /// can enroll passkeys in parallel without their challenges colliding.</summary>
+    private string WebAuthnSessionKey(string userId) =>
+        ReadDeviceCookie() ?? $"u:{userId}";
+
     /// <summary>Writes the resolved device id back. Called after an auth flow
     /// returns its effective DeviceId so the browser stays in sync with the
     /// server (matters when UA-match fallback kicked in because the cookie
@@ -734,7 +896,7 @@ public sealed class AuthController : ControllerBase
         });
 
     private string? GetIp() =>
-        HttpContext.Connection.RemoteIpAddress?.ToString();
+        HttpContext.ClientIpForAudit();
 
     private string? GetUserAgent() =>
         Request.Headers.UserAgent.ToString() is { Length: > 0 } ua ? ua : null;

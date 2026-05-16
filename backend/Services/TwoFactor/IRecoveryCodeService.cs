@@ -5,17 +5,23 @@ namespace SayimLink.Api.Services.TwoFactor;
 
 public interface IRecoveryCodeService
 {
-    /// <summary>Generates 10 plaintext codes (XXXX-XXXX-XXXX) plus their sha256 hashes.</summary>
+    /// <summary>Generates 10 plaintext codes (XXXX-XXXX-XXXX) plus their BCrypt hashes.</summary>
     (List<string> plaintext, List<string> hashes) Generate(int count = 10);
 
     /// <summary>Tries to consume one matching hash from the given list, returning the new
     /// list (without the matched code) on success.</summary>
     bool TryConsume(IList<string> existingHashes, string suppliedCode, out List<string> remaining);
+
+    /// <summary>Same match logic as <see cref="TryConsume"/> but returns the matched hash
+    /// instead of rewriting the list — for callers that want to do an atomic <c>$pull</c>
+    /// at the database layer instead of full-document replace.</summary>
+    bool TryMatch(IList<string> existingHashes, string suppliedCode, out string? matchedHash);
 }
 
 public sealed class RecoveryCodeService : IRecoveryCodeService
 {
     private const string Alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // unambiguous
+    private const int BcryptWorkFactor = 10;
 
     public (List<string> plaintext, List<string> hashes) Generate(int count = 10)
     {
@@ -25,22 +31,51 @@ public sealed class RecoveryCodeService : IRecoveryCodeService
         {
             var code = GenerateCode();
             plain.Add(code);
-            hashes.Add(Hash(code));
+            hashes.Add(BCrypt.Net.BCrypt.HashPassword(code, BcryptWorkFactor));
         }
         return (plain, hashes);
     }
 
     public bool TryConsume(IList<string> existingHashes, string suppliedCode, out List<string> remaining)
     {
-        var normalized = NormalizeForCompare(suppliedCode);
-        var hash = Hash(normalized);
-        if (existingHashes.Contains(hash))
+        if (TryMatch(existingHashes, suppliedCode, out var matched) && matched is not null)
         {
-            remaining = existingHashes.Where(h => h != hash).ToList();
+            remaining = existingHashes.Where(h => h != matched).ToList();
             return true;
         }
         remaining = existingHashes.ToList();
         return false;
+    }
+
+    public bool TryMatch(IList<string> existingHashes, string suppliedCode, out string? matchedHash)
+    {
+        var normalized = NormalizeForCompare(suppliedCode);
+        var legacyHash = LegacySha256Hex(normalized);
+
+        // Each stored entry is either a BCrypt hash (new format, starts with $2)
+        // or a hex sha256 (legacy plaintext-hashed). Walk every entry so we can
+        // identify the matching one regardless of format.
+        for (var i = 0; i < existingHashes.Count; i++)
+        {
+            var stored = existingHashes[i];
+            var matched = stored.StartsWith("$2", StringComparison.Ordinal)
+                ? SafeBcryptVerify(normalized, stored)
+                : string.Equals(stored, legacyHash, StringComparison.OrdinalIgnoreCase);
+            if (matched)
+            {
+                matchedHash = stored;
+                return true;
+            }
+        }
+
+        matchedHash = null;
+        return false;
+    }
+
+    private static bool SafeBcryptVerify(string plain, string hash)
+    {
+        try { return BCrypt.Net.BCrypt.Verify(plain, hash); }
+        catch { return false; }
     }
 
     private static string GenerateCode()
@@ -70,7 +105,7 @@ public sealed class RecoveryCodeService : IRecoveryCodeService
         return $"{raw[..4]}-{raw[4..8]}-{raw[8..]}";
     }
 
-    private static string Hash(string code)
+    private static string LegacySha256Hex(string code)
     {
         var bytes = Encoding.UTF8.GetBytes(code);
         var hash = SHA256.HashData(bytes);

@@ -5,9 +5,11 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Fido2NetLib;
+using SayimLink.Api.Common;
 using SayimLink.Api.Configuration;
 using SayimLink.Api.Hubs;
 using SayimLink.Api.Repositories;
@@ -41,6 +43,8 @@ builder.Services.Configure<Fido2Settings>(
     builder.Configuration.GetSection("Fido2"));
 builder.Services.Configure<TurnstileSettings>(
     builder.Configuration.GetSection(TurnstileSettings.SectionName));
+builder.Services.Configure<EncryptionSettings>(
+    builder.Configuration.GetSection(EncryptionSettings.SectionName));
 
 // ─── Application services ────────────────────────────────────────────────────
 builder.Services.AddSingleton<IMongoDbService, MongoDbService>();
@@ -56,6 +60,7 @@ builder.Services.AddSingleton<IOzelRaporStorage, OzelRaporStorage>();
 builder.Services.AddSingleton<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddSingleton<IAuditService, AuditService>();
 builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
+builder.Services.AddSingleton<IMigrationGuard, MigrationGuard>();
 builder.Services.AddSingleton<IJwtService, JwtService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton<IEmailService, ResendEmailService>();
@@ -82,6 +87,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 // ─── 2FA stack ───────────────────────────────────────────────────────────────
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<IRecoveryCodeService, RecoveryCodeService>();
+builder.Services.AddSingleton<ITotpSecretProtector, TotpSecretProtector>();
 builder.Services.AddSingleton<ITotpService, TotpService>();
 builder.Services.AddSingleton<IEmailOtpService, EmailOtpService>();
 builder.Services.AddScoped<IWebAuthnService, WebAuthnService>();
@@ -233,6 +239,15 @@ if (!builder.Environment.IsDevelopment())
             "Resend:EmailVerificationUrlTemplate must include the literal '{token}' placeholder " +
             "(e.g. https://syncompare.com/verify-email?token={token}). " +
             "Set Resend__EmailVerificationUrlTemplate env var. Refusing to start.");
+
+    if (string.IsNullOrWhiteSpace(resendSettings.PasswordChangeUndoUrlTemplate)
+        || !resendSettings.PasswordChangeUndoUrlTemplate.Contains("{token}"))
+        throw new InvalidOperationException(
+            "Resend:PasswordChangeUndoUrlTemplate must include the literal '{token}' placeholder " +
+            "(e.g. https://syncompare.com/password-undo?token={token}). " +
+            "Without it the undo link is dropped and the change-password flow loses its " +
+            "defence-in-depth notice. Set Resend__PasswordChangeUndoUrlTemplate env var. " +
+            "Refusing to start.");
 }
 
 builder.Services
@@ -263,6 +278,45 @@ builder.Services
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
                     ctx.Token = accessToken;
                 return Task.CompletedTask;
+            },
+            // Stateless JWT revocation. The signing-key check has already passed
+            // by the time we get here; we reject tokens whose `iat` predates the
+            // owner's TokenInvalidatedAt cut-off (set when an admin pacifies the
+            // user, the user changes their password, etc.). 30s in-memory cache
+            // keeps the DB lookup off the per-request hot path for chatty
+            // endpoints; the brief lag is acceptable because the natural access-
+            // token expiry is already only 15 minutes.
+            OnTokenValidated = async ctx =>
+            {
+                var sub = ctx.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                       ?? ctx.Principal?.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+                if (string.IsNullOrEmpty(sub)) { ctx.Fail("missing-sub"); return; }
+
+                var iatClaim = ctx.Principal!.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Iat)?.Value;
+                if (!long.TryParse(iatClaim, out var iatUnix)) return; // tokens minted before this rollout lacked iat
+                var iat = DateTimeOffset.FromUnixTimeSeconds(iatUnix).UtcDateTime;
+
+                var cache = ctx.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+                var cacheKey = $"tokeninv:{sub}";
+                if (!cache.TryGetValue(cacheKey, out object? boxed))
+                {
+                    var users = ctx.HttpContext.RequestServices.GetRequiredService<SayimLink.Api.Repositories.IUserRepository>();
+                    var user = await users.FindByIdAsync(sub, ctx.HttpContext.RequestAborted);
+                    // Also reject any token belonging to a now-pacified user (defence-
+                    // in-depth on top of the AktifMi check downstream).
+                    if (user is not null && !user.AktifMi)
+                    {
+                        ctx.Fail("user-deactivated");
+                        return;
+                    }
+                    // Boxed Nullable<DateTime> so the cache can tell "we looked it up
+                    // and there was no cut-off" apart from "we never looked".
+                    boxed = (object?)user?.TokenInvalidatedAt;
+                    cache.Set(cacheKey, boxed, TimeSpan.FromSeconds(30));
+                }
+
+                if (boxed is DateTime cutoff && cutoff > iat)
+                    ctx.Fail("token-invalidated");
             },
         };
     });
@@ -300,23 +354,42 @@ var app = builder.Build();
 // Serilog request logging) so they see the real client IP, not Render's LB.
 app.UseForwardedHeaders();
 
-// Cloudflare puts the real client IP in CF-Connecting-IP. X-Forwarded-For
-// can land with Cloudflare's own edge IP (172.70.0.0/13, 104.16.0.0/12, …)
-// at the rightmost position, which is what ForwardedHeaders picks, so the
-// audit log and active-sessions UI end up showing a Cloudflare IP. Prefer
-// CF-Connecting-IP when present — purely cosmetic / observability, not a
-// security control, so unverified upstreams are acceptable here too.
+// Cloudflare puts the real client IP in CF-Connecting-IP. X-Forwarded-For can
+// land with Cloudflare's own edge IP (172.70.0.0/13, 104.16.0.0/12, …) at the
+// rightmost position, which is what ForwardedHeaders picks, so the audit log
+// and active-sessions UI end up showing a Cloudflare IP. We cache the CF value
+// on HttpContext.Items for audit / observability ONLY — Connection.RemoteIpAddress
+// stays untouched so the rate limiter, SignalR transport and anything else
+// making security decisions keep seeing the verified upstream IP. If an attacker
+// reaches the origin URL directly (Render origin is public) and forges CF-IP,
+// they can mislead the audit log but cannot evade per-IP throttling or lockouts.
 app.Use(async (ctx, next) =>
 {
-    if (ctx.Request.Headers.TryGetValue("CF-Connecting-IP", out var cfRaw)
-        && System.Net.IPAddress.TryParse(cfRaw.ToString().Trim(), out var cfIp))
-    {
-        ctx.Connection.RemoteIpAddress = cfIp;
-    }
+    ctx.ResolveAuditClientIp();
     await next();
 });
 
-app.UseSerilogRequestLogging();
+app.UseSerilogRequestLogging(opts =>
+{
+    // Default Serilog template logs RequestPath including the query string verbatim.
+    // SignalR sends the JWT as ?access_token=... on the WebSocket handshake (browsers
+    // can't set Authorization on WS upgrades) so the raw token would otherwise land
+    // in every request log line. Mask it before it leaves the process.
+    opts.MessageTemplate =
+        "HTTP {RequestMethod} {SanitizedPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+    opts.EnrichDiagnosticContext = (diag, http) =>
+    {
+        var path = http.Request.Path.ToString();
+        var query = http.Request.QueryString.HasValue ? http.Request.QueryString.Value! : string.Empty;
+        if (!string.IsNullOrEmpty(query))
+        {
+            query = System.Text.RegularExpressions.Regex.Replace(
+                query, @"access_token=[^&]+", "access_token=***",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+        diag.Set("SanitizedPath", path + query);
+    };
+});
 
 // Global exception handler — TR-localized 500, traceId, hide stack in prod.
 app.UseExceptionHandler(eh =>
@@ -351,8 +424,26 @@ app.Use(async (ctx, next) =>
     headers["X-Content-Type-Options"] = "nosniff";
     headers["X-Frame-Options"] = "DENY";
     headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    headers["Permissions-Policy"] = "geolocation=(), microphone=(self), camera=(self), payment=()";
     if (!app.Environment.IsDevelopment())
-        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+    {
+        // preload makes us eligible for the browser HSTS preload list — once added
+        // there, browsers refuse plaintext requests to syncompare.com even on the
+        // very first visit. Note: only add to hstspreload.org after confirming all
+        // subdomains can serve HTTPS, removal can take months.
+        headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload";
+        // API only serves JSON in production; nothing here should ever load scripts,
+        // styles or framing. Frontend (Angular) ships its own CSP from Netlify.
+        // default-src 'none' is the safest possible policy for a JSON API.
+        headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'";
+    }
+    else
+    {
+        // Dev: Swagger UI needs inline scripts/styles and same-origin assets to
+        // render. Keep the policy loose enough not to break /swagger.
+        headers["Content-Security-Policy"] =
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'";
+    }
     await next();
 });
 

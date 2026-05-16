@@ -255,7 +255,18 @@ public sealed class OzelRaporlarController : ControllerBase
         catch (FileNotFoundException) { return NotFound(); }
 
         _audit.Log(User, AuditAksiyonlari.OzelRaporDownload, "ozel-rapor", rapor.Id, yeni: dosya.Ad);
-        return File(stream, dosya.MimeType, dosya.Ad);
+
+        // Force download instead of inline rendering. The stored MimeType comes from the
+        // uploader's Content-Type header — we don't trust it for inline display. Combined
+        // with the extension allow-list (xlsx/xls/pdf) and X-Content-Type-Options=nosniff
+        // this neutralises XSS-via-upload tricks.
+        var disposition = new System.Net.Mime.ContentDisposition
+        {
+            FileName = dosya.Ad,
+            Inline = false,
+        };
+        Response.Headers["Content-Disposition"] = disposition.ToString();
+        return File(stream, "application/octet-stream");
     }
 
     private bool CanRead(OzelRapor rapor, string uid) =>

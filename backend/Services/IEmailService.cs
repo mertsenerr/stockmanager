@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Options;
@@ -31,6 +32,15 @@ public sealed class ResendEmailService : IEmailService
         _environment = environment;
         _logger = logger;
     }
+
+    /// <summary>HTML-encode any user-controlled string before splicing it into an
+    /// email body. Without this, a user who registers with <c>AdSoyad =
+    /// &lt;a href="evil"&gt;click&lt;/a&gt;</c> can inject arbitrary markup
+    /// (phishing links, fake call-to-action buttons) into every system mail their
+    /// account receives — and admins who create users for others would spray the
+    /// same payload at the real victims.</summary>
+    private static string Esc(string? s) =>
+        string.IsNullOrEmpty(s) ? string.Empty : WebUtility.HtmlEncode(s);
 
     public async Task SendPasswordResetAsync(
         string toEmail,
@@ -67,10 +77,10 @@ public sealed class ResendEmailService : IEmailService
             <div style="font-family: -apple-system, Inter, sans-serif; max-width: 480px; margin: 24px auto; color: #fafafa; background: #111111; padding: 32px; border: 1px solid #1f1f1f; border-radius: 12px;">
               <h2 style="font-size: 18px; margin: 0 0 16px;">SayımLink — Parola Sıfırlama</h2>
               <p style="font-size: 14px; color: #a1a1aa; line-height: 1.5;">
-                Merhaba {toName}, parolanı sıfırlamak için aşağıdaki bağlantıya tıkla.
+                Merhaba {Esc(toName)}, parolanı sıfırlamak için aşağıdaki bağlantıya tıkla.
                 Bağlantı 30 dakika geçerlidir.
               </p>
-              <a href="{resetUrl}"
+              <a href="{Esc(resetUrl)}"
                  style="display: inline-block; margin-top: 16px; padding: 10px 16px; background: #fafafa; color: #0a0a0a; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;">
                 Parolayı sıfırla
               </a>
@@ -129,11 +139,11 @@ public sealed class ResendEmailService : IEmailService
             <div style="font-family: -apple-system, Inter, sans-serif; max-width: 480px; margin: 24px auto; color: #fafafa; background: #111111; padding: 32px; border: 1px solid #1f1f1f; border-radius: 12px;">
               <h2 style="font-size: 18px; margin: 0 0 16px;">SynCompare — Parola değişti</h2>
               <p style="font-size: 14px; color: #a1a1aa; line-height: 1.5;">
-                Merhaba {toName}, hesabının parolası az önce değiştirildi. Bu sen değilsen
+                Merhaba {Esc(toName)}, hesabının parolası az önce değiştirildi. Bu sen değilsen
                 hemen aşağıdaki bağlantıya tıklayarak değişikliği geri al ve diğer cihazlardan
                 çıkış yapılsın. Bağlantı 30 dakika geçerlidir.
               </p>
-              <a href="{undoUrl}"
+              <a href="{Esc(undoUrl)}"
                  style="display: inline-block; margin-top: 16px; padding: 10px 16px; background: #ff5d3a; color: #fff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 600;">
                 Bu ben değildim — geri al
               </a>
@@ -191,7 +201,7 @@ public sealed class ResendEmailService : IEmailService
             <div style="font-family: -apple-system, Inter, sans-serif; max-width: 480px; margin: 24px auto; color: #fafafa; background: #111111; padding: 32px; border: 1px solid #1f1f1f; border-radius: 12px;">
               <h2 style="font-size: 18px; margin: 0 0 16px;">SynCompare — Doğrulama Kodu</h2>
               <p style="font-size: 14px; color: #a1a1aa; line-height: 1.5;">
-                Merhaba {toName}, giriş işlemini tamamlamak için doğrulama kodu:
+                Merhaba {Esc(toName)}, giriş işlemini tamamlamak için doğrulama kodu:
               </p>
               <p style="font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; letter-spacing: 0.32em; text-align: center; padding: 18px; background: #0a0a0a; border-radius: 8px; color: #14b8a6; margin: 16px 0;">
                 {code}
@@ -206,7 +216,10 @@ public sealed class ResendEmailService : IEmailService
         {
             from = $"{_settings.FromName} <{_settings.FromEmail}>",
             to = new[] { toEmail },
-            subject = $"SynCompare doğrulama kodu: {code}",
+            // Kod artık sadece body'de — kilit-ekranı bildirim önizlemesi (Gmail/iOS
+            // banner, smartwatch, masa üstündeki telefon) OTP'yi 3. şahıslara açık
+            // göstermesin. Subject "yapıyor musun?" sorusuna yeter.
+            subject = "SynCompare doğrulama kodu",
             html,
         };
         try
@@ -259,10 +272,10 @@ public sealed class ResendEmailService : IEmailService
             <div style="font-family: -apple-system, Inter, sans-serif; max-width: 480px; margin: 24px auto; color: #fafafa; background: #111111; padding: 32px; border: 1px solid #1f1f1f; border-radius: 12px;">
               <h2 style="font-size: 18px; margin: 0 0 16px;">SayımLink — E-posta Doğrulama</h2>
               <p style="font-size: 14px; color: #a1a1aa; line-height: 1.5;">
-                Merhaba {toName}, hesabını aktif etmek için aşağıdaki bağlantıya tıklayarak
+                Merhaba {Esc(toName)}, hesabını aktif etmek için aşağıdaki bağlantıya tıklayarak
                 e-posta adresini doğrula. Bağlantı 24 saat geçerlidir.
               </p>
-              <a href="{verifyUrl}"
+              <a href="{Esc(verifyUrl)}"
                  style="display: inline-block; margin-top: 16px; padding: 10px 16px; background: #fafafa; color: #0a0a0a; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 500;">
                 E-postamı doğrula
               </a>

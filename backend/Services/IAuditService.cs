@@ -23,6 +23,12 @@ public interface IAuditService
 
 public sealed class AuditService : IAuditService
 {
+    // Per-field char cap. Many callers splice user-controlled strings into
+    // eskiDeger / yeniDeger (e.g. a urun yorum, a sayım change list); without a
+    // cap an attacker could keep posting maximum-length comments to bloat the
+    // audit collection until it fills the Atlas free tier disk quota.
+    private const int FieldCharLimit = 4_000;
+
     private readonly Channel<AuditLog> _channel;
 
     public AuditService()
@@ -57,16 +63,22 @@ public sealed class AuditService : IAuditService
     {
         Aksiyon = aksiyon,
         KullaniciId = kullaniciId,
-        KullaniciAdi = kullaniciAdi ?? "?",
+        KullaniciAdi = Truncate(kullaniciAdi ?? "?", 160) ?? "?",
         KullaniciRol = rol ?? string.Empty,
         Hedef = hedef,
         HedefId = hedefId,
-        EskiDeger = eskiDeger,
-        YeniDeger = yeniDeger,
+        EskiDeger = Truncate(eskiDeger, FieldCharLimit),
+        YeniDeger = Truncate(yeniDeger, FieldCharLimit),
         IpAdres = ip,
-        UserAgent = userAgent,
+        UserAgent = Truncate(userAgent, 500),
         Basarili = basarili,
     };
+
+    private static string? Truncate(string? s, int max)
+    {
+        if (s is null) return null;
+        return s.Length <= max ? s : s[..max] + "…[truncated]";
+    }
 }
 
 public sealed class AuditWriterService : BackgroundService

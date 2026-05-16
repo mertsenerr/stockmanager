@@ -21,6 +21,7 @@ public sealed class OturumlarController : ControllerBase
     private readonly IMagazaRepository _magazalar;
     private readonly IFirmaRepository _firmalar;
     private readonly IUserRepository _users;
+    private readonly IAtamaRepository _atamalar;
     private readonly IAuditService _audit;
     private readonly IValidator<OturumCreateRequest> _createValidator;
     private readonly IValidator<OturumUpdateRequest> _updateValidator;
@@ -33,6 +34,7 @@ public sealed class OturumlarController : ControllerBase
         IMagazaRepository magazalar,
         IFirmaRepository firmalar,
         IUserRepository users,
+        IAtamaRepository atamalar,
         IAuditService audit,
         IValidator<OturumCreateRequest> createValidator,
         IValidator<OturumUpdateRequest> updateValidator,
@@ -44,6 +46,7 @@ public sealed class OturumlarController : ControllerBase
         _magazalar = magazalar;
         _firmalar = firmalar;
         _users = users;
+        _atamalar = atamalar;
         _audit = audit;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
@@ -143,6 +146,15 @@ public sealed class OturumlarController : ControllerBase
         var magaza = await _magazalar.FindByIdAsync(request.MagazaId, ct);
         if (magaza is null) return BadRequest(new { message = "Mağaza bulunamadı." });
 
+        // Non-Sistem callers may only open oturums under firmalar they own — otherwise a
+        // SayimBaskani who guessed another tenant's MagazaId could attach an oturum there.
+        if (!User.IsSistem())
+        {
+            var uid = CurrentUserId();
+            var firma = await _firmalar.FindByIdAsync(magaza.FirmaId, ct);
+            if (firma is null || firma.OlusturanKullaniciId != uid) return Forbid();
+        }
+
         var oturum = new SayimOturumu
         {
             MagazaId = magaza.Id,
@@ -182,6 +194,7 @@ public sealed class OturumlarController : ControllerBase
 
         var oturum = await _oturumlar.FindByIdAsync(id, ct);
         if (oturum is null) return NotFound();
+        if (!await CanWriteStructuralAsync(oturum, ct)) return Forbid();
         if (oturum.Durum is OturumDurumlari.Tamamlandi or OturumDurumlari.Iptal)
             return Conflict(new { message = "Kapanmış oturum düzenlenemez." });
 
@@ -207,6 +220,7 @@ public sealed class OturumlarController : ControllerBase
 
         var oturum = await _oturumlar.FindByIdAsync(id, ct);
         if (oturum is null) return NotFound();
+        if (!await CanWriteStructuralAsync(oturum, ct)) return Forbid();
 
         if (!IsValidTransition(oturum.Durum, request.Durum))
             return Conflict(new
@@ -227,6 +241,7 @@ public sealed class OturumlarController : ControllerBase
     {
         var oturum = await _oturumlar.FindByIdAsync(id, ct);
         if (oturum is null) return NotFound();
+        if (!await CanWriteStructuralAsync(oturum, ct)) return Forbid();
         await _oturumlar.UpdateDurumAsync(id, OturumDurumlari.Iptal, ct);
         Audit(AuditAksiyonlari.OturumDelete, id, eski: oturum.Durum, yeni: OturumDurumlari.Iptal);
         return NoContent();
@@ -238,6 +253,7 @@ public sealed class OturumlarController : ControllerBase
     {
         var oturum = await _oturumlar.FindByIdAsync(id, ct);
         if (oturum is null) return NotFound();
+        if (!await CanWriteStructuralAsync(oturum, ct)) return Forbid();
         var deleted = await _oturumlar.HardDeleteAsync(id, ct);
         if (!deleted) return NotFound();
         Audit(AuditAksiyonlari.OturumDelete, id, eski: $"hard-delete · {oturum.Durum}", yeni: "deleted");
@@ -246,6 +262,11 @@ public sealed class OturumlarController : ControllerBase
 
     [HttpPost("{id}/excel")]
     [Authorize(Roles = $"{Roles.Admin},{Roles.SayimYoneticisi}")]
+    // Hard cap on the request body. ExcelImportRequestValidator already enforces
+    // 50K rows + per-field length limits, but the body limit is the first line of
+    // defence — Kestrel rejects oversize payloads before model binding allocates
+    // anything. 40MB is enough for the legitimate 50K-row × 800-byte case.
+    [RequestSizeLimit(40_000_000)]
     public async Task<IActionResult> ImportExcel(
         string id, [FromBody] ExcelImportRequest request, CancellationToken ct)
     {
@@ -254,6 +275,7 @@ public sealed class OturumlarController : ControllerBase
 
         var oturum = await _oturumlar.FindByIdAsync(id, ct);
         if (oturum is null) return NotFound();
+        if (!await CanWriteStructuralAsync(oturum, ct)) return Forbid();
 
         if (oturum.Durum is OturumDurumlari.Tamamlandi or OturumDurumlari.Iptal or OturumDurumlari.Kilitli)
             return Conflict(new { message = "Bu oturumun durumu Excel yüklemeye uygun değil." });
@@ -317,7 +339,25 @@ public sealed class OturumlarController : ControllerBase
         var uid = CurrentUserId() ?? string.Empty;
         var uname = User.FindFirst(ClaimTypes.Name)?.Value ?? "?";
         var canEditDurum = Roles.IsAdminLevel(User);
-        var canEditSayilan = !User.IsInRole(Roles.Sayman) || urun.Durum == UrunDurumlari.TekrarSayiliyor;
+        // The "Sayman" role string is an alias for "Kullanici" (see Roles.cs note), so
+        // role membership alone says nothing about whether the caller is actually a
+        // counter on THIS oturum's atama. The authoritative source is the atama's
+        // SaymanKullaniciIds list. Without this check, a mağaza müdürü (also "Kullanici")
+        // would be allowed to edit sayım counts they have nothing to do with.
+        Atama? oturumAtamasi = null;
+        if (!string.IsNullOrEmpty(oturum.AtamaId))
+            oturumAtamasi = await _atamalar.FindByIdAsync(oturum.AtamaId, ct);
+        var isAtamaSayman = oturumAtamasi is not null
+            && oturumAtamasi.SaymanKullaniciIds.Contains(uid);
+        var isAdminLevel = Roles.IsAdminLevel(User) || User.IsInRole(Roles.SayimYoneticisi);
+        // Sayman edit: only atama saymans may edit sayilan stok, and only their own
+        // assignment or an unassigned row, and only while the row is in a counting state.
+        var saymanOwnsUrun = string.IsNullOrEmpty(urun.AtananSaymanId)
+            || urun.AtananSaymanId == uid;
+        var canEditSayilan = isAdminLevel
+            || (isAtamaSayman
+                && saymanOwnsUrun
+                && (urun.Durum == UrunDurumlari.Beklemede || urun.Durum == UrunDurumlari.TekrarSayiliyor));
         var canAtaSayman = Roles.IsAdminLevel(User) || User.IsInRole(Roles.SayimYoneticisi);
         var canEditMaster = Roles.IsAdminLevel(User); // Barkod/UrunAdi/SistemStok = Excel "ground truth"
 
@@ -450,6 +490,7 @@ public sealed class OturumlarController : ControllerBase
     {
         var oturum = await _oturumlar.FindByIdAsync(oturumId, ct);
         if (oturum is null) return NotFound();
+        if (!await CanWriteStructuralAsync(oturum, ct)) return Forbid();
         if (oturum.Durum is OturumDurumlari.Tamamlandi or OturumDurumlari.Iptal)
             return Conflict(new { message = "Kapanmış oturumdan satır silinemez." });
 
@@ -527,6 +568,21 @@ public sealed class OturumlarController : ControllerBase
             return true;
 
         return false;
+    }
+
+    // Structural writes (Update, ChangeDurum, SoftCancel, HardDelete, ImportExcel,
+    // DeleteUrun) require the caller to own the firma the oturum belongs to. Being
+    // a Katilimci or DavetliMail target is enough for participation (PatchUrun uses
+    // CanReadAsync) but not enough to reshape the session itself — that authority
+    // stays with the firma owner and the platform super-admin.
+    private async Task<bool> CanWriteStructuralAsync(SayimOturumu oturum, CancellationToken ct)
+    {
+        if (User.IsSistem()) return true;
+        var uid = CurrentUserId();
+        if (uid is null) return false;
+
+        var firma = await _firmalar.FindByIdAsync(oturum.FirmaId, ct);
+        return firma is not null && firma.OlusturanKullaniciId == uid;
     }
 
     private static bool IsValidTransition(string from, string to)

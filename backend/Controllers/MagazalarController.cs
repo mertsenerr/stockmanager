@@ -99,6 +99,13 @@ public sealed class MagazalarController : ControllerBase
         var firma = await _firmalar.FindByIdAsync(request.FirmaId, ct);
         if (firma is null) return BadRequest(new { message = "Firma bulunamadı." });
 
+        // Non-Sistem callers may only attach magazas to firmalar they own. Without this
+        // a SayimBaskani could plant a magaza under another tenant's firma by guessing
+        // the FirmaId — the Update/Delete ownership guard wouldn't help because they
+        // both check magaza.OlusturanKullaniciId, which would be the attacker.
+        if (!User.IsSistem() && firma.OlusturanKullaniciId != User.GetUserId())
+            return Forbid();
+
         var magaza = new Magaza
         {
             FirmaId = request.FirmaId,
@@ -133,6 +140,16 @@ public sealed class MagazalarController : ControllerBase
         if (magaza is null) return NotFound();
         // Phase 3: non-Sistem may only update magazas they created.
         if (!User.IsSistem() && magaza.OlusturanKullaniciId != User.GetUserId()) return Forbid();
+
+        // If the update is also reparenting the magaza to a new firma, the caller must
+        // own the new firma too — otherwise the magaza could be smuggled into another
+        // tenant's catalog.
+        if (!User.IsSistem() && request.FirmaId != magaza.FirmaId)
+        {
+            var newFirma = await _firmalar.FindByIdAsync(request.FirmaId, ct);
+            if (newFirma is null) return BadRequest(new { message = "Firma bulunamadı." });
+            if (newFirma.OlusturanKullaniciId != User.GetUserId()) return Forbid();
+        }
 
         var oldMudurId = magaza.MuduruKullaniciId;
 

@@ -26,6 +26,8 @@ namespace SayimLink.Api.Services;
 /// </summary>
 public sealed class Phase2_5MigrationHostedService : IHostedService
 {
+    private const string MigrationId = "phase2_5_tenant_split";
+
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<Phase2_5MigrationHostedService> _logger;
 
@@ -42,11 +44,21 @@ public sealed class Phase2_5MigrationHostedService : IHostedService
         try
         {
             using var scope = _serviceProvider.CreateScope();
-            var mongo = scope.ServiceProvider.GetRequiredService<IMongoDbService>();
+            var guard = scope.ServiceProvider.GetRequiredService<IMigrationGuard>();
+            if (await guard.HasRunAsync(MigrationId, cancellationToken))
+            {
+                _logger.LogInformation("Phase2.5 migration already applied — skipping.");
+                return;
+            }
 
+            var mongo = scope.ServiceProvider.GetRequiredService<IMongoDbService>();
             await ResetFirmaIndexesAsync(mongo, cancellationToken);
             await SplitMultiUserOrgFirmasAsync(mongo, cancellationToken);
+            // Token revoke runs ONCE now — previously it fired on every cold start
+            // and silently logged out the entire user base after every deploy / 15
+            // minute idle on Render free tier.
             await RevokeAllActiveRefreshTokensAsync(mongo, cancellationToken);
+            await guard.MarkAppliedAsync(MigrationId, cancellationToken);
         }
         catch (Exception ex)
         {

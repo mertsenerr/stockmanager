@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using SayimLink.Api.Common;
 using SayimLink.Api.Models;
 using SayimLink.Api.Repositories;
 using SayimLink.Api.Services;
@@ -65,6 +67,7 @@ public sealed class FriendshipsController : ControllerBase
     }
 
     [HttpGet("ara")]
+    [EnableRateLimiting("auth-moderate")]
     public async Task<IActionResult> Search([FromQuery] string q, CancellationToken ct)
     {
         var uid = Uid;
@@ -93,19 +96,59 @@ public sealed class FriendshipsController : ControllerBase
             return "yok";
         }
 
+        // Substring search used to expose every active user (email + ad + rol) to any
+        // authenticated caller — a free directory dump. We now scope to the caller's
+        // own social graph: shared firma, existing friendship rows, or platform admin.
+        // An exact-email match still resolves so a known address can be friend-requested.
+        var callerIsSistem = User.IsSistem();
+        var caller = await _users.FindByIdAsync(uid, ct);
+        var callerFirmaIds = new HashSet<string>(StringComparer.Ordinal);
+        if (caller is not null)
+        {
+            if (!string.IsNullOrEmpty(caller.FirmaId)) callerFirmaIds.Add(caller.FirmaId);
+            foreach (var fid in caller.FirmaIds) callerFirmaIds.Add(fid);
+        }
+        var relatedUserIds = new HashSet<string>(
+            allFriendships.SelectMany(f => new[] { f.FromUserId, f.ToUserId }),
+            StringComparer.Ordinal);
+
+        bool InCallerScope(User u)
+        {
+            if (callerIsSistem) return true;
+            if (!string.IsNullOrEmpty(u.FirmaId) && callerFirmaIds.Contains(u.FirmaId)) return true;
+            if (u.FirmaIds.Any(callerFirmaIds.Contains)) return true;
+            if (relatedUserIds.Contains(u.Id)) return true;
+            return false;
+        }
+
         var matches = all
             .Where(u => u.Id != uid)
             .Where(u =>
                 u.AdSoyad.ToLowerInvariant().Contains(needle) ||
                 u.Email.ToLowerInvariant().Contains(needle))
+            .Where(InCallerScope)
             .Take(20)
+            .ToList();
+
+        // Always allow a single exact-email hit even when out of scope, so the caller
+        // can send a friend request to a known address without needing to be in the
+        // same tenant first.
+        if (!matches.Any(m => string.Equals(m.Email, needle, StringComparison.OrdinalIgnoreCase)))
+        {
+            var exact = all.FirstOrDefault(u =>
+                u.Id != uid && string.Equals(u.Email, needle, StringComparison.OrdinalIgnoreCase));
+            if (exact is not null) matches.Add(exact);
+        }
+
+        var dtos = matches
             .Select(u => new UserSearchDto(u.Id, u.AdSoyad, u.Email, u.Rol, StatusFor(u.Id)))
             .ToList();
 
-        return Ok(matches);
+        return Ok(dtos);
     }
 
     [HttpPost("istek")]
+    [EnableRateLimiting("auth-moderate")]
     public async Task<IActionResult> SendRequest([FromBody] FriendRequestBody body, CancellationToken ct)
     {
         var uid = Uid;

@@ -38,8 +38,10 @@ public sealed class AuditController : ControllerBase
         if (skip < 0) skip = 0;
 
         // Phase 2.5: SayimBaskani sees only logs for themselves + users attached to a Firma
-        // they own. Sistem keeps the unrestricted view.
-        HashSet<string>? allowedUserIds = null;
+        // they own. Sistem keeps the unrestricted view. The allowed-id set is pushed down
+        // to the repository so paging totals reflect what the caller can actually see,
+        // not just what the current page rendered.
+        IReadOnlyCollection<string>? allowedUserIds = null;
         if (!User.IsSistem())
         {
             var uid = User.GetUserId();
@@ -50,25 +52,21 @@ public sealed class AuditController : ControllerBase
             var ownedFirmaIds = ownedFirmas.Select(f => f.Id).ToHashSet();
 
             var all = await _users.ListAsync(includeInactive: true, ct);
-            allowedUserIds = new HashSet<string> { uid };
+            var ids = new HashSet<string> { uid };
             foreach (var u in all)
             {
                 if (!string.IsNullOrEmpty(u.FirmaId) && ownedFirmaIds.Contains(u.FirmaId))
-                    allowedUserIds.Add(u.Id);
+                    ids.Add(u.Id);
             }
+            allowedUserIds = ids;
 
-            if (!string.IsNullOrEmpty(kullaniciId) && !allowedUserIds.Contains(kullaniciId))
+            if (!string.IsNullOrEmpty(kullaniciId) && !ids.Contains(kullaniciId))
                 return Ok(EmptyPage(skip, take));
         }
 
         var (items, total) = await _logs.QueryAsync(
-            TryParseDate(from), TryParseDate(to), kullaniciId, aksiyon, skip, take, ct);
-
-        if (allowedUserIds is not null)
-        {
-            items = items.Where(l => l.KullaniciId is not null && allowedUserIds.Contains(l.KullaniciId)).ToList();
-            total = items.Count; // approximate — total reflects post-filter visible rows
-        }
+            TryParseDate(from), TryParseDate(to), kullaniciId, aksiyon, skip, take,
+            allowedUserIds, ct);
 
         return Ok(new AuditPageDto
         {

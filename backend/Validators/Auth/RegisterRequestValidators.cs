@@ -12,10 +12,7 @@ public sealed class RegisterSayimBaskaniRequestValidator : AbstractValidator<Reg
             .EmailAddress().WithMessage("Geçerli bir e-posta adresi girin.")
             .MaximumLength(160);
 
-        RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Parola zorunludur.")
-            .MinimumLength(8).WithMessage("Parola en az 8 karakter olmalıdır.")
-            .MaximumLength(128);
+        RuleFor(x => x.Password).Password();
 
         RuleFor(x => x.AdSoyad)
             .NotEmpty().WithMessage("Ad soyad zorunludur.")
@@ -36,10 +33,7 @@ public sealed class RegisterKullaniciRequestValidator : AbstractValidator<Regist
             .EmailAddress().WithMessage("Geçerli bir e-posta adresi girin.")
             .MaximumLength(160);
 
-        RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Parola zorunludur.")
-            .MinimumLength(8).WithMessage("Parola en az 8 karakter olmalıdır.")
-            .MaximumLength(128);
+        RuleFor(x => x.Password).Password();
 
         RuleFor(x => x.AdSoyad)
             .NotEmpty().WithMessage("Ad soyad zorunludur.")

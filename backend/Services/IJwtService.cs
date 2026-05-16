@@ -51,6 +51,13 @@ public sealed class JwtService : IJwtService
             new(JwtRegisteredClaimNames.Sub, user.Id),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(JwtRegisteredClaimNames.Name, user.AdSoyad),
+            // Explicit iat — the OnTokenValidated hook reads it and rejects tokens
+            // issued before user.TokenInvalidatedAt. Without an explicit iat claim,
+            // bumping the cut-off would only revoke tokens issued before the bump
+            // by lucky timing, not deterministically.
+            new(JwtRegisteredClaimNames.Iat,
+                new DateTimeOffset(now).ToUnixTimeSeconds().ToString(),
+                System.Security.Claims.ClaimValueTypes.Integer64),
             new(ClaimTypes.NameIdentifier, user.Id),
             new(ClaimTypes.Name, user.AdSoyad),
             new(ClaimTypes.Email, user.Email),

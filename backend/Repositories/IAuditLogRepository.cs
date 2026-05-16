@@ -10,7 +10,9 @@ public interface IAuditLogRepository
     Task InsertManyAsync(IEnumerable<AuditLog> logs, CancellationToken ct = default);
     Task<(IReadOnlyList<AuditLog> items, long total)> QueryAsync(
         DateTime? fromUtc, DateTime? toUtc, string? kullaniciId, string? aksiyon,
-        int skip, int take, CancellationToken ct = default);
+        int skip, int take,
+        IReadOnlyCollection<string>? allowedUserIds = null,
+        CancellationToken ct = default);
 }
 
 public sealed class AuditLogRepository : IAuditLogRepository
@@ -53,7 +55,9 @@ public sealed class AuditLogRepository : IAuditLogRepository
 
     public async Task<(IReadOnlyList<AuditLog> items, long total)> QueryAsync(
         DateTime? fromUtc, DateTime? toUtc, string? kullaniciId, string? aksiyon,
-        int skip, int take, CancellationToken ct = default)
+        int skip, int take,
+        IReadOnlyCollection<string>? allowedUserIds = null,
+        CancellationToken ct = default)
     {
         var filter = Builders<AuditLog>.Filter.Empty;
         if (fromUtc.HasValue) filter &= Builders<AuditLog>.Filter.Gte(l => l.Tarih, fromUtc.Value);
@@ -62,6 +66,15 @@ public sealed class AuditLogRepository : IAuditLogRepository
             filter &= Builders<AuditLog>.Filter.Eq(l => l.KullaniciId, kullaniciId);
         if (!string.IsNullOrEmpty(aksiyon))
             filter &= Builders<AuditLog>.Filter.Eq(l => l.Aksiyon, aksiyon);
+        if (allowedUserIds is not null)
+        {
+            // Tenant scope is applied DB-side so the `total` we return matches what the
+            // caller actually paginates through. An empty set short-circuits to zero
+            // rather than producing $in:[] (which Mongo treats as "match nothing" anyway,
+            // but the explicit check avoids any driver-version surprises).
+            if (allowedUserIds.Count == 0) return (Array.Empty<AuditLog>(), 0);
+            filter &= Builders<AuditLog>.Filter.In(l => l.KullaniciId, allowedUserIds);
+        }
 
         var total = await _logs.CountDocumentsAsync(filter, cancellationToken: ct);
         var items = await _logs.Find(filter)

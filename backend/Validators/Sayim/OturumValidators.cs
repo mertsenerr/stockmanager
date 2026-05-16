@@ -49,9 +49,23 @@ public sealed class ExcelImportRequestValidator : AbstractValidator<ExcelImportR
             .Must(list => list.Count <= 50000)
             .WithMessage("Tek seferde en fazla 50.000 satır yüklenebilir.");
 
+        // Per-cell length caps. Without these the JSON body can balloon past Kestrel's
+        // default request limit AND drive a single SayimOturumu document past Mongo's
+        // 16MB ceiling (the oturum holds the entire ürün array embedded). A 200-char
+        // ürün adı × 50K rows is already ~10MB — leave headroom for the rest of the
+        // document.
         RuleForEach(x => x.Urunler).ChildRules(u =>
         {
-            u.RuleFor(r => r.Barkod).NotEmpty().WithMessage("Barkod zorunludur.");
+            u.RuleFor(r => r.Barkod).NotEmpty().WithMessage("Barkod zorunludur.")
+                .MaximumLength(80).WithMessage("Barkod 80 karakteri geçemez.");
+            u.RuleFor(r => r.UrunAdi).MaximumLength(200);
+            u.RuleFor(r => r.StokKodu!).MaximumLength(80).When(r => r.StokKodu is not null);
+            u.RuleFor(r => r.Kategori!).MaximumLength(100).When(r => r.Kategori is not null);
+            u.RuleFor(r => r.AltKategori!).MaximumLength(100).When(r => r.AltKategori is not null);
+            u.RuleFor(r => r.Renk!).MaximumLength(60).When(r => r.Renk is not null);
+            u.RuleFor(r => r.Beden!).MaximumLength(40).When(r => r.Beden is not null);
+            u.RuleFor(r => r.Marka!).MaximumLength(80).When(r => r.Marka is not null);
+            u.RuleFor(r => r.Model!).MaximumLength(120).When(r => r.Model is not null);
         });
     }
 }

@@ -3,6 +3,7 @@ using System.Security.Claims;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SayimLink.Api.Common;
 using SayimLink.Api.Dtos.Takvim;
 using SayimLink.Api.Models;
 using SayimLink.Api.Repositories;
@@ -66,11 +67,13 @@ public sealed class AtamalarController : ControllerBase
             atamalar = await _atamalar.ListForUserAsync(userId, fromUtc, toUtc, ct);
 
             // Mağaza Müdürü additionally sees atamalar for their assigned magazas.
+            // Read MagazaIds from the live DB row, not the JWT — the access token can
+            // be up to AccessTokenMinutes (default 60) stale, so an admin who just
+            // unassigned the user from a magaza would still find them visible here.
             if (User.IsInRole(Roles.MagazaMuduru))
             {
-                var magazaIds = (User.FindFirst("magazaIds")?.Value ?? string.Empty)
-                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                    .ToHashSet();
+                var dbUser = await _users.FindByIdAsync(userId, ct);
+                var magazaIds = (dbUser?.MagazaIds ?? new List<string>()).ToHashSet();
                 if (magazaIds.Count > 0)
                 {
                     var allInRange = await _atamalar.ListByDateRangeAsync(fromUtc, toUtc, ct);
@@ -89,7 +92,7 @@ public sealed class AtamalarController : ControllerBase
     {
         var atama = await _atamalar.FindByIdAsync(id, ct);
         if (atama is null) return NotFound();
-        if (!CanRead(atama)) return Forbid();
+        if (!await CanReadAsync(atama, ct)) return Forbid();
         return Ok(await EnrichOneAsync(atama, ct));
     }
 
@@ -102,6 +105,8 @@ public sealed class AtamalarController : ControllerBase
 
         var magaza = await _magazalar.FindByIdAsync(request.MagazaId, ct);
         if (magaza is null) return BadRequest(new { message = "Mağaza bulunamadı." });
+
+        if (!await CanWriteForMagazaAsync(magaza, ct)) return Forbid();
 
         var atama = new Atama
         {
@@ -132,9 +137,14 @@ public sealed class AtamalarController : ControllerBase
 
         var atama = await _atamalar.FindByIdAsync(id, ct);
         if (atama is null) return NotFound();
+        if (!await CanWriteAsync(atama, ct)) return Forbid();
 
         var magaza = await _magazalar.FindByIdAsync(request.MagazaId, ct);
         if (magaza is null) return BadRequest(new { message = "Mağaza bulunamadı." });
+
+        // The caller may also be redirecting the atama to a new magaza — that target's
+        // firma must be in the caller's tenancy too.
+        if (!await CanWriteForMagazaAsync(magaza, ct)) return Forbid();
 
         atama.MagazaId = magaza.Id;
         atama.FirmaId = magaza.FirmaId;
@@ -161,6 +171,7 @@ public sealed class AtamalarController : ControllerBase
 
         var atama = await _atamalar.FindByIdAsync(id, ct);
         if (atama is null) return NotFound();
+        if (!await CanWriteAsync(atama, ct)) return Forbid();
 
         var oldDate = atama.Tarih.ToString("yyyy-MM-dd");
         await _atamalar.UpdateDateAsync(id, ParseUtcMidnight(request.Tarih), ct);
@@ -175,6 +186,7 @@ public sealed class AtamalarController : ControllerBase
     {
         var atama = await _atamalar.FindByIdAsync(id, ct);
         if (atama is null) return NotFound();
+        if (!await CanWriteAsync(atama, ct)) return Forbid();
         await _atamalar.DeleteAsync(id, ct);
         _audit.Log(User, AuditAksiyonlari.AtamaDelete, "atama", id);
         return NoContent();
@@ -184,7 +196,7 @@ public sealed class AtamalarController : ControllerBase
 
     private string? CurrentUserId() => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-    private bool CanRead(Atama atama)
+    private async Task<bool> CanReadAsync(Atama atama, CancellationToken ct)
     {
         if (Roles.IsAdminLevel(User)) return true;
         var uid = CurrentUserId();
@@ -193,11 +205,33 @@ public sealed class AtamalarController : ControllerBase
         if (atama.SaymanKullaniciIds.Contains(uid)) return true;
         if (User.IsInRole(Roles.MagazaMuduru))
         {
-            var magazaIds = (User.FindFirst("magazaIds")?.Value ?? string.Empty)
-                .Split(',', StringSplitOptions.RemoveEmptyEntries);
-            if (magazaIds.Contains(atama.MagazaId)) return true;
+            // Live DB read (not the cached JWT claim) so a recently-removed magaza
+            // assignment loses visibility immediately, not at next token refresh.
+            var dbUser = await _users.FindByIdAsync(uid, ct);
+            if (dbUser is not null && dbUser.MagazaIds.Contains(atama.MagazaId)) return true;
         }
         return false;
+    }
+
+    // Writes (Update/MoveDate/Delete) require the caller to own the firma the atama
+    // belongs to. Role gate up top already restricted to AdminLevel; this is the
+    // per-resource tenancy check that role attribute does NOT provide.
+    private async Task<bool> CanWriteAsync(Atama atama, CancellationToken ct)
+    {
+        if (User.IsSistem()) return true;
+        var uid = CurrentUserId();
+        if (uid is null) return false;
+        var firma = await _firmalar.FindByIdAsync(atama.FirmaId, ct);
+        return firma is not null && firma.OlusturanKullaniciId == uid;
+    }
+
+    private async Task<bool> CanWriteForMagazaAsync(Magaza magaza, CancellationToken ct)
+    {
+        if (User.IsSistem()) return true;
+        var uid = CurrentUserId();
+        if (uid is null) return false;
+        var firma = await _firmalar.FindByIdAsync(magaza.FirmaId, ct);
+        return firma is not null && firma.OlusturanKullaniciId == uid;
     }
 
     private async Task<AtamaDto> EnrichOneAsync(Atama atama, CancellationToken ct)

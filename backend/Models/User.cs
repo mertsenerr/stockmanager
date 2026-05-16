@@ -53,6 +53,12 @@ public sealed class User
     public bool EmailOtpEnabled { get; set; }
     public string? EmailOtpCodeHash { get; set; }
     public DateTime? EmailOtpExpiresAt { get; set; }
+    // Cooldown / cap state for /2fa/email/send. The pending-token caller already
+    // proved the password but should not be able to spam the user's inbox or burn
+    // Resend quota by repeatedly requesting new codes.
+    public DateTime? EmailOtpLastSentAt { get; set; }
+    public DateTime? EmailOtpDayWindowStart { get; set; }
+    public int EmailOtpDayCount { get; set; }
 
     // WebAuthn / passkey credentials. Each item stores a CBOR-encoded credential
     // descriptor produced by Fido2NetLib's StoredCredential.
@@ -61,6 +67,27 @@ public sealed class User
     // Account-wide single-use recovery codes (works for any 2FA method).
     // Each is a sha256 hash of the plaintext shown to the user once.
     public List<string> RecoveryCodeHashes { get; set; } = [];
+
+    // ─── 2FA brute-force throttling ────────────────────────────────────────
+    // Per-user attempt counter on the /2fa/verify path. The IP-based rate limit
+    // doesn't help against rotating-IP attackers who already know the password
+    // and are guessing the second factor; this counter does.
+    public int TwoFactorFailedAttempts { get; set; }
+    public DateTime? TwoFactorLockedUntil { get; set; }
+
+    // ─── Login brute-force throttling ──────────────────────────────────────
+    // Same idea on the password verification step. Distributed credential-
+    // stuffing rotates IPs so the IP rate limiter alone is bypassable; a
+    // per-account counter caps the total guess budget regardless of source.
+    public int LoginFailedAttempts { get; set; }
+    public DateTime? LoginLockedUntil { get; set; }
+
+    // ─── JWT access-token revocation cut-off ───────────────────────────────
+    // JWT access tokens are stateless — we can't "delete" them, only outwait
+    // their exp. When an admin pacifies / deletes a user, or the user changes
+    // their password, we bump this timestamp; the JwtBearer OnTokenValidated
+    // hook then rejects any access token whose `iat` is older.
+    public DateTime? TokenInvalidatedAt { get; set; }
 }
 
 public sealed class WebAuthnCredential

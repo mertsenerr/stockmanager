@@ -19,6 +19,8 @@ public sealed class SayimHub : Hub<ISayimHubClient>
     private readonly IAuditService _audit;
     private readonly ICallRegistry _calls;
     private readonly IFriendshipRepository _friends;
+    private readonly IUserRepository _users;
+    private readonly IAtamaRepository _atamalar;
     private readonly ILogger<SayimHub> _logger;
 
     public SayimHub(
@@ -27,6 +29,8 @@ public sealed class SayimHub : Hub<ISayimHubClient>
         IAuditService audit,
         ICallRegistry calls,
         IFriendshipRepository friends,
+        IUserRepository users,
+        IAtamaRepository atamalar,
         ILogger<SayimHub> logger)
     {
         _oturumlar = oturumlar;
@@ -34,6 +38,8 @@ public sealed class SayimHub : Hub<ISayimHubClient>
         _audit = audit;
         _calls = calls;
         _friends = friends;
+        _users = users;
+        _atamalar = atamalar;
         _logger = logger;
     }
 
@@ -49,7 +55,7 @@ public sealed class SayimHub : Hub<ISayimHubClient>
     {
         var oturum = await _oturumlar.FindByIdAsync(oturumId, Context.ConnectionAborted);
         if (oturum is null) throw new HubException("Oturum bulunamadı.");
-        if (!CanAccess(oturum)) throw new HubException("Bu oturuma erişim yetkin yok.");
+        if (!await CanAccessAsync(oturum, Context.ConnectionAborted)) throw new HubException("Bu oturuma erişim yetkin yok.");
 
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(oturumId), Context.ConnectionAborted);
         await Clients.OthersInGroup(GroupName(oturumId))
@@ -91,7 +97,7 @@ public sealed class SayimHub : Hub<ISayimHubClient>
     {
         var oturum = await _oturumlar.FindByIdAsync(oturumId, Context.ConnectionAborted);
         if (oturum is null) throw new HubException("Oturum bulunamadı.");
-        if (!CanAccess(oturum)) throw new HubException("Erişim yok.");
+        if (!await CanAccessAsync(oturum, Context.ConnectionAborted)) throw new HubException("Erişim yok.");
         if (oturum.Durum is OturumDurumlari.Tamamlandi or OturumDurumlari.Iptal or OturumDurumlari.Kilitli)
             throw new HubException("Kapanmış/kilitli oturumda satır güncellenemez.");
 
@@ -100,7 +106,21 @@ public sealed class SayimHub : Hub<ISayimHubClient>
 
         var canEditDurum = UserRol == Roles.Admin;
         var canAtaSayman = UserRol == Roles.Admin || UserRol == Roles.SayimYoneticisi;
-        var canEditSayilan = UserRol != Roles.Sayman || urun.Durum == UrunDurumlari.TekrarSayiliyor;
+        // Sayman gate: "Sayman" rol stringi aslında "Kullanici"nin alias'ı, gerçek sayım
+        // yetkisi atama'nın SaymanKullaniciIds listesinden geliyor. REST PatchUrun ile
+        // aynı kuralı uyguluyoruz — mağaza müdürü (de Kullanici) sayım atomik değil.
+        Atama? oturumAtamasi = null;
+        if (!string.IsNullOrEmpty(oturum.AtamaId))
+            oturumAtamasi = await _atamalar.FindByIdAsync(oturum.AtamaId, Context.ConnectionAborted);
+        var isAtamaSayman = oturumAtamasi is not null
+            && oturumAtamasi.SaymanKullaniciIds.Contains(UserId);
+        var isAdminLevel = UserRol == Roles.Admin || UserRol == Roles.SayimYoneticisi;
+        var saymanOwnsUrun = string.IsNullOrEmpty(urun.AtananSaymanId)
+            || urun.AtananSaymanId == UserId;
+        var canEditSayilan = isAdminLevel
+            || (isAtamaSayman
+                && saymanOwnsUrun
+                && (urun.Durum == UrunDurumlari.Beklemede || urun.Durum == UrunDurumlari.TekrarSayiliyor));
 
         var changes = new List<UrunDegisiklik>();
 
@@ -213,7 +233,7 @@ public sealed class SayimHub : Hub<ISayimHubClient>
     {
         var oturum = await _oturumlar.FindByIdAsync(oturumId, Context.ConnectionAborted);
         if (oturum is null) throw new HubException("Oturum bulunamadı.");
-        if (!CanAccess(oturum)) throw new HubException("Erişim yok.");
+        if (!await CanAccessAsync(oturum, Context.ConnectionAborted)) throw new HubException("Erişim yok.");
         if (oturum.Durum is OturumDurumlari.Tamamlandi or OturumDurumlari.Iptal or OturumDurumlari.Kilitli)
             throw new HubException("Kapanmış/kilitli oturumda talep açılamaz.");
 
@@ -265,7 +285,7 @@ public sealed class SayimHub : Hub<ISayimHubClient>
     {
         var oturum = await _oturumlar.FindByIdAsync(oturumId, Context.ConnectionAborted);
         if (oturum is null) throw new HubException("Oturum bulunamadı.");
-        if (!CanAccess(oturum)) throw new HubException("Erişim yok.");
+        if (!await CanAccessAsync(oturum, Context.ConnectionAborted)) throw new HubException("Erişim yok.");
         if (oturum.Durum is OturumDurumlari.Tamamlandi or OturumDurumlari.Iptal or OturumDurumlari.Kilitli)
             throw new HubException("Kapanmış/kilitli oturumda karar verilemez.");
         if (UserRol != Roles.Sistem && UserRol != Roles.SayimBaskani)
@@ -325,7 +345,7 @@ public sealed class SayimHub : Hub<ISayimHubClient>
     {
         var oturum = await _oturumlar.FindByIdAsync(oturumId, Context.ConnectionAborted);
         if (oturum is null) throw new HubException("Oturum bulunamadı.");
-        if (!CanAccess(oturum)) throw new HubException("Erişim yok.");
+        if (!await CanAccessAsync(oturum, Context.ConnectionAborted)) throw new HubException("Erişim yok.");
         if (UserRol != Roles.Sistem && UserRol != Roles.SayimBaskani)
             throw new HubException("Talebi sadece sayım başkanı reddedebilir.");
 
@@ -359,7 +379,7 @@ public sealed class SayimHub : Hub<ISayimHubClient>
     {
         var oturum = await _oturumlar.FindByIdAsync(oturumId, Context.ConnectionAborted);
         if (oturum is null) throw new HubException("Oturum bulunamadı.");
-        if (!CanAccess(oturum)) throw new HubException("Bu oturuma erişim yetkin yok.");
+        if (!await CanAccessAsync(oturum, Context.ConnectionAborted)) throw new HubException("Bu oturuma erişim yetkin yok.");
 
         var me = new CallParticipant(Context.ConnectionId, UserId, UserAd, UserRol);
         var existing = _calls.Join(oturumId, me);
@@ -410,13 +430,24 @@ public sealed class SayimHub : Hub<ISayimHubClient>
         if (_calls.OturumIdOf(Context.ConnectionId) != oturumId)
             throw new HubException("Önce aramaya katılın.");
 
+        // Hedef de aynı çağrı oturumunda olmalı. Connection ID'ler GUID — tahmin
+        // zor, ama bir oturum aramasındaki kötü niyetli katılımcının, bilinen
+        // (örn. başka bir oturum üzerinden tanıştığı) bir connection'a SDP/ICE
+        // payload sızdırmasını engelliyoruz. ICE candidate'lar hedef peer'in
+        // network topolojisini açabilir, o yüzden grup üyeliği bir security check.
+        if (_calls.OturumIdOf(toConnectionId) != oturumId)
+            throw new HubException("Hedef aramada değil.");
+
         await Clients.Client(toConnectionId)
             .CallSignal(oturumId, Context.ConnectionId, UserId, UserAd, type, payload);
     }
 
     /// <summary>
-    /// Aramaya bireysel kullanıcı davet eder. Hedef user oturumun katılımcısı değilse otomatik eklenir
-    /// (oturuma erişim verilir), sonra user-grubuna CallRinging push'u atılır.
+    /// Aramaya bireysel kullanıcı davet eder. Hedef user zaten oturumun katılımcısıysa
+    /// ring push'u her zaman gönderilir. Aksi halde sadece Sistem/SayimBaskani
+    /// (oturum yöneticileri) hedef kullanıcıyı katılımcılar listesine ekleyip
+    /// oturuma erişim verebilir — daha düşük roller kendi arkadaşlarını oturuma
+    /// "kaçıramaz".
     /// </summary>
     public async Task CallInvite(string oturumId, string hedefKullaniciId)
     {
@@ -425,21 +456,20 @@ public sealed class SayimHub : Hub<ISayimHubClient>
 
         var oturum = await _oturumlar.FindByIdAsync(oturumId, Context.ConnectionAborted);
         if (oturum is null) throw new HubException("Oturum bulunamadı.");
-        if (!CanAccess(oturum)) throw new HubException("Erişim yok.");
+        if (!await CanAccessAsync(oturum, Context.ConnectionAborted)) throw new HubException("Erişim yok.");
 
-        // Yetki kuralı:
-        // - Sistem/SayimBaskani: oturuma katılabilen herhangi birini davet edebilir
-        // - Diğer roller (Kullanici, MagazaMuduru): sadece arkadaşlarını davet edebilir
-        if (UserRol != Roles.Sistem && UserRol != Roles.SayimBaskani)
-        {
-            var friendship = await _friends.FindBetweenAsync(UserId, hedefKullaniciId, Context.ConnectionAborted);
-            if (friendship is null || friendship.Durum != FriendshipDurumlari.Kabul)
-                throw new HubException("Sadece arkadaşlarını davet edebilirsin.");
-        }
+        var alreadyParticipant = oturum.Katilimcilar.Any(k => k.KullaniciId == hedefKullaniciId);
 
-        // Hedef user yoksa Katilimcilar'a ekle — bu sayede oturum verilerine erişebilir.
-        if (!oturum.Katilimcilar.Any(k => k.KullaniciId == hedefKullaniciId))
+        if (!alreadyParticipant)
         {
+            // Adding a new katilimci grants oturum-data access — only the session
+            // owners (Sistem / SayimBaskani who owns the firma) can do that. Lower
+            // roles can still "ring" anyone who is already a participant, but they
+            // cannot pull outsiders into the session.
+            if (UserRol != Roles.Sistem && UserRol != Roles.SayimBaskani)
+                throw new HubException(
+                    "Yalnızca oturumun yöneticisi (Sistem / Sayım Başkanı) yeni katılımcı ekleyebilir.");
+
             oturum.Katilimcilar.Add(new Katilimci
             {
                 KullaniciId = hedefKullaniciId,
@@ -448,20 +478,32 @@ public sealed class SayimHub : Hub<ISayimHubClient>
             });
             await _oturumlar.ReplaceAsync(oturum, Context.ConnectionAborted);
         }
+        else if (UserRol != Roles.Sistem && UserRol != Roles.SayimBaskani)
+        {
+            // Even for ring-only invites of an existing participant, lower-role callers
+            // must already be friends with the target — keeps random session participants
+            // from spamming each other with phone-call popups.
+            var friendship = await _friends.FindBetweenAsync(UserId, hedefKullaniciId, Context.ConnectionAborted);
+            if (friendship is null || friendship.Durum != FriendshipDurumlari.Kabul)
+                throw new HubException("Sadece arkadaşlarını davet edebilirsin.");
+        }
 
         await Clients.Group(UserGroupName(hedefKullaniciId))
             .CallRinging(oturumId, UserId, UserAd);
     }
 
-    private bool CanAccess(SayimOturumu oturum)
+    private async Task<bool> CanAccessAsync(SayimOturumu oturum, CancellationToken ct)
     {
         if (UserRol == Roles.Admin) return true;
         if (oturum.Katilimcilar.Any(k => k.KullaniciId == UserId)) return true;
         if (UserRol == Roles.MagazaMuduru)
         {
-            var magazaIds = (Context.User?.FindFirst("magazaIds")?.Value ?? string.Empty)
-                .Split(',', StringSplitOptions.RemoveEmptyEntries);
-            if (magazaIds.Contains(oturum.MagazaId)) return true;
+            // Read MagazaIds from the live DB row, not the JWT claim. The JWT can
+            // be up to AccessTokenMinutes stale, so an admin who just unassigned the
+            // user from a magaza would still find them able to join the hub group
+            // and live-edit the oturum until token expiry.
+            var dbUser = await _users.FindByIdAsync(UserId, ct);
+            if (dbUser is not null && dbUser.MagazaIds.Contains(oturum.MagazaId)) return true;
         }
         return false;
     }

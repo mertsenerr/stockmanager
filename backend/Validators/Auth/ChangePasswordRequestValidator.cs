@@ -10,10 +10,7 @@ public sealed class ChangePasswordRequestValidator : AbstractValidator<ChangePas
         RuleFor(x => x.CurrentPassword)
             .NotEmpty().WithMessage("Mevcut parola zorunludur.");
 
-        RuleFor(x => x.NewPassword)
-            .NotEmpty().WithMessage("Yeni parola zorunludur.")
-            .MinimumLength(8).WithMessage("Parola en az 8 karakter olmalı.")
-            .MaximumLength(128).WithMessage("Parola en fazla 128 karakter olabilir.");
+        RuleFor(x => x.NewPassword).Password();
 
         RuleFor(x => x)
             .Must(x => x.CurrentPassword != x.NewPassword)

@@ -1,6 +1,7 @@
 using FluentValidation;
 using SayimLink.Api.Dtos.Admin;
 using SayimLink.Api.Models;
+using SayimLink.Api.Validators.Auth;
 
 namespace SayimLink.Api.Validators.Admin;
 
@@ -20,11 +21,7 @@ public sealed class KullaniciCreateRequestValidator : AbstractValidator<Kullanic
             .NotEmpty().WithMessage("Rol zorunludur.")
             .Must(Roles.IsValid).WithMessage("Geçersiz rol.");
 
-        RuleFor(x => x.Password)
-            .NotEmpty().WithMessage("Parola zorunludur.")
-            .MinimumLength(8).WithMessage("Parola en az 8 karakter olmalıdır.")
-            .Matches("[A-Za-z]").WithMessage("Parola en az bir harf içermelidir.")
-            .Matches("[0-9]").WithMessage("Parola en az bir rakam içermelidir.");
+        RuleFor(x => x.Password).Password();
     }
 }
 
@@ -39,10 +36,7 @@ public sealed class KullaniciUpdateRequestValidator : AbstractValidator<Kullanic
 
         When(x => !string.IsNullOrEmpty(x.NewPassword), () =>
         {
-            RuleFor(x => x.NewPassword!)
-                .MinimumLength(8).WithMessage("Parola en az 8 karakter olmalıdır.")
-                .Matches("[A-Za-z]").WithMessage("Parola en az bir harf içermelidir.")
-                .Matches("[0-9]").WithMessage("Parola en az bir rakam içermelidir.");
+            RuleFor(x => x.NewPassword!).Password();
         });
     }
 }

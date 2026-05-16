@@ -9,10 +9,21 @@ public static class Roles
     public const string SayimBaskani = "SayimBaskani"; // bir firmanın yöneticisi
     public const string Kullanici = "Kullanici";    // mağaza/şube tarafı
 
-    // Geri uyumluluk için eski isimler yeni rollere aliaslıdır.
-    // [Authorize(Roles = Roles.Admin)] gibi kullanımlar string değerinin
-    // değişmesinden etkilenir; mevcut DB değerleri AdminSeederHostedService
-    // tarafından yeni isimlere migrate edilir.
+    // ⚠️ READ THIS BEFORE TOUCHING ROLE COMPARISONS ⚠️
+    // The "tenant-side" identities — MagazaMuduru, Sayman — are aliases for the
+    // single underlying role string "Kullanici". A user in the system has exactly
+    // one role value; "Sayman" vs "MagazaMuduru" is a UI/intent label, not a
+    // distinct authorization tier. Consequence: `User.IsInRole(Roles.Sayman)`
+    // returns true for every Kullanici, including those acting as MagazaMuduru.
+    //
+    // If you need to distinguish at runtime (e.g. "is this user actually counting,
+    // or just supervising a store?"), gate on a separate signal such as
+    // dbUser.MagazaIds.Count > 0 or atama.SaymanKullaniciIds.Contains(uid).
+    // DO NOT add new behavioural branches that key off these aliases alone — they
+    // will fire for the wrong users.
+    //
+    // Admin / SayimYoneticisi aliases for Sistem / SayimBaskani are similarly
+    // backwards-compat shims; the new names are canonical.
     public const string Admin = Sistem;
     public const string SayimYoneticisi = SayimBaskani;
     public const string MagazaMuduru = Kullanici;

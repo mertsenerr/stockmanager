@@ -23,6 +23,11 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
     public RefreshTokenRepository(IMongoDbService mongo)
     {
         _tokens = mongo.Database.GetCollection<RefreshToken>("refresh_tokens");
+        // Drop the old 60d TTL index if present — Mongo refuses CreateIndex with
+        // the same name but different options, so we have to clear before creating
+        // the new ExpireAfter=0 version. Safe no-op if already absent.
+        try { _tokens.Indexes.DropOne("ix_refresh_ttl"); }
+        catch { /* IndexNotFound */ }
         _tokens.Indexes.CreateMany(new[]
         {
             new CreateIndexModel<RefreshToken>(
@@ -36,12 +41,17 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
                     .Ascending(t => t.UserId)
                     .Ascending(t => t.DeviceId),
                 new CreateIndexOptions { Name = "ix_refresh_user_device" }),
+            // TTL field is ExpiresAt itself, with ExpireAfter=0 → Mongo deletes
+            // the row at the exact instant the token expires. Previously this was
+            // ExpireAfter=60d which left already-expired+revoked rows hanging
+            // around long after they were useful for anything except inflating
+            // the collection's working set.
             new CreateIndexModel<RefreshToken>(
                 Builders<RefreshToken>.IndexKeys.Ascending(t => t.ExpiresAt),
                 new CreateIndexOptions
                 {
                     Name = "ix_refresh_ttl",
-                    ExpireAfter = TimeSpan.FromDays(60),
+                    ExpireAfter = TimeSpan.Zero,
                 }),
         });
     }

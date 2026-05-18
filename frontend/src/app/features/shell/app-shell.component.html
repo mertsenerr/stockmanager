@@ -85,6 +85,26 @@
       </nav>
     }
 
+    @if (recentVisits().length > 0) {
+      <section class="orbix-panel-recent" aria-label="Son ziyaret edilen sayfalar">
+        <h3 class="orbix-panel-recent-title">Son ziyaretler</h3>
+        <ul class="orbix-panel-recent-list">
+          @for (item of recentVisits(); track item.path) {
+            <li>
+              <a [routerLink]="item.path" class="orbix-panel-recent-item">
+                @if (item.iconImg) {
+                  <img [src]="item.iconImg" alt="" class="orbix-panel-recent-icon" aria-hidden="true" />
+                } @else {
+                  <span class="orbix-panel-recent-icon orbix-panel-recent-icon-fallback" aria-hidden="true">◷</span>
+                }
+                <span class="orbix-panel-recent-label">{{ item.label }}</span>
+              </a>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
     <!-- User card at bottom of panel -->
     @if (user(); as u) {
       <div class="orbix-panel-foot">

@@ -12,6 +12,7 @@ import { IncomingCallService } from '../../core/realtime/incoming-call.service';
 import { IncomingCallHostComponent } from '../../core/realtime/incoming-call-host.component';
 import { CommandPaletteComponent } from './command-palette/command-palette.component';
 import { HoverGifComponent } from './hover-gif.component';
+import { RecentVisitsService } from '../../core/recent-visits/recent-visits.service';
 
 interface SubItem {
   label: string;
@@ -46,6 +47,7 @@ export class AppShellComponent {
   private readonly incomingCalls = inject(IncomingCallService);
   private readonly themeSvc = inject(ThemeService);
   private readonly toast = inject(ToastService);
+  private readonly recentSvc = inject(RecentVisitsService);
 
   readonly theme = this.themeSvc.theme;
   readonly toggleTheme = () => this.themeSvc.toggle();
@@ -183,6 +185,24 @@ export class AppShellComponent {
   readonly activeGroup = computed<NavGroup | undefined>(
     () => this.groups().find((g) => g.id === this.activeGroupId()),
   );
+
+  /** Resolves recent paths against nav items so each row gets a label + icon.
+   * Paths that don't match any nav item are dropped — keeps the list tidy. */
+  readonly recentVisits = computed<SubItem[]>(() => {
+    const current = this.currentPath();
+    const items = this.groups().flatMap((g) => g.items);
+    const out: SubItem[] = [];
+    const seen = new Set<string>();
+    for (const path of this.recentSvc.visits()) {
+      if (path === current) continue;
+      const match = items.find((i) => this.matchesPath(i.path, path));
+      if (!match || seen.has(match.path)) continue;
+      seen.add(match.path);
+      out.push(match);
+      if (out.length >= 4) break;
+    }
+    return out;
+  });
 
   setActiveGroup(id: string): void {
     const group = this.groups().find((g) => g.id === id);

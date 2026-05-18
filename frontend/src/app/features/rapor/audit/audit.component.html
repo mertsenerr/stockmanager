@@ -1,5 +1,5 @@
 <app-page-header title="Audit Log" description="Kim ne zaman ne yaptı — son 180 gün.">
-  <div actions class="flex items-center gap-2">
+  <div actions class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
     <input type="date" [(ngModel)]="filterFrom"
            class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm font-mono" />
     <span class="text-text-muted text-xs">→</span>
@@ -19,7 +19,8 @@
 </app-page-header>
 
 <div class="card overflow-hidden">
-  <table class="w-full text-sm">
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm min-w-[760px]">
     <thead class="bg-surface-elevated">
       <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
         <th class="px-3 py-2 font-medium">Tarih</th>
@@ -67,6 +68,7 @@
       }
     </tbody>
   </table>
+  </div>
   <footer class="px-4 py-2 border-t border-border bg-surface-elevated flex items-center justify-between text-xs text-text-muted">
     <span>{{ skip() + 1 }}–{{ skip() + items().length }} / {{ total() }}</span>
     <div class="flex items-center gap-2">

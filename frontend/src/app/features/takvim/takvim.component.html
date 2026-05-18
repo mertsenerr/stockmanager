@@ -1,5 +1,5 @@
 <app-page-header title="Takvim" description="Sayım atamalarını planla, takip et, sürükle-bırak ile gün taşı.">
-  <div actions class="flex items-center gap-2">
+  <div actions class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
     <select [value]="firmaFilter()" (change)="setFirmaFilter(($any($event.target)).value)"
             class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm">
       <option value="">Tüm firmalar</option>

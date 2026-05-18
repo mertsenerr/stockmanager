@@ -1,5 +1,5 @@
 <app-page-header title="Mağazalar" description="Firma mağazalarını ve istasyonları yönet, harita üzerinde gör.">
-  <div actions class="flex items-center gap-2">
+  <div actions class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
     <select
       [value]="firmaFilter()"
       (change)="firmaFilter.set(($any($event.target)).value); refresh()"
@@ -20,7 +20,7 @@
       [value]="query()"
       (input)="query.set(($any($event.target)).value)"
       placeholder="Ara..."
-      class="focus-ring text-xs px-2.5 py-1.5 bg-surface-elevated border border-border rounded-sm w-44 placeholder:text-text-muted"
+      class="focus-ring text-xs px-2.5 py-1.5 bg-surface-elevated border border-border rounded-sm flex-1 basis-[140px] min-w-[140px] sm:flex-none sm:w-44 placeholder:text-text-muted"
     />
     <div class="inline-flex border border-border rounded-sm overflow-hidden">
       <button (click)="setView('list')"
@@ -42,7 +42,8 @@
 
 @if (view() === 'list') {
   <div class="card overflow-hidden">
-    <table class="w-full text-sm">
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[680px]">
       <thead class="bg-surface-elevated">
         <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
           <th class="px-4 py-2.5 font-medium">Mağaza</th>
@@ -81,6 +82,7 @@
         }
       </tbody>
     </table>
+    </div>
   </div>
 }
 

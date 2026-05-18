@@ -1,25 +1,32 @@
 <app-page-header title="Raporlar" description="Sayım geçmişi, mağaza sapma istatistikleri ve sayman performansı.">
-  <div actions class="inline-flex border border-border rounded-sm overflow-hidden">
-    <button (click)="setTab('oturum')" class="text-xs px-3 py-1.5"
+  <div actions class="inline-flex border border-border rounded-sm overflow-hidden max-w-full">
+    <button (click)="setTab('oturum')" class="text-xs px-3 py-1.5 whitespace-nowrap"
             [class.bg-surface-elevated]="tab() === 'oturum'"
             [class.text-text-primary]="tab() === 'oturum'"
-            [class.text-text-muted]="tab() !== 'oturum'">Oturum geçmişi</button>
+            [class.text-text-muted]="tab() !== 'oturum'">
+      <span class="sm:hidden">Oturum</span><span class="hidden sm:inline">Oturum geçmişi</span>
+    </button>
     @if (canSeeReports()) {
-      <button (click)="setTab('sapma')" class="text-xs px-3 py-1.5 border-l border-border"
+      <button (click)="setTab('sapma')" class="text-xs px-3 py-1.5 border-l border-border whitespace-nowrap"
               [class.bg-surface-elevated]="tab() === 'sapma'"
               [class.text-text-primary]="tab() === 'sapma'"
-              [class.text-text-muted]="tab() !== 'sapma'">Mağaza sapma</button>
-      <button (click)="setTab('sayman')" class="text-xs px-3 py-1.5 border-l border-border"
+              [class.text-text-muted]="tab() !== 'sapma'">
+        <span class="sm:hidden">Sapma</span><span class="hidden sm:inline">Mağaza sapma</span>
+      </button>
+      <button (click)="setTab('sayman')" class="text-xs px-3 py-1.5 border-l border-border whitespace-nowrap"
               [class.bg-surface-elevated]="tab() === 'sayman'"
               [class.text-text-primary]="tab() === 'sayman'"
-              [class.text-text-muted]="tab() !== 'sayman'">Sayman performansı</button>
+              [class.text-text-muted]="tab() !== 'sayman'">
+        <span class="sm:hidden">Performans</span><span class="hidden sm:inline">Sayman performansı</span>
+      </button>
     }
   </div>
 </app-page-header>
 
 @if (tab() === 'oturum') {
   <div class="card overflow-hidden">
-    <table class="w-full text-sm">
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[600px]">
       <thead class="bg-surface-elevated">
         <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
           <th class="px-4 py-2.5 font-medium">Tarih</th>
@@ -69,12 +76,14 @@
         }
       </tbody>
     </table>
+    </div>
   </div>
 }
 
 @if (tab() === 'sapma') {
   <div class="card overflow-hidden">
-    <table class="w-full text-sm">
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[680px]">
       <thead class="bg-surface-elevated">
         <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
           <th class="px-4 py-2.5 font-medium">Mağaza</th>
@@ -114,12 +123,14 @@
         }
       </tbody>
     </table>
+    </div>
   </div>
 }
 
 @if (tab() === 'sayman') {
   <div class="card overflow-hidden">
-    <table class="w-full text-sm">
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[560px]">
       <thead class="bg-surface-elevated">
         <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
           <th class="px-4 py-2.5 font-medium">Kullanıcı</th>
@@ -147,5 +158,6 @@
         }
       </tbody>
     </table>
+    </div>
   </div>
 }

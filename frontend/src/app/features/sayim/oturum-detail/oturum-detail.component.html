@@ -4,7 +4,7 @@
   <div class="text-xs text-text-muted py-12 text-center">Yükleniyor...</div>
 } @else if (o) {
   <app-page-header [title]="o.firmaAdi + ' · ' + o.magazaAdi" [description]="'Sayım tarihi: ' + o.tarih.slice(0, 10)">
-    <div actions class="flex items-center gap-2">
+    <div actions class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
       <a routerLink="/oturumlar" class="focus-ring text-xs text-text-muted hover:text-text-primary transition-colors">← Tüm oturumlar</a>
       @if (canLockUnlock()) {
         @if (o.durum === 'aktif') {

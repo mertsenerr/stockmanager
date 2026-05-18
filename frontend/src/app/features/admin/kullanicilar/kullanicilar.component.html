@@ -1,5 +1,5 @@
 <app-page-header title="Kullanıcılar" description="Sistem kullanıcılarını ve rolleri yönet.">
-  <div actions class="flex items-center gap-2">
+  <div actions class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
     <label class="flex items-center gap-1.5 text-xs text-text-muted cursor-pointer">
       <input type="checkbox" [checked]="includeInactive()" (change)="toggleInactive()"
              class="w-3.5 h-3.5 bg-surface-elevated border border-border accent-text-primary" />
@@ -10,7 +10,7 @@
       [value]="query()"
       (input)="query.set(($any($event.target)).value)"
       placeholder="Ara..."
-      class="focus-ring text-xs px-2.5 py-1.5 bg-surface-elevated border border-border rounded-sm w-44 placeholder:text-text-muted"
+      class="focus-ring text-xs px-2.5 py-1.5 bg-surface-elevated border border-border rounded-sm flex-1 basis-[140px] min-w-[140px] sm:flex-none sm:w-44 placeholder:text-text-muted"
     />
     <button (click)="openCreate()" class="pill-btn pill-btn-accent">
       <span aria-hidden="true">+</span> Yeni kullanıcı
@@ -19,7 +19,8 @@
 </app-page-header>
 
 <div class="card overflow-hidden">
-  <table class="w-full text-sm">
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm min-w-[720px]">
     <thead class="bg-surface-elevated">
       <tr class="text-left text-[11px] uppercase tracking-wide text-text-muted">
         <th class="px-4 py-2.5 font-medium">Ad Soyad</th>
@@ -60,6 +61,7 @@
       }
     </tbody>
   </table>
+  </div>
 </div>
 
 <app-modal [open]="modalOpen()" [title]="editing() ? 'Kullanıcıyı düzenle' : 'Yeni kullanıcı'" (closed)="closeModal()" size="lg">

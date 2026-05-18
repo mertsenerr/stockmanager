@@ -185,7 +185,17 @@ export class AppShellComponent {
   );
 
   setActiveGroup(id: string): void {
+    const group = this.groups().find((g) => g.id === id);
+    // Single-item groups (e.g. "Anasayfa" → "/") skip the panel detour — one tap
+    // navigates straight to the page. On mobile this is mandatory UX; on desktop
+    // it removes an annoying two-click round trip.
+    if (group && group.items.length === 1) {
+      this.router.navigateByUrl(group.items[0].path);
+      return;
+    }
     this._activeGroupId.set(id);
+    // On mobile this slides the panel up from the bottom; desktop CSS ignores it.
+    this.mobileNavOpen.set(true);
   }
 
   isPathActive(path: string): boolean {

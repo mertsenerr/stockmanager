@@ -719,50 +719,119 @@
 }
 
 /* ═══ MOBILE ══════════════════════════════════════════════════════════════ */
+/* Mobile pattern: rail flips to a fixed BOTTOM bar (iOS/Android tab-bar idiom).
+   Panel slides up from the bottom as a sheet over the content; main content
+   gets bottom padding so the bar doesn't cover its last row. */
 @media (max-width: 768px) {
-  /* Drop the desktop 3-column flex (68px rail + 300px panel + 1fr main). On
-     mobile the rail and panel become slide-in drawers (position:fixed), so
-     they must NOT participate in the flex line — and main content must take
-     the full viewport width regardless. */
+  /* Drop the desktop 3-column flex; rail/panel are fixed overlays now. */
   .orbix-shell {
     display: block;
     width: 100%;
     min-width: 0;
   }
 
+  /* ─── Rail → bottom tab bar ───────────────────────────────────────────── */
   .orbix-rail {
     position: fixed;
-    top: 0; left: 0; bottom: 0;
-    height: 100dvh;
-    transform: translateX(-100%);
-    transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
-    padding-top: max(14px, env(safe-area-inset-top));
-    padding-bottom: max(14px, env(safe-area-inset-bottom));
-    padding-left: max(10px, env(safe-area-inset-left));
+    top: auto;
+    left: 0; right: 0; bottom: 0;
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 8px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+    border-right: none;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    overflow: visible;
+    transform: none;
+    z-index: 41;
   }
-  .orbix-rail.is-open { transform: translateX(0); }
+  [data-theme="dark"] .orbix-rail {
+    border-right: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.10);
+    background: var(--color-surface);
+  }
 
+  /* Brand has no room in a tab bar — hide it on mobile. */
+  .orbix-rail-brand { display: none; }
+
+  /* Nav items lay out horizontally, evenly spread. */
+  .orbix-rail-nav {
+    flex-direction: row;
+    flex: 1;
+    align-items: center;
+    justify-content: space-around;
+    gap: 4px;
+    height: auto;
+    width: auto;
+  }
+
+  /* Theme toggle sits at the right edge with a thin separator. */
+  .orbix-rail-foot {
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+    padding: 0 0 0 8px;
+    margin-left: 4px;
+    border-top: none;
+    border-left: 1px solid rgba(0, 0, 0, 0.06);
+    gap: 0;
+  }
+  [data-theme="dark"] .orbix-rail-foot {
+    border-top: none;
+    border-left: 1px solid var(--color-border);
+  }
+
+  /* Slightly smaller tap targets — bar is height-constrained. */
+  .orbix-rail-item {
+    width: 44px;
+    height: 44px;
+  }
+  .orbix-rail-icon-img {
+    width: 26px;
+    height: 26px;
+  }
+
+  /* ─── Panel → bottom sheet ────────────────────────────────────────────── */
   .orbix-panel {
     position: fixed;
-    top: 0; left: 68px; bottom: 0;
-    width: calc(100vw - 68px - env(safe-area-inset-right));
-    max-width: 320px;
-    height: 100dvh;
-    transform: translateX(-100%);
-    transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
-    padding-top: max(0px, env(safe-area-inset-top));
-    padding-bottom: max(0px, env(safe-area-inset-bottom));
+    top: auto;
+    left: 0; right: 0; bottom: 0;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    max-height: min(78vh, 78dvh);
+    /* Leave room for the bottom bar (~56px) + iOS home indicator. */
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    border-right: none;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    transform: translateY(100%);
+    transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+    z-index: 40;
   }
-  .orbix-panel.is-open { transform: translateX(0); }
+  .orbix-panel.is-open { transform: translateY(0); }
+  [data-theme="dark"] .orbix-panel {
+    border-right: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.55);
+  }
 
-  /* Main now owns the full viewport on mobile; rail/panel float over it. */
+  /* User card inside panel-foot gets tighter padding on mobile. */
+  .orbix-panel-foot { padding: 12px 14px 14px; }
+
+  /* ─── Main content ────────────────────────────────────────────────────── */
   .orbix-main {
     width: 100%;
     min-width: 0;
   }
 
-  /* Topbar shrinks: hamburger + brand wordmark + user-card on one row, search
-     drops to icon-only (label "Ara" + ⌘K kbd hidden). */
   .orbix-topbar {
     padding: 10px 14px;
     padding-top: max(10px, env(safe-area-inset-top));
@@ -780,27 +849,19 @@
   }
   .orbix-topbar-search-text,
   .orbix-topbar-search-kbd { display: none; }
-  .orbix-topbar-user {
-    padding-right: 8px;
-  }
+  .orbix-topbar-user { padding-right: 8px; }
   .orbix-topbar-user-text { display: none; }
   .orbix-profile-chevron { display: none; }
 
+  /* Hamburger no longer needed — bottom bar is the always-on nav entry. */
+  .orbix-mobile-toggle { display: none !important; }
+
+  /* Reserve space at the bottom so content's last row clears the bar. */
   .orbix-content {
     padding: 16px 14px 24px;
     padding-left: max(14px, env(safe-area-inset-left));
     padding-right: max(14px, env(safe-area-inset-right));
-    padding-bottom: max(24px, env(safe-area-inset-bottom));
-  }
-}
-
-/* Very narrow phones — hide the icon rail body when not open; the hamburger
-   in the topbar is the only entry point. Backdrop covers the rest. */
-@media (max-width: 420px) {
-  .orbix-panel {
-    left: 0;
-    width: calc(100vw - env(safe-area-inset-right));
-    max-width: none;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
   }
 }
 

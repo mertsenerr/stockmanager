@@ -87,8 +87,11 @@
     }
 
     <div class="bt-form-row">
-      <label class="bt-label" for="bt-ad">Belge adı <span class="bt-required">*</span></label>
-      <input id="bt-ad" type="text" formControlName="ad" class="bt-input" maxlength="120" placeholder="Sayım Kabul Tutanağı" />
+      <label class="bt-label" for="bt-belge-adi">Belge adı <span class="bt-required">*</span></label>
+      <!-- id "bt-ad" yerine "bt-belge-adi": ad-blocker eklentiler "ad" geçen
+           ID'leri banner reklam sanıp display:none ile gizliyor (kullanıcı bug
+           olarak görüyor — input DOM'da var ama görünmüyor). -->
+      <input id="bt-belge-adi" type="text" formControlName="ad" class="bt-input" maxlength="120" placeholder="Sayım Kabul Tutanağı" />
       @if (form.controls.ad.touched && form.controls.ad.errors?.['required']) {
         <p class="bt-error">Belge adı zorunlu.</p>
       }

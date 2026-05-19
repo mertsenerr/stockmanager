@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace SayimLink.Api.Models;
 
+[BsonIgnoreExtraElements]
 public sealed class OzelRaporDosya
 {
     [BsonRepresentation(BsonType.ObjectId)]
@@ -86,6 +87,7 @@ public sealed class KaseDamga
     public DateTime Tarih { get; set; } = DateTime.UtcNow;
 }
 
+[BsonIgnoreExtraElements]
 public sealed class OzelRapor
 {
     [BsonId]

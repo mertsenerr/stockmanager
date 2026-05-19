@@ -9,6 +9,7 @@ namespace SayimLink.Api.Models;
 /// kataloğun bir öğesine bağlanır; o anki imza/kaşe gereksinimleri
 /// dosyaya snapshot olarak yazılır.
 /// </summary>
+[BsonIgnoreExtraElements]
 public sealed class BelgeTipi
 {
     [BsonId]

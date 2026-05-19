@@ -116,39 +116,37 @@
 .bt-form { display: flex; flex-direction: column; gap: 14px; }
 .bt-form-row { display: flex; flex-direction: column; gap: 6px; }
 
-/* Modal içindeki input/textarea/select için bariz kontrastlı stil.
-   Global .field-input dark mode'da çok soluk kalıyor, kullanıcı input'u
-   farkedemiyor. */
-.bt-form input[type="text"],
-.bt-form select,
-.bt-form textarea {
-  width: 100%;
-  padding: 10px 12px;
-  font-size: 13px;
-  background: var(--color-surface-elevated);
-  color: var(--color-ink);
-  border: 1.5px solid var(--color-border-strong, rgba(0,0,0,0.18));
-  border-radius: 10px;
-  font-family: inherit;
-}
-.bt-form input[type="text"]:focus,
-.bt-form select:focus,
-.bt-form textarea:focus {
+/* Kendi input class'ımız — global .field-input ile çarpışmasın diye ayrı
+   isim verdik. Modal içinde dark mode'da görünür kontrastla render eder. */
+.bt-input {
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-height: 40px !important;
+  padding: 9px 12px !important;
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  background: var(--color-surface-elevated) !important;
+  color: var(--color-ink) !important;
+  border: 1.5px solid rgba(0, 0, 0, 0.22) !important;
+  border-radius: 10px !important;
+  font-family: inherit !important;
   outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-soft, rgba(var(--color-accent-rgb), 0.15));
 }
-:host-context([data-theme="dark"]) .bt-form input[type="text"],
-:host-context([data-theme="dark"]) .bt-form select,
-:host-context([data-theme="dark"]) .bt-form textarea {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(255,255,255,0.20);
+.bt-input::placeholder { color: var(--color-ink-muted); }
+.bt-input:focus {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 3px var(--color-accent-soft, rgba(var(--color-accent-rgb), 0.15)) !important;
 }
-:host-context([data-theme="dark"]) .bt-form input[type="text"]:focus,
-:host-context([data-theme="dark"]) .bt-form select:focus,
-:host-context([data-theme="dark"]) .bt-form textarea:focus {
-  background: rgba(255,255,255,0.07);
-  border-color: rgba(var(--color-accent-rgb), 0.6);
+textarea.bt-input { min-height: 64px !important; resize: vertical; }
+
+:host-context([data-theme="dark"]) .bt-input {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}
+:host-context([data-theme="dark"]) .bt-input:focus {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(var(--color-accent-rgb), 0.65) !important;
 }
 .bt-label {
   font-size: 12px; font-weight: 600;

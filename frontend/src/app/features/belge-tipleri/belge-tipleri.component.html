@@ -74,7 +74,7 @@
     @if (isSistem()) {
       <div class="bt-form-row">
         <label class="bt-label" for="bt-firma">Firma</label>
-        <select id="bt-firma" formControlName="firmaId" class="field-input" [disabled]="!!editing()">
+        <select id="bt-firma" formControlName="firmaId" class="bt-input" [disabled]="!!editing()">
           <option value="">Seçiniz…</option>
           @for (f of firmalar(); track f.id) {
             <option [value]="f.id">{{ f.ad }}</option>
@@ -88,7 +88,7 @@
 
     <div class="bt-form-row">
       <label class="bt-label" for="bt-ad">Belge adı <span class="bt-required">*</span></label>
-      <input id="bt-ad" type="text" formControlName="ad" class="field-input" maxlength="120" placeholder="Sayım Kabul Tutanağı" />
+      <input id="bt-ad" type="text" formControlName="ad" class="bt-input" maxlength="120" placeholder="Sayım Kabul Tutanağı" />
       @if (form.controls.ad.touched && form.controls.ad.errors?.['required']) {
         <p class="bt-error">Belge adı zorunlu.</p>
       }
@@ -96,7 +96,7 @@
 
     <div class="bt-form-row">
       <label class="bt-label" for="bt-aciklama">Açıklama</label>
-      <textarea id="bt-aciklama" formControlName="aciklama" class="field-input" rows="2" maxlength="1000" placeholder="Opsiyonel — bu belgenin ne için kullanıldığı"></textarea>
+      <textarea id="bt-aciklama" formControlName="aciklama" class="bt-input" rows="2" maxlength="1000" placeholder="Opsiyonel — bu belgenin ne için kullanıldığı"></textarea>
     </div>
 
     <fieldset class="bt-form-row bt-fieldset">

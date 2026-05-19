@@ -15,12 +15,17 @@ public sealed class BelgeTipiUpsertRequestValidator : AbstractValidator<BelgeTip
         RuleFor(x => x.Aciklama)
             .MaximumLength(1000).When(x => !string.IsNullOrEmpty(x.Aciklama));
 
-        RuleFor(x => x.GerekenImzaRolleri)
+        RuleFor(x => x.ImzaSlotlari)
             .NotNull()
-            .Must(BeValidRoles)
-            .WithMessage("Geçersiz imza rolü.");
+            .Must(BeValidSlots)
+            .WithMessage("Geçersiz imza rolü veya konumu.");
+
+        RuleFor(x => x.KaseKonum!)
+            .Must(ImzaKonumlari.IsValid)
+            .WithMessage("Geçersiz kaşe konumu.")
+            .When(x => x.KaseGerekli);
     }
 
-    private static bool BeValidRoles(List<string> roles) =>
-        roles.All(ImzaRolleri.IsValid);
+    private static bool BeValidSlots(List<ImzaSlotDto> slots) =>
+        slots.All(s => ImzaRolleri.IsValid(s.Rol) && ImzaKonumlari.IsValid(s.Konum));
 }

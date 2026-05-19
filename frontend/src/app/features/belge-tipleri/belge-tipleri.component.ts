@@ -8,7 +8,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { Firma } from '../admin/admin.models';
 import { FirmaService } from '../admin/firma.service';
 import { BelgeTipiService } from './belge-tipi.service';
-import { BelgeTipi, BelgeTipiUpsert, IMZA_ROL_OPTIONS, ImzaRolu } from './belge-tipi.models';
+import { BelgeTipi, BelgeTipiUpsert, IMZA_KONUM_OPTIONS, IMZA_ROL_OPTIONS, ImzaKonum, ImzaRolu, ImzaSlot } from './belge-tipi.models';
 
 @Component({
   selector: 'app-belge-tipleri',
@@ -40,14 +40,18 @@ export class BelgeTipleriComponent implements OnInit {
   readonly serverError = signal<string | null>(null);
 
   protected readonly imzaRolOptions = IMZA_ROL_OPTIONS;
+  protected readonly imzaKonumOptions = IMZA_KONUM_OPTIONS;
 
   readonly form = this.fb.nonNullable.group({
     firmaId: [''],
     ad: ['', [Validators.required, Validators.maxLength(120)]],
     aciklama: ['', [Validators.maxLength(1000)]],
     sayimBaskaniImza: [false],
+    sayimBaskaniKonum: ['SagAlt' as ImzaKonum],
     magazaYetkilisiImza: [false],
+    magazaYetkilisiKonum: ['SolAlt' as ImzaKonum],
     kaseGerekli: [false],
+    kaseKonum: ['OrtaAlt' as ImzaKonum],
     arsivlendi: [false],
   });
 
@@ -102,8 +106,11 @@ export class BelgeTipleriComponent implements OnInit {
       ad: '',
       aciklama: '',
       sayimBaskaniImza: false,
+      sayimBaskaniKonum: 'SagAlt',
       magazaYetkilisiImza: false,
+      magazaYetkilisiKonum: 'SolAlt',
       kaseGerekli: false,
+      kaseKonum: 'OrtaAlt',
       arsivlendi: false,
     });
     this.modalOpen.set(true);
@@ -112,13 +119,18 @@ export class BelgeTipleriComponent implements OnInit {
   openEdit(t: BelgeTipi): void {
     this.editing.set(t);
     this.serverError.set(null);
+    const sbSlot = t.imzaSlotlari.find((s) => s.rol === 'SayimBaskani');
+    const myslot = t.imzaSlotlari.find((s) => s.rol === 'MagazaYetkilisi');
     this.form.reset({
       firmaId: t.firmaId,
       ad: t.ad,
       aciklama: t.aciklama ?? '',
-      sayimBaskaniImza: t.gerekenImzaRolleri.includes('SayimBaskani'),
-      magazaYetkilisiImza: t.gerekenImzaRolleri.includes('MagazaYetkilisi'),
+      sayimBaskaniImza: !!sbSlot,
+      sayimBaskaniKonum: sbSlot?.konum ?? 'SagAlt',
+      magazaYetkilisiImza: !!myslot,
+      magazaYetkilisiKonum: myslot?.konum ?? 'SolAlt',
       kaseGerekli: t.kaseGerekli,
+      kaseKonum: t.kaseKonum ?? 'OrtaAlt',
       arsivlendi: t.arsivlendi,
     });
     this.modalOpen.set(true);
@@ -136,16 +148,17 @@ export class BelgeTipleriComponent implements OnInit {
     }
 
     const v = this.form.getRawValue();
-    const roller: ImzaRolu[] = [];
-    if (v.sayimBaskaniImza) roller.push('SayimBaskani');
-    if (v.magazaYetkilisiImza) roller.push('MagazaYetkilisi');
+    const slots: ImzaSlot[] = [];
+    if (v.sayimBaskaniImza) slots.push({ rol: 'SayimBaskani', konum: v.sayimBaskaniKonum });
+    if (v.magazaYetkilisiImza) slots.push({ rol: 'MagazaYetkilisi', konum: v.magazaYetkilisiKonum });
 
     const payload: BelgeTipiUpsert = {
       firmaId: this.isSistem() ? (v.firmaId || null) : null,
       ad: v.ad.trim(),
       aciklama: v.aciklama.trim() ? v.aciklama.trim() : null,
-      gerekenImzaRolleri: roller,
+      imzaSlotlari: slots,
       kaseGerekli: v.kaseGerekli,
+      kaseKonum: v.kaseGerekli ? v.kaseKonum : null,
       arsivlendi: v.arsivlendi,
     };
 
@@ -173,8 +186,9 @@ export class BelgeTipleriComponent implements OnInit {
       firmaId: this.isSistem() ? t.firmaId : null,
       ad: t.ad,
       aciklama: t.aciklama,
-      gerekenImzaRolleri: t.gerekenImzaRolleri,
+      imzaSlotlari: t.imzaSlotlari,
       kaseGerekli: t.kaseGerekli,
+      kaseKonum: t.kaseKonum,
       arsivlendi: !t.arsivlendi,
     };
     this.svc.update(t.id, payload).subscribe({
@@ -187,9 +201,19 @@ export class BelgeTipleriComponent implements OnInit {
   }
 
   rolEtiketleri(t: BelgeTipi): string {
-    if (t.gerekenImzaRolleri.length === 0) return 'İmza gerekmiyor';
-    return t.gerekenImzaRolleri
-      .map((r) => IMZA_ROL_OPTIONS.find((o) => o.value === r)?.label ?? r)
+    if (t.imzaSlotlari.length === 0) return 'İmza gerekmiyor';
+    return t.imzaSlotlari
+      .map((s) => {
+        const rol = IMZA_ROL_OPTIONS.find((o) => o.value === s.rol)?.label ?? s.rol;
+        const konum = IMZA_KONUM_OPTIONS.find((o) => o.value === s.konum)?.label ?? s.konum;
+        return `${rol} (${konum})`;
+      })
       .join(', ');
+  }
+
+  kaseEtiketi(t: BelgeTipi): string {
+    if (!t.kaseGerekli) return '';
+    const konum = IMZA_KONUM_OPTIONS.find((o) => o.value === t.kaseKonum)?.label ?? 'orta alt';
+    return `Kaşe (${konum})`;
   }
 }

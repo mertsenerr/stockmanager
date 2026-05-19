@@ -170,6 +170,19 @@ textarea.bt-input { min-height: 64px !important; resize: vertical; }
   font-size: 13px; color: var(--color-ink);
   cursor: pointer;
 }
+.bt-slot-row {
+  display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+}
+.bt-slot-row .bt-check { flex: 1 1 auto; min-width: 0; }
+.bt-konum-select {
+  width: auto !important;
+  min-height: 32px !important;
+  min-width: 110px !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+}
 .bt-form-actions {
   display: flex; gap: 8px; justify-content: flex-end;
   padding-top: 4px;

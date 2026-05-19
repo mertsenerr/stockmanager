@@ -24,12 +24,15 @@ public sealed class BelgeTipi
     public string? Aciklama { get; set; }
 
     /// <summary>
-    /// Bu belgeye imza atması gereken rollerin listesi (ImzaRolleri sabitlerinden).
-    /// Boş liste = imza gerekmiyor.
+    /// Bu belgeye imza atması gereken rollerin ve PDF üzerinde nereye
+    /// yerleşeceklerinin listesi. Boş liste = imza gerekmiyor.
     /// </summary>
-    public List<string> GerekenImzaRolleri { get; set; } = [];
+    public List<ImzaSlot> ImzaSlotlari { get; set; } = [];
 
     public bool KaseGerekli { get; set; }
+
+    /// <summary>Kaşe gerektiğinde PDF'te nereye basılacak (ImzaKonumlari sabitlerinden).</summary>
+    public string? KaseKonum { get; set; }
 
     /// <summary>Soft delete bayrağı; arşivlenen kayıtlar listelerden gizlenir.</summary>
     public bool Arsivlendi { get; set; }
@@ -56,4 +59,32 @@ public static class ImzaRolleri
     };
 
     public static bool IsValid(string rol) => All.Contains(rol);
+}
+
+/// <summary>
+/// PDF üstünde imza/kaşe yerleşim konumu. Üç köşe — sayfanın altında, sol /
+/// orta / sağ. Şimdilik basit; ileride pixel-level template editör'e geçilebilir.
+/// </summary>
+public static class ImzaKonumlari
+{
+    public const string SolAlt = "SolAlt";
+    public const string OrtaAlt = "OrtaAlt";
+    public const string SagAlt = "SagAlt";
+
+    public static readonly IReadOnlyCollection<string> All = new[]
+    {
+        SolAlt, OrtaAlt, SagAlt,
+    };
+
+    public static bool IsValid(string konum) => All.Contains(konum);
+}
+
+/// <summary>
+/// Tek bir imza alanı — hangi rol, PDF'te neresi. Belge tipi tanımında
+/// kullanılır ve dosya yüklenirken snapshot'lanır.
+/// </summary>
+public sealed class ImzaSlot
+{
+    public string Rol { get; set; } = string.Empty;
+    public string Konum { get; set; } = ImzaKonumlari.OrtaAlt;
 }

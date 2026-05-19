@@ -12,6 +12,11 @@ export interface KaseDamga {
   tarih: string;
 }
 
+export interface ImzaSlotSnapshot {
+  rol: string;
+  konum: string;
+}
+
 export interface OzelRaporDosya {
   id: string;
   ad: string;
@@ -20,8 +25,9 @@ export interface OzelRaporDosya {
   yuklemeTarihi: string;
   belgeTipiId?: string | null;
   belgeTipiAdi?: string | null;
-  imzaGerekenRoller: string[];
+  imzaSlotlari: ImzaSlotSnapshot[];
   kaseGerekli: boolean;
+  kaseKonum?: string | null;
   imzalar: DosyaImza[];
   kase?: KaseDamga | null;
 }

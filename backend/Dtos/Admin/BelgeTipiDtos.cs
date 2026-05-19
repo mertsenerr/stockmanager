@@ -1,5 +1,11 @@
 namespace SayimLink.Api.Dtos.Admin;
 
+public sealed class ImzaSlotDto
+{
+    public string Rol { get; set; } = string.Empty;
+    public string Konum { get; set; } = string.Empty;
+}
+
 public sealed class BelgeTipiDto
 {
     public string Id { get; set; } = string.Empty;
@@ -7,8 +13,9 @@ public sealed class BelgeTipiDto
     public string? FirmaAdi { get; set; }
     public string Ad { get; set; } = string.Empty;
     public string? Aciklama { get; set; }
-    public IReadOnlyList<string> GerekenImzaRolleri { get; set; } = [];
+    public IReadOnlyList<ImzaSlotDto> ImzaSlotlari { get; set; } = [];
     public bool KaseGerekli { get; set; }
+    public string? KaseKonum { get; set; }
     public bool Arsivlendi { get; set; }
     public DateTime OlusturmaTarihi { get; set; }
     public DateTime? GuncellenmeTarihi { get; set; }
@@ -24,7 +31,8 @@ public sealed class BelgeTipiUpsertRequest
 
     public string Ad { get; set; } = string.Empty;
     public string? Aciklama { get; set; }
-    public List<string> GerekenImzaRolleri { get; set; } = [];
+    public List<ImzaSlotDto> ImzaSlotlari { get; set; } = [];
     public bool KaseGerekli { get; set; }
+    public string? KaseKonum { get; set; }
     public bool Arsivlendi { get; set; }
 }

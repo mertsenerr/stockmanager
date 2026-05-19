@@ -27,14 +27,17 @@ public sealed class OzelRaporDosya
     public string? BelgeTipiId { get; set; }
 
     /// <summary>
-    /// Yükleme anındaki imza gerekleri (BelgeTipi'nden snapshot). Katalog
-    /// sonradan değişirse mevcut dosyalar etkilenmesin diye snapshot kullanıyoruz.
+    /// Yükleme anındaki imza alanları (BelgeTipi'nden snapshot — rol + konum).
+    /// Katalog sonradan değişirse mevcut dosyalar etkilenmesin diye snapshot.
     /// Boş liste = imza gerekmiyor.
     /// </summary>
-    public List<string> ImzaGerekenRoller { get; set; } = [];
+    public List<ImzaSlot> ImzaSlotlari { get; set; } = [];
 
     /// <summary>Yükleme anındaki kaşe gereksinimi snapshot'ı.</summary>
     public bool KaseGerekli { get; set; }
+
+    /// <summary>Yükleme anındaki kaşe konumu snapshot'ı (ImzaKonumlari sabitlerinden).</summary>
+    public string? KaseKonum { get; set; }
 
     /// <summary>
     /// Bu dosyaya atılan imzaların listesi. Her rol için en fazla bir kayıt

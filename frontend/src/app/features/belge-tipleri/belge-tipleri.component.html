@@ -47,7 +47,7 @@
               <span class="bt-row-meta">
                 <span>{{ rolEtiketleri(t) }}</span>
                 @if (t.kaseGerekli) {
-                  <span class="bt-chip bt-chip-kase">Kaşe</span>
+                  <span class="bt-chip bt-chip-kase">{{ kaseEtiketi(t) }}</span>
                 }
               </span>
               @if (t.aciklama) {
@@ -104,23 +104,54 @@
 
     <fieldset class="bt-form-row bt-fieldset">
       <legend class="bt-label">İmzacı rolleri</legend>
-      <label class="bt-check">
-        <input type="checkbox" formControlName="sayimBaskaniImza" />
-        <span>Sayım Başkanı imzalayacak</span>
-      </label>
-      <label class="bt-check">
-        <input type="checkbox" formControlName="magazaYetkilisiImza" />
-        <span>Mağaza Yetkilisi imzalayacak</span>
-      </label>
-      <p class="bt-help">Hiçbiri seçilmezse imza gerekmez.</p>
+
+      <div class="bt-slot-row">
+        <label class="bt-check">
+          <input type="checkbox" formControlName="sayimBaskaniImza" />
+          <span>Sayım Başkanı imzalayacak</span>
+        </label>
+        @if (form.controls.sayimBaskaniImza.value) {
+          <select formControlName="sayimBaskaniKonum" class="bt-input bt-konum-select">
+            @for (k of imzaKonumOptions; track k.value) {
+              <option [value]="k.value">{{ k.label }}</option>
+            }
+          </select>
+        }
+      </div>
+
+      <div class="bt-slot-row">
+        <label class="bt-check">
+          <input type="checkbox" formControlName="magazaYetkilisiImza" />
+          <span>Mağaza Yetkilisi imzalayacak</span>
+        </label>
+        @if (form.controls.magazaYetkilisiImza.value) {
+          <select formControlName="magazaYetkilisiKonum" class="bt-input bt-konum-select">
+            @for (k of imzaKonumOptions; track k.value) {
+              <option [value]="k.value">{{ k.label }}</option>
+            }
+          </select>
+        }
+      </div>
+
+      <p class="bt-help">Konum, PDF'in son sayfasında imzanın nereye basılacağını belirler.</p>
     </fieldset>
 
-    <div class="bt-form-row">
-      <label class="bt-check">
-        <input type="checkbox" formControlName="kaseGerekli" />
-        <span>Kaşe gerekli</span>
-      </label>
-    </div>
+    <fieldset class="bt-form-row bt-fieldset">
+      <legend class="bt-label">Kaşe</legend>
+      <div class="bt-slot-row">
+        <label class="bt-check">
+          <input type="checkbox" formControlName="kaseGerekli" />
+          <span>Kaşe gerekli</span>
+        </label>
+        @if (form.controls.kaseGerekli.value) {
+          <select formControlName="kaseKonum" class="bt-input bt-konum-select">
+            @for (k of imzaKonumOptions; track k.value) {
+              <option [value]="k.value">{{ k.label }}</option>
+            }
+          </select>
+        }
+      </div>
+    </fieldset>
 
     @if (editing()) {
       <div class="bt-form-row">

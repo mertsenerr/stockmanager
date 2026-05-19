@@ -232,8 +232,11 @@ public sealed class OzelRaporlarController : ControllerBase
                 Boyut = file.Length,
                 StorageName = storageName,
                 BelgeTipiId = belgeTipi?.Id,
-                ImzaGerekenRoller = belgeTipi is null ? [] : [..belgeTipi.GerekenImzaRolleri],
+                ImzaSlotlari = belgeTipi is null
+                    ? []
+                    : belgeTipi.ImzaSlotlari.Select(s => new ImzaSlot { Rol = s.Rol, Konum = s.Konum }).ToList(),
                 KaseGerekli = belgeTipi?.KaseGerekli ?? false,
+                KaseKonum = belgeTipi?.KaseKonum,
             };
             rapor.Dosyalar.Add(dosya);
             added.Add(dosya);
@@ -269,7 +272,7 @@ public sealed class OzelRaporlarController : ControllerBase
         if (!ImzaRolleri.IsValid(request.Rol))
             return BadRequest(new { message = "Geçersiz imza rolü." });
 
-        if (!dosya.ImzaGerekenRoller.Contains(request.Rol))
+        if (!dosya.ImzaSlotlari.Any(s => s.Rol == request.Rol))
             return BadRequest(new { message = "Bu belge için bu rolün imzası gerekli değil." });
 
         if (!CanSignAs(request.Rol))
@@ -404,7 +407,7 @@ public sealed class OzelRaporlarController : ControllerBase
         {
             await using (original)
             {
-                signed = _pdfSigner.Stamp(original, dosya.Imzalar, dosya.Kase);
+                signed = _pdfSigner.Stamp(original, dosya.Imzalar, dosya.ImzaSlotlari, dosya.Kase, dosya.KaseKonum);
             }
         }
         catch (InvalidOperationException ex)
@@ -552,8 +555,9 @@ public sealed class OzelRaporlarController : ControllerBase
                 YuklemeTarihi = d.YuklemeTarihi,
                 BelgeTipiId = d.BelgeTipiId,
                 BelgeTipiAdi = d.BelgeTipiId is not null && belgeTipiMap.TryGetValue(d.BelgeTipiId, out var btAd) ? btAd : null,
-                ImzaGerekenRoller = d.ImzaGerekenRoller,
+                ImzaSlotlari = d.ImzaSlotlari.Select(s => new ImzaSlotDto { Rol = s.Rol, Konum = s.Konum }).ToList(),
                 KaseGerekli = d.KaseGerekli,
+                KaseKonum = d.KaseKonum,
                 Imzalar = d.Imzalar.Select(i => new DosyaImzaDto
                 {
                     Id = i.Id,

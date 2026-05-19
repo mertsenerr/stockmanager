@@ -98,8 +98,9 @@ public sealed class BelgeTipleriController : ControllerBase
             FirmaId = firmaId,
             Ad = ad,
             Aciklama = string.IsNullOrWhiteSpace(request.Aciklama) ? null : request.Aciklama.Trim(),
-            GerekenImzaRolleri = request.GerekenImzaRolleri.Distinct().ToList(),
+            ImzaSlotlari = NormalizeSlots(request.ImzaSlotlari),
             KaseGerekli = request.KaseGerekli,
+            KaseKonum = request.KaseGerekli ? (request.KaseKonum ?? ImzaKonumlari.OrtaAlt) : null,
             Arsivlendi = false,
             OlusturanKullaniciId = User.GetUserId(),
         };
@@ -131,8 +132,9 @@ public sealed class BelgeTipleriController : ControllerBase
         var oldArsivli = kayit.Arsivlendi;
         kayit.Ad = ad;
         kayit.Aciklama = string.IsNullOrWhiteSpace(request.Aciklama) ? null : request.Aciklama.Trim();
-        kayit.GerekenImzaRolleri = request.GerekenImzaRolleri.Distinct().ToList();
+        kayit.ImzaSlotlari = NormalizeSlots(request.ImzaSlotlari);
         kayit.KaseGerekli = request.KaseGerekli;
+        kayit.KaseKonum = request.KaseGerekli ? (request.KaseKonum ?? ImzaKonumlari.OrtaAlt) : null;
         kayit.Arsivlendi = request.Arsivlendi;
         await _repo.ReplaceAsync(kayit, ct);
 
@@ -195,12 +197,21 @@ public sealed class BelgeTipleriController : ControllerBase
         FirmaAdi = firmaMap.TryGetValue(t.FirmaId, out var ad) ? ad : null,
         Ad = t.Ad,
         Aciklama = t.Aciklama,
-        GerekenImzaRolleri = t.GerekenImzaRolleri,
+        ImzaSlotlari = t.ImzaSlotlari.Select(s => new ImzaSlotDto { Rol = s.Rol, Konum = s.Konum }).ToList(),
         KaseGerekli = t.KaseGerekli,
+        KaseKonum = t.KaseKonum,
         Arsivlendi = t.Arsivlendi,
         OlusturmaTarihi = t.OlusturmaTarihi,
         GuncellenmeTarihi = t.GuncellenmeTarihi,
     };
+
+    /// <summary>Aynı rolün birden çok kez gönderilmesini engeller, geçersiz değerleri eler.</summary>
+    private static List<ImzaSlot> NormalizeSlots(IEnumerable<ImzaSlotDto> slots) =>
+        slots
+            .Where(s => ImzaRolleri.IsValid(s.Rol) && ImzaKonumlari.IsValid(s.Konum))
+            .GroupBy(s => s.Rol)
+            .Select(g => new ImzaSlot { Rol = g.Key, Konum = g.First().Konum })
+            .ToList();
 
     private IActionResult ValidationFailure(FluentValidation.Results.ValidationResult result)
     {

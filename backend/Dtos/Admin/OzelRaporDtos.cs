@@ -9,8 +9,9 @@ public sealed class OzelRaporDosyaDto
     public DateTime YuklemeTarihi { get; set; }
     public string? BelgeTipiId { get; set; }
     public string? BelgeTipiAdi { get; set; }
-    public IReadOnlyList<string> ImzaGerekenRoller { get; set; } = [];
+    public IReadOnlyList<ImzaSlotDto> ImzaSlotlari { get; set; } = [];
     public bool KaseGerekli { get; set; }
+    public string? KaseKonum { get; set; }
     public IReadOnlyList<DosyaImzaDto> Imzalar { get; set; } = [];
     public KaseDamgaDto? Kase { get; set; }
 }

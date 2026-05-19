@@ -52,10 +52,16 @@ public interface IPdfSigner
 {
     /// <summary>
     /// Mevcut bir PDF'in son sayfasının altına imza PNG'leri + dinamik kaşe
-    /// damgası bindirir. Sonuç MemoryStream olarak döner.
+    /// damgası bindirir. Yerleşim, belge tipinin tanımladığı konum
+    /// (SolAlt/OrtaAlt/SagAlt) snapshot'larına göre yapılır.
     /// </summary>
     /// <exception cref="InvalidOperationException">PDF okunamaz veya şifrelidir.</exception>
-    MemoryStream Stamp(Stream originalPdf, IReadOnlyList<DosyaImza> imzalar, KaseDamga? kase);
+    MemoryStream Stamp(
+        Stream originalPdf,
+        IReadOnlyList<DosyaImza> imzalar,
+        IReadOnlyList<ImzaSlot> slotlar,
+        KaseDamga? kase,
+        string? kaseKonum);
 }
 
 public sealed class PdfSigner : IPdfSigner
@@ -74,7 +80,12 @@ public sealed class PdfSigner : IPdfSigner
         EmbeddedFontResolver.Install();
     }
 
-    public MemoryStream Stamp(Stream originalPdf, IReadOnlyList<DosyaImza> imzalar, KaseDamga? kase)
+    public MemoryStream Stamp(
+        Stream originalPdf,
+        IReadOnlyList<DosyaImza> imzalar,
+        IReadOnlyList<ImzaSlot> slotlar,
+        KaseDamga? kase,
+        string? kaseKonum)
     {
         // GridFS download stream'i seek desteklemiyor, PdfReader seek istiyor —
         // MemoryStream'e buffer'la, sonra ondan oku.
@@ -98,30 +109,34 @@ public sealed class PdfSigner : IPdfSigner
         var lastPage = doc.Pages[^1];
         using (var gfx = XGraphics.FromPdfPage(lastPage))
         {
-            // Blokları sayfanın altına yatay olarak yerleştir.
-            var blocks = new List<Action<double>>();
+            var y = lastPage.Height - BlockHeight - Padding;
+
+            // Her imza, slot tanımındaki konuma yerleştirilir. Slot bulunamazsa
+            // (eski snapshot) OrtaAlt fallback.
             foreach (var imza in imzalar)
             {
-                blocks.Add(x => DrawSignatureBlock(gfx, x, lastPage.Height - BlockHeight - Padding, imza));
+                var slot = slotlar.FirstOrDefault(s => s.Rol == imza.Rol);
+                var konum = slot?.Konum ?? ImzaKonumlari.OrtaAlt;
+                var x = KonumToX(konum, lastPage.Width);
+                DrawSignatureBlock(gfx, x, y, imza);
             }
+
             if (kase is not null)
             {
-                blocks.Add(x => DrawKase(gfx, x, lastPage.Height - BlockHeight - Padding, kase));
-            }
-
-            if (blocks.Count == 0) return WriteToStream(doc);
-
-            // Sayfaya sığacak şekilde ortala.
-            var totalWidth = blocks.Count * BlockWidth + (blocks.Count - 1) * Padding;
-            var startX = Math.Max(Padding, (lastPage.Width - totalWidth) / 2);
-            for (var i = 0; i < blocks.Count; i++)
-            {
-                blocks[i](startX + i * (BlockWidth + Padding));
+                var x = KonumToX(kaseKonum ?? ImzaKonumlari.OrtaAlt, lastPage.Width);
+                DrawKase(gfx, x, y, kase);
             }
         }
 
         return WriteToStream(doc);
     }
+
+    private static double KonumToX(string konum, double pageWidth) => konum switch
+    {
+        ImzaKonumlari.SolAlt => Padding,
+        ImzaKonumlari.SagAlt => pageWidth - BlockWidth - Padding,
+        _ => (pageWidth - BlockWidth) / 2, // OrtaAlt default
+    };
 
     private static MemoryStream WriteToStream(PdfDocument doc)
     {

@@ -116,18 +116,18 @@
                   <p class="text-[11px] text-ink-muted font-mono">
                     {{ formatSize(d.boyut) }} · {{ formatDate(d.yuklemeTarihi) }}
                   </p>
-                  @if (d.belgeTipiAdi || d.imzaGerekenRoller.length > 0 || d.kaseGerekli) {
+                  @if (d.belgeTipiAdi || d.imzaSlotlari.length > 0 || d.kaseGerekli) {
                     <div class="mt-1.5 flex flex-wrap gap-1">
                       @if (d.belgeTipiAdi) {
                         <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-surface border border-border text-text-secondary">
                           {{ d.belgeTipiAdi }}
                         </span>
                       }
-                      @for (rol of d.imzaGerekenRoller; track rol) {
-                        @if (hasSignature(d, rol); as signed) {
-                          @if (getSignature(d, rol); as imza) {
+                      @for (slot of d.imzaSlotlari; track slot.rol) {
+                        @if (hasSignature(d, slot.rol); as signed) {
+                          @if (getSignature(d, slot.rol); as imza) {
                             <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] bg-accent-info/15 border border-accent-info/40 text-accent-info">
-                              ✓ {{ rolEtiketi(rol) }} · {{ imza.kullaniciAdSoyad }} · {{ formatDate(imza.imzalanmaTarihi) }}
+                              ✓ {{ rolEtiketi(slot.rol) }} · {{ imza.kullaniciAdSoyad }} · {{ formatDate(imza.imzalanmaTarihi) }}
                               @if (imza.kullaniciId === (user()?.id) || (user()?.rol) === 'Sistem') {
                                 <button type="button" (click)="removeSignature(r, d, imza.id)"
                                         class="text-accent-info/70 hover:text-accent-danger leading-none" aria-label="İmzayı sil">×</button>
@@ -136,7 +136,7 @@
                           }
                         } @else {
                           <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-accent-info/5 border border-dashed border-accent-info/30 text-accent-info/70">
-                            İmza bekliyor: {{ rolEtiketi(rol) }}
+                            İmza bekliyor: {{ rolEtiketi(slot.rol) }}
                           </span>
                         }
                       }
@@ -159,11 +159,11 @@
                   }
                 </div>
                 <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                  @for (rol of d.imzaGerekenRoller; track rol) {
-                    @if (!hasSignature(d, rol) && canSignAs(rol)) {
-                      <button type="button" (click)="openSignModal(r.id, d, rol)"
+                  @for (slot of d.imzaSlotlari; track slot.rol) {
+                    @if (!hasSignature(d, slot.rol) && canSignAs(slot.rol)) {
+                      <button type="button" (click)="openSignModal(r.id, d, slot.rol)"
                               class="focus-ring text-xs font-medium px-2.5 py-1.5 rounded-sm border border-accent-info/40 text-accent-info hover:bg-accent-info/10 transition-colors">
-                        İmzala: {{ rolEtiketi(rol) }}
+                        İmzala: {{ rolEtiketi(slot.rol) }}
                       </button>
                     }
                   }

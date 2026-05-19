@@ -139,6 +139,13 @@
   box-shadow: 0 0 0 3px var(--color-accent-soft, rgba(var(--color-accent-rgb), 0.15)) !important;
 }
 textarea.bt-input { min-height: 64px !important; resize: vertical; }
+/* Native <select> dropdown popup'u OS kontrolünde; <option>'ların rengini
+   explicit override etmezsek dark mode'da popup beyaz ama text light
+   inherit ediyor → beyaz üstüne beyaz. */
+.bt-input option {
+  background-color: var(--color-surface) !important;
+  color: var(--color-ink) !important;
+}
 
 :host-context([data-theme="dark"]) .bt-input {
   background: rgba(255, 255, 255, 0.04) !important;

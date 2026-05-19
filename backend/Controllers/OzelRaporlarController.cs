@@ -415,14 +415,12 @@ public sealed class OzelRaporlarController : ControllerBase
 
         _audit.Log(User, AuditAksiyonlari.OzelRaporImzaliDownload, "ozel-rapor", rapor.Id, yeni: dosya.Ad);
 
+        // File(stream, mime, fileName) overload'u dosya adını RFC 5987'ye göre
+        // (filename*=UTF-8''...) encode eder — System.Net.Mime.ContentDisposition
+        // line-folding yapıyor ve uzun/Türkçe dosya adlarında header'a CR/LF
+        // sızdırıyor, Kestrel bunu güvenlik gerekçesiyle reddediyor.
         var stem = Path.GetFileNameWithoutExtension(dosya.Ad);
-        var disposition = new System.Net.Mime.ContentDisposition
-        {
-            FileName = $"{stem} (imzalı).pdf",
-            Inline = false,
-        };
-        Response.Headers["Content-Disposition"] = disposition.ToString();
-        return File(signed, "application/pdf");
+        return File(signed, "application/pdf", $"{stem} (imzalı).pdf");
     }
 
     private static bool IsPdf(OzelRaporDosya d) =>
@@ -481,17 +479,13 @@ public sealed class OzelRaporlarController : ControllerBase
 
         _audit.Log(User, AuditAksiyonlari.OzelRaporDownload, "ozel-rapor", rapor.Id, yeni: dosya.Ad);
 
-        // Force download instead of inline rendering. The stored MimeType comes from the
-        // uploader's Content-Type header — we don't trust it for inline display. Combined
-        // with the extension allow-list (xlsx/xls/pdf) and X-Content-Type-Options=nosniff
-        // this neutralises XSS-via-upload tricks.
-        var disposition = new System.Net.Mime.ContentDisposition
-        {
-            FileName = dosya.Ad,
-            Inline = false,
-        };
-        Response.Headers["Content-Disposition"] = disposition.ToString();
-        return File(stream, "application/octet-stream");
+        // File(stream, mime, fileName) overload'u ASP.NET'in RFC 5987 encode'unu
+        // kullanır (filename*=UTF-8''...). System.Net.Mime.ContentDisposition
+        // MIME line-folding yapıp uzun/Türkçe adlarda header'a CR/LF sızdırıyor
+        // ve Kestrel response-splitting koruması nedeniyle reddediyor.
+        // Combined with the extension allow-list (xlsx/xls/pdf/csv) and the
+        // X-Content-Type-Options=nosniff header this neutralises XSS-via-upload tricks.
+        return File(stream, "application/octet-stream", dosya.Ad);
     }
 
     private bool CanRead(OzelRapor rapor, string uid) =>

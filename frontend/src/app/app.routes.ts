@@ -108,6 +108,12 @@ export const routes: Routes = [
           import('./features/ozel-raporlar/ozel-raporlar.component').then((m) => m.OzelRaporlarComponent),
       },
       {
+        path: 'ozel-raporlar/belge-tipleri',
+        canActivate: [roleGuard('Sistem', 'SayimBaskani')],
+        loadComponent: () =>
+          import('./features/belge-tipleri/belge-tipleri.component').then((m) => m.BelgeTipleriComponent),
+      },
+      {
         path: 'arkadaslar',
         loadComponent: () =>
           import('./features/arkadaslar/arkadaslar.component').then((m) => m.ArkadaslarComponent),
@@ -143,12 +149,6 @@ export const routes: Routes = [
             path: 'bildirimler',
             loadComponent: () =>
               import('./features/ayarlar/bildirimler/bildirimler.component').then((m) => m.BildirimlerComponent),
-          },
-          {
-            path: 'belge-tipleri',
-            canActivate: [roleGuard('Sistem', 'SayimBaskani')],
-            loadComponent: () =>
-              import('./features/belge-tipleri/belge-tipleri.component').then((m) => m.BelgeTipleriComponent),
           },
         ],
       },

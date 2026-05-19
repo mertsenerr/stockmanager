@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 import { ModalComponent } from '../../shared/ui/modal/modal.component';
 import { ToastService } from '../../shared/ui/toast/toast.service';
 import { AuthService } from '../../core/auth/auth.service';
@@ -12,7 +13,7 @@ import { BelgeTipi, BelgeTipiUpsert, IMZA_ROL_OPTIONS, ImzaRolu } from './belge-
 @Component({
   selector: 'app-belge-tipleri',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent],
+  imports: [ReactiveFormsModule, RouterLink, ModalComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './belge-tipleri.component.html',
   styleUrls: ['./belge-tipleri.component.css'],

@@ -183,8 +183,6 @@ export class AyarlarShellComponent {
     { path: 'genel',      label: 'Genel ayarlar',      description: 'Dil, bölge, görünüm',     iconImg: '/assets/images/gear.png' },
     { path: 'guvenlik',   label: 'Gizlilik & güvenlik', description: 'Şifre, oturumlar, 2FA',  iconImg: '/assets/images/shield.png' },
     { path: 'bildirimler', label: 'Bildirimler',       description: 'E-posta & in-app',        iconImg: '/assets/images/notification.png' },
-    { path: 'belge-tipleri', label: 'Belge tipleri',   description: 'İmza/kaşe gereksinimleri', iconImg: '/assets/images/document.png',
-      roles: ['Sistem', 'SayimBaskani'] },
   ];
 
   protected readonly visibleKategoriler = computed<AyarKategori[]>(() => {

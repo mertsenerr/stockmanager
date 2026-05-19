@@ -88,7 +88,18 @@
 
     <div class="bt-form-row">
       <label class="bt-label" for="bt-ad">Belge adı <span class="bt-required">*</span></label>
-      <input id="bt-ad" type="text" formControlName="ad" class="bt-input" maxlength="120" placeholder="Sayım Kabul Tutanağı" />
+      <input
+        id="bt-ad"
+        type="text"
+        formControlName="ad"
+        maxlength="120"
+        placeholder="Sayım Kabul Tutanağı"
+        style="display: block; width: 100%; min-height: 40px; padding: 10px 12px;
+               font-size: 13px; line-height: 1.4; font-family: inherit;
+               background: rgba(255, 255, 255, 0.05); color: #fff;
+               border: 1.5px solid rgba(255, 255, 255, 0.28); border-radius: 10px;
+               outline: none; box-sizing: border-box;"
+      />
       @if (form.controls.ad.touched && form.controls.ad.errors?.['required']) {
         <p class="bt-error">Belge adı zorunlu.</p>
       }

@@ -1,9 +1,52 @@
 using PdfSharpCore.Drawing;
+using PdfSharpCore.Fonts;
 using PdfSharpCore.Pdf;
 using PdfSharpCore.Pdf.IO;
 using SayimLink.Api.Models;
 
 namespace SayimLink.Api.Services;
+
+/// <summary>
+/// PdfSharpCore'un IFontResolver implementasyonu — assembly'ye embed edilmiş
+/// Noto Sans dosyalarını döner. Linux container'larda system font'a bağımlı
+/// kalmamak için. Process başına bir defa GlobalFontSettings.FontResolver'a
+/// atanmalı.
+/// </summary>
+internal sealed class EmbeddedFontResolver : IFontResolver
+{
+    private const string DefaultFamily = "Noto Sans";
+    private const string RegularResource = "SayimLink.Api.Resources.Fonts.NotoSans-Regular.ttf";
+    private const string BoldResource = "SayimLink.Api.Resources.Fonts.NotoSans-Bold.ttf";
+
+    public string DefaultFontName => DefaultFamily;
+
+    public FontResolverInfo? ResolveTypeface(string familyName, bool isBold, bool isItalic)
+    {
+        // Hangi aile istenirse istensin (Arial, Helvetica, vs.) Noto'ya yönlendir
+        // — Linux container'larda eldeki tek font bu, ve metric'leri benzer.
+        var face = isBold ? "NotoSans#bold" : "NotoSans#regular";
+        return new FontResolverInfo(face);
+    }
+
+    public byte[] GetFont(string faceName)
+    {
+        var resourceName = faceName.EndsWith("bold", StringComparison.OrdinalIgnoreCase)
+            ? BoldResource
+            : RegularResource;
+        using var stream = typeof(EmbeddedFontResolver).Assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException($"Embedded font not found: {resourceName}");
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        return ms.ToArray();
+    }
+
+    /// <summary>Process başına bir kez global resolver olarak atar.</summary>
+    public static void Install()
+    {
+        if (GlobalFontSettings.FontResolver is EmbeddedFontResolver) return;
+        GlobalFontSettings.FontResolver = new EmbeddedFontResolver();
+    }
+}
 
 public interface IPdfSigner
 {
@@ -22,16 +65,30 @@ public sealed class PdfSigner : IPdfSigner
     private const double Padding = 16;
     private const double SignatureImageHeight = 50;
     private const double KaseDiameter = 110;
+    private const string FontFamily = "Noto Sans";
+
+    public PdfSigner()
+    {
+        // FontResolver process-wide global — DI singleton constructor'da
+        // bir kez kurulur, sonraki çağrılar idempotent.
+        EmbeddedFontResolver.Install();
+    }
 
     public MemoryStream Stamp(Stream originalPdf, IReadOnlyList<DosyaImza> imzalar, KaseDamga? kase)
     {
+        // GridFS download stream'i seek desteklemiyor, PdfReader seek istiyor —
+        // MemoryStream'e buffer'la, sonra ondan oku.
+        using var buffered = new MemoryStream();
+        originalPdf.CopyTo(buffered);
+        buffered.Position = 0;
+
         // PdfSharpCore.Open: bazı PDF'ler "encrypted" hatası verebilir; bu
         // durumda InvalidOperationException atıp controller'a 422 döndürmesini
         // söylüyoruz.
         PdfDocument doc;
         try
         {
-            doc = PdfReader.Open(originalPdf, PdfDocumentOpenMode.Modify);
+            doc = PdfReader.Open(buffered, PdfDocumentOpenMode.Modify);
         }
         catch (PdfReaderException ex)
         {
@@ -76,9 +133,9 @@ public sealed class PdfSigner : IPdfSigner
 
     private static void DrawSignatureBlock(XGraphics gfx, double x, double y, DosyaImza imza)
     {
-        var titleFont = new XFont("Arial", 8, XFontStyle.Bold);
-        var nameFont = new XFont("Arial", 9, XFontStyle.Regular);
-        var dateFont = new XFont("Arial", 7, XFontStyle.Regular);
+        var titleFont = new XFont(FontFamily, 8, XFontStyle.Bold);
+        var nameFont = new XFont(FontFamily, 9, XFontStyle.Regular);
+        var dateFont = new XFont(FontFamily, 7, XFontStyle.Regular);
 
         var ink = XBrushes.Black;
         var muted = new XSolidBrush(XColor.FromArgb(110, 110, 110));
@@ -140,8 +197,8 @@ public sealed class PdfSigner : IPdfSigner
         // Orta yatay çizgi (klasik "kabul edildi" damgası gibi)
         gfx.DrawLine(redThinPen, centerX - diameter / 2 + 6, centerY, centerX + diameter / 2 - 6, centerY);
 
-        var bigFont = new XFont("Arial", 9, XFontStyle.Bold);
-        var smallFont = new XFont("Arial", 7, XFontStyle.Regular);
+        var bigFont = new XFont(FontFamily, 9, XFontStyle.Bold);
+        var smallFont = new XFont(FontFamily, 7, XFontStyle.Regular);
 
         // Üst yarı: "MAĞAZA KAŞESİ"
         gfx.DrawString("MAĞAZA KAŞESİ", bigFont, redBrush,

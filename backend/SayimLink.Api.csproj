@@ -28,4 +28,12 @@
     <PackageReference Include="Fido2" Version="3.0.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Noto Sans, SIL OFL — PdfSharpCore Linux container'larda Arial
+         bulamadığı için embed ediyoruz. PdfSigner kendi FontResolver'ı
+         üzerinden bu dosyaları çözer. -->
+    <EmbeddedResource Include="Resources/Fonts/NotoSans-Regular.ttf" />
+    <EmbeddedResource Include="Resources/Fonts/NotoSans-Bold.ttf" />
+  </ItemGroup>
+
 </Project>

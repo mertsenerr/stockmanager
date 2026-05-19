@@ -20,10 +20,11 @@ public sealed class BelgeTipiUpsertRequestValidator : AbstractValidator<BelgeTip
             .Must(BeValidSlots)
             .WithMessage("Geçersiz imza rolü veya konumu.");
 
-        RuleFor(x => x.KaseKonum!)
-            .Must(ImzaKonumlari.IsValid)
-            .WithMessage("Geçersiz kaşe konumu.")
-            .When(x => x.KaseGerekli);
+        // Null kabul ediyoruz — controller KaseGerekli=true iken null gelirse
+        // OrtaAlt default'una düşürüyor. Sadece dolu gelirse geçerlilik kontrol et.
+        RuleFor(x => x.KaseKonum)
+            .Must(k => k is null || ImzaKonumlari.IsValid(k))
+            .WithMessage("Geçersiz kaşe konumu.");
     }
 
     private static bool BeValidSlots(List<ImzaSlotDto> slots) =>

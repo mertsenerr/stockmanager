@@ -10,6 +10,7 @@ export interface CurrentUser {
   firmaKisaltmasi?: string | null;
   firmaIds: string[];
   magazaIds: string[];
+  avatarDataUri?: string | null;
 }
 
 export interface LoginRequest {

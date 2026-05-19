@@ -326,6 +326,47 @@ public sealed class AuthController : ControllerBase
         return Ok(dto);
     }
 
+    [HttpPut("me/avatar")]
+    [Authorize]
+    public async Task<IActionResult> UpdateAvatar([FromBody] UpdateAvatarRequest request, CancellationToken ct)
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+        // Validate format + size. data:image/(png|jpeg|webp);base64,...
+        // Max ~200KB sonrası bytes — User doc'unu kontrol altında tut.
+        const int MaxBytes = 200 * 1024;
+        var dataUri = request.DataUri ?? string.Empty;
+        if (!dataUri.StartsWith("data:image/png;base64,", StringComparison.OrdinalIgnoreCase)
+            && !dataUri.StartsWith("data:image/jpeg;base64,", StringComparison.OrdinalIgnoreCase)
+            && !dataUri.StartsWith("data:image/webp;base64,", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "Geçerli bir resim verisi gönderin (PNG/JPEG/WebP)." });
+        }
+        var commaIdx = dataUri.IndexOf(',');
+        var base64Part = dataUri[(commaIdx + 1)..];
+        // base64 length → byte count: (len * 3) / 4 minus padding
+        var approxBytes = (base64Part.Length * 3) / 4;
+        if (approxBytes > MaxBytes)
+            return BadRequest(new { message = "Resim çok büyük (en fazla 200 KB)." });
+
+        var dto = await _auth.UpdateAvatarAsync(userId, dataUri, ct);
+        if (dto is null) return Unauthorized();
+        return Ok(dto);
+    }
+
+    [HttpDelete("me/avatar")]
+    [Authorize]
+    public async Task<IActionResult> DeleteAvatar(CancellationToken ct)
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+        var dto = await _auth.UpdateAvatarAsync(userId, null, ct);
+        if (dto is null) return Unauthorized();
+        return Ok(dto);
+    }
+
     [HttpPost("change-password")]
     [Authorize]
     [EnableRateLimiting("auth-strict")]

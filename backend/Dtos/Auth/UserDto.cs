@@ -11,4 +11,11 @@ public sealed class UserDto
     public string? FirmaKisaltmasi { get; set; }
     public IReadOnlyList<string> FirmaIds { get; set; } = [];
     public IReadOnlyList<string> MagazaIds { get; set; } = [];
+    public string? AvatarDataUri { get; set; }
+}
+
+public sealed class UpdateAvatarRequest
+{
+    /// <summary>data:image/(png|jpeg|webp);base64,... formatında. null → avatarı kaldırır (DELETE endpoint).</summary>
+    public string? DataUri { get; set; }
 }

@@ -418,6 +418,21 @@
   font-size: 11px;
 }
 
+/* Avatar image variant — kullanıcının yüklediği profil fotoğrafı. Boyutları
+   .orbix-avatar ile aynı, böylece initials → resim geçişinde layout
+   sıçramasın. */
+.orbix-avatar-img {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: block;
+}
+.orbix-avatar-img.orbix-avatar-sm {
+  width: 30px; height: 30px;
+  border-radius: 9px;
+}
+
 .orbix-logout {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 6px 10px;

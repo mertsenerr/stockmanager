@@ -17,6 +17,7 @@ public interface IAuthService
     Task<bool> ResetPasswordAsync(string tokenPlaintext, string newPassword, CancellationToken ct = default);
     Task<UserDto?> GetCurrentUserAsync(string userId, CancellationToken ct = default);
     Task<UserDto?> UpdateProfileAsync(string userId, UpdateProfileRequest request, CancellationToken ct = default);
+    Task<UserDto?> UpdateAvatarAsync(string userId, string? dataUri, CancellationToken ct = default);
     Task<ChangePasswordResult> ChangePasswordAsync(string userId, ChangePasswordRequest request, string? currentRefreshToken, CancellationToken ct = default);
     Task<bool> UndoPasswordChangeAsync(string token, CancellationToken ct = default);
     Task<long> RevokeOtherSessionsAsync(string userId, string? currentRefreshToken, CancellationToken ct = default);
@@ -500,6 +501,15 @@ public sealed class AuthService : IAuthService
         return await ToDtoEnrichedAsync(user, ct);
     }
 
+    public async Task<UserDto?> UpdateAvatarAsync(string userId, string? dataUri, CancellationToken ct = default)
+    {
+        var user = await _users.FindByIdAsync(userId, ct);
+        if (user is null || !user.AktifMi) return null;
+        user.AvatarDataUri = string.IsNullOrWhiteSpace(dataUri) ? null : dataUri;
+        await _users.ReplaceAsync(user, ct);
+        return await ToDtoEnrichedAsync(user, ct);
+    }
+
     public async Task<ChangePasswordResult> ChangePasswordAsync(
         string userId, ChangePasswordRequest request,
         string? currentRefreshToken, CancellationToken ct = default)
@@ -806,6 +816,7 @@ public sealed class AuthService : IAuthService
         FirmaId = user.FirmaId,
         FirmaIds = user.FirmaIds,
         MagazaIds = user.MagazaIds,
+        AvatarDataUri = user.AvatarDataUri,
     };
 
     private static string GenerateOpaqueToken()

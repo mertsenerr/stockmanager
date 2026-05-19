@@ -209,6 +209,18 @@ export class AuthService {
       .pipe(tap((user) => this._currentUser.set(user)));
   }
 
+  updateAvatar(dataUri: string): Observable<CurrentUser> {
+    return this.http
+      .put<CurrentUser>(`${this.base}/me/avatar`, { dataUri }, { withCredentials: true })
+      .pipe(tap((user) => this._currentUser.set(user)));
+  }
+
+  removeAvatar(): Observable<CurrentUser> {
+    return this.http
+      .delete<CurrentUser>(`${this.base}/me/avatar`, { withCredentials: true })
+      .pipe(tap((user) => this._currentUser.set(user)));
+  }
+
   changePassword(req: ChangePasswordRequest): Observable<void> {
     return this.http
       .post<void>(`${this.base}/change-password`, req, { withCredentials: true });

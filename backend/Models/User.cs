@@ -23,6 +23,14 @@ public sealed class User
 
     public bool AktifMi { get; set; } = true;
 
+    /// <summary>
+    /// Profil fotoğrafı, data URI olarak inline saklanır (data:image/...;base64,...).
+    /// Frontend kırpıp 240px kareye düşürüyor, ~50KB sınırında tutuyoruz —
+    /// User doc'unu şişirmemek için. Null = avatar yok, initials gösterilsin.
+    /// </summary>
+    public string? AvatarDataUri { get; set; }
+
+
     public DateTime OlusturmaTarihi { get; set; } = DateTime.UtcNow;
     public DateTime? SonGirisTarihi { get; set; }
 

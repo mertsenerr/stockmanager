@@ -109,7 +109,11 @@
     @if (user(); as u) {
       <div class="orbix-panel-foot">
         <div class="orbix-user">
-          <span class="orbix-avatar">{{ initials() }}</span>
+          @if (u.avatarDataUri) {
+            <img [src]="u.avatarDataUri" alt="" class="orbix-avatar-img" />
+          } @else {
+            <span class="orbix-avatar">{{ initials() }}</span>
+          }
           <span class="orbix-user-text">
             <span class="orbix-user-name">{{ u.adSoyad }}</span>
             <span class="orbix-user-role">{{ roleLabel() }}</span>
@@ -154,7 +158,11 @@
               aria-haspopup="menu"
               aria-label="Profil menüsünü aç"
             >
-              <span class="orbix-avatar orbix-avatar-sm">{{ initials() }}</span>
+              @if (u.avatarDataUri) {
+                <img [src]="u.avatarDataUri" alt="" class="orbix-avatar-img orbix-avatar-sm" />
+              } @else {
+                <span class="orbix-avatar orbix-avatar-sm">{{ initials() }}</span>
+              }
               <span class="orbix-topbar-user-text">
                 <span class="orbix-topbar-user-name">{{ u.adSoyad }}</span>
                 <span class="orbix-topbar-user-handle">{{ '@' + (u.email.split('@')[0] || '') }}</span>
@@ -166,7 +174,11 @@
               <div class="orbix-profile-backdrop" (click)="closeProfileMenu()"></div>
               <div class="orbix-profile-menu" role="menu">
                 <header class="orbix-profile-head">
-                  <span class="orbix-avatar">{{ initials() }}</span>
+                  @if (u.avatarDataUri) {
+                    <img [src]="u.avatarDataUri" alt="" class="orbix-avatar-img" />
+                  } @else {
+                    <span class="orbix-avatar">{{ initials() }}</span>
+                  }
                   <span class="orbix-profile-head-text">
                     <span class="orbix-profile-head-name">{{ u.adSoyad }}</span>
                     <span class="orbix-profile-head-email">{{ u.email }}</span>

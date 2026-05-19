@@ -1,4 +1,7 @@
 using Microsoft.Extensions.Options;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Driver.GridFS;
 using SayimLink.Api.Configuration;
 
 namespace SayimLink.Api.Services;
@@ -8,7 +11,7 @@ public interface IOzelRaporStorage
     /// <summary>Yüklenecek dosyanın boyut/uzantı validasyonu. Geçerliyse null, değilse hata mesajı.</summary>
     string? ValidateUpload(string fileName, long size);
 
-    /// <summary>Dosyayı diske yazar, kaydedilen storage adını (id+ext) döner.</summary>
+    /// <summary>Dosyayı saklamaya yazar, kaydedilen storage adını (GridFS ObjectId string) döner.</summary>
     Task<string> SaveAsync(string raporId, string storageId, string originalFileName, Stream content, CancellationToken ct);
 
     Task<Stream> OpenReadAsync(string raporId, string storageName, CancellationToken ct);
@@ -20,20 +23,22 @@ public interface IOzelRaporStorage
     long MaxFileSizeBytes { get; }
 }
 
+/// <summary>
+/// MongoDB GridFS tabanlı dosya saklama. Render gibi PaaS'larda kalıcı disk
+/// gerektirmez — dosyalar Mongo'da chunk'lar halinde saklanır. StorageName,
+/// GridFS dosyasının ObjectId'sinin string halidir.
+/// </summary>
 public sealed class OzelRaporStorage : IOzelRaporStorage
 {
+    private const string BucketName = "ozel_rapor";
     private readonly OzelRaporSettings _settings;
-    private readonly string _root;
+    private readonly IGridFSBucket _bucket;
 
-    public OzelRaporStorage(IOptions<OzelRaporSettings> options, IHostEnvironment env)
+    public OzelRaporStorage(IOptions<OzelRaporSettings> options, IMongoDbService mongo)
     {
         _settings = options.Value;
-        _root = string.IsNullOrWhiteSpace(_settings.StorageRoot)
-            ? Path.Combine(env.ContentRootPath, "App_Data", "ozel-raporlar")
-            : _settings.StorageRoot;
+        _bucket = new GridFSBucket(mongo.Database, new GridFSBucketOptions { BucketName = BucketName });
     }
-
-    private void EnsureRoot() => Directory.CreateDirectory(_root);
 
     public long MaxFileSizeBytes => _settings.MaxFileSizeBytes;
 
@@ -53,34 +58,51 @@ public sealed class OzelRaporStorage : IOzelRaporStorage
     public async Task<string> SaveAsync(
         string raporId, string storageId, string originalFileName, Stream content, CancellationToken ct)
     {
-        EnsureRoot();
-        var ext = Path.GetExtension(originalFileName).ToLowerInvariant();
-        var storageName = storageId + ext;
-        var folder = Path.Combine(_root, raporId);
-        Directory.CreateDirectory(folder);
-        var fullPath = Path.Combine(folder, storageName);
-        await using var fs = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-        await content.CopyToAsync(fs, ct);
-        return storageName;
+        // GridFS metadata — DeleteRaporFolder filtre çekerken kullanıyor, mimeType da
+        // download üzerinde Content-Type belirleme şansı verir.
+        var ext = Path.GetExtension(originalFileName);
+        var meta = new BsonDocument
+        {
+            { "raporId", raporId },
+            { "dosyaId", storageId },
+            { "ext", ext.ToLowerInvariant() },
+        };
+        var opts = new GridFSUploadOptions { Metadata = meta };
+        // Filename'i {storageId}{ext} olarak yazıyoruz — orijinal ad zaten OzelRaporDosya.Ad'da.
+        var id = await _bucket.UploadFromStreamAsync($"{storageId}{ext}", content, opts, ct);
+        return id.ToString();
     }
 
-    public Task<Stream> OpenReadAsync(string raporId, string storageName, CancellationToken ct)
+    public async Task<Stream> OpenReadAsync(string raporId, string storageName, CancellationToken ct)
     {
-        var path = Path.Combine(_root, raporId, storageName);
-        if (!File.Exists(path)) throw new FileNotFoundException("Rapor dosyası bulunamadı.", path);
-        Stream s = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        return Task.FromResult(s);
+        if (!ObjectId.TryParse(storageName, out var oid))
+            throw new FileNotFoundException("Rapor dosyası bulunamadı (geçersiz id).", storageName);
+        try
+        {
+            return await _bucket.OpenDownloadStreamAsync(oid, cancellationToken: ct);
+        }
+        catch (GridFSFileNotFoundException)
+        {
+            throw new FileNotFoundException("Rapor dosyası bulunamadı.", storageName);
+        }
     }
 
     public void DeleteFile(string raporId, string storageName)
     {
-        var path = Path.Combine(_root, raporId, storageName);
-        if (File.Exists(path)) File.Delete(path);
+        if (!ObjectId.TryParse(storageName, out var oid)) return;
+        try { _bucket.Delete(oid); }
+        catch (GridFSFileNotFoundException) { /* zaten yok, sorun değil */ }
     }
 
     public void DeleteRaporFolder(string raporId)
     {
-        var folder = Path.Combine(_root, raporId);
-        if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+        // GridFS'de "klasör" kavramı yok — metadata.raporId üzerinden filtreliyoruz.
+        var filter = Builders<GridFSFileInfo>.Filter.Eq("metadata.raporId", raporId);
+        using var cursor = _bucket.Find(filter);
+        foreach (var file in cursor.ToEnumerable())
+        {
+            try { _bucket.Delete(file.Id); }
+            catch (GridFSFileNotFoundException) { /* paralel silinmiş olabilir */ }
+        }
     }
 }

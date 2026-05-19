@@ -58,6 +58,7 @@ builder.Services.AddSingleton<IFriendshipRepository, FriendshipRepository>();
 builder.Services.AddSingleton<IOzelRaporRepository, OzelRaporRepository>();
 builder.Services.AddSingleton<IOzelRaporStorage, OzelRaporStorage>();
 builder.Services.AddSingleton<IBelgeTipiRepository, BelgeTipiRepository>();
+builder.Services.AddSingleton<IPdfSigner, PdfSigner>();
 builder.Services.AddSingleton<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddSingleton<IAuditService, AuditService>();
 builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();

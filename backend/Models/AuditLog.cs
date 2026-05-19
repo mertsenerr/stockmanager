@@ -50,6 +50,12 @@ public static class AuditAksiyonlari
     public const string BelgeTipiUpdate = "belge-tipi.update";
     public const string BelgeTipiArchive = "belge-tipi.archive";
     public const string BelgeTipiRestore = "belge-tipi.restore";
+
+    public const string OzelRaporImzaAt = "ozel-rapor.imza.at";
+    public const string OzelRaporImzaSil = "ozel-rapor.imza.sil";
+    public const string OzelRaporKaseBas = "ozel-rapor.kase.bas";
+    public const string OzelRaporKaseSil = "ozel-rapor.kase.sil";
+    public const string OzelRaporImzaliDownload = "ozel-rapor.imzali.download";
 }
 
 public sealed class AuditLog

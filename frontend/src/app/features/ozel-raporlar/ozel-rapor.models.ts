@@ -1,3 +1,17 @@
+export interface DosyaImza {
+  id: string;
+  rol: string;
+  kullaniciId: string;
+  kullaniciAdSoyad: string;
+  imzalanmaTarihi: string;
+}
+
+export interface KaseDamga {
+  basanKullaniciId: string;
+  basanAdSoyad: string;
+  tarih: string;
+}
+
 export interface OzelRaporDosya {
   id: string;
   ad: string;
@@ -8,6 +22,8 @@ export interface OzelRaporDosya {
   belgeTipiAdi?: string | null;
   imzaGerekenRoller: string[];
   kaseGerekli: boolean;
+  imzalar: DosyaImza[];
+  kase?: KaseDamga | null;
 }
 
 export interface OzelRapor {

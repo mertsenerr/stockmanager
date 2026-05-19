@@ -35,6 +35,52 @@ public sealed class OzelRaporDosya
 
     /// <summary>Yükleme anındaki kaşe gereksinimi snapshot'ı.</summary>
     public bool KaseGerekli { get; set; }
+
+    /// <summary>
+    /// Bu dosyaya atılan imzaların listesi. Her rol için en fazla bir kayıt
+    /// olur (DELETE ile geri alınabilir, sonra yeniden eklenebilir).
+    /// </summary>
+    public List<DosyaImza> Imzalar { get; set; } = [];
+
+    /// <summary>
+    /// Kaşe damgası — atıldığında doludur. KaseGerekli=true olan dosyalar
+    /// için Mağaza Yetkilisi (veya Sistem) tarafından basılır.
+    /// </summary>
+    public KaseDamga? Kase { get; set; }
+}
+
+/// <summary>
+/// Tek bir imza kaydı — bir dosyaya, belirli bir rolün, belirli bir kullanıcı
+/// tarafından atıldığı imza. UX mock için imza görseli PNG data URI olarak
+/// saklanır (gerçek e-imza değil, sadece görsel rüya).
+/// </summary>
+public sealed class DosyaImza
+{
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+
+    /// <summary>Hangi rolün imza slotu (ImzaRolleri sabitlerinden).</summary>
+    public string Rol { get; set; } = string.Empty;
+
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string KullaniciId { get; set; } = string.Empty;
+
+    public string KullaniciAdSoyad { get; set; } = string.Empty;
+
+    /// <summary>Canvas'tan üretilmiş PNG (data:image/png;base64,...) — render aşamasında PDF'e bindirilir.</summary>
+    public string ImzaGorseliDataUri { get; set; } = string.Empty;
+
+    public DateTime ImzalanmaTarihi { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class KaseDamga
+{
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string BasanKullaniciId { get; set; } = string.Empty;
+
+    public string BasanAdSoyad { get; set; } = string.Empty;
+
+    public DateTime Tarih { get; set; } = DateTime.UtcNow;
 }
 
 public sealed class OzelRapor

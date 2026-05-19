@@ -119,20 +119,67 @@
                           {{ d.belgeTipiAdi }}
                         </span>
                       }
-                      @if (d.imzaGerekenRoller.length > 0) {
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-accent-info/10 border border-accent-info/30 text-accent-info">
-                          İmza: {{ imzaLabel(d.imzaGerekenRoller) }}
-                        </span>
+                      @for (rol of d.imzaGerekenRoller; track rol) {
+                        @if (hasSignature(d, rol); as signed) {
+                          @if (getSignature(d, rol); as imza) {
+                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] bg-accent-info/15 border border-accent-info/40 text-accent-info">
+                              ✓ {{ rolEtiketi(rol) }} · {{ imza.kullaniciAdSoyad }} · {{ formatDate(imza.imzalanmaTarihi) }}
+                              @if (imza.kullaniciId === (user()?.id) || (user()?.rol) === 'Sistem') {
+                                <button type="button" (click)="removeSignature(r, d, imza.id)"
+                                        class="text-accent-info/70 hover:text-accent-danger leading-none" aria-label="İmzayı sil">×</button>
+                              }
+                            </span>
+                          }
+                        } @else {
+                          <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-accent-info/5 border border-dashed border-accent-info/30 text-accent-info/70">
+                            İmza bekliyor: {{ rolEtiketi(rol) }}
+                          </span>
+                        }
                       }
                       @if (d.kaseGerekli) {
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-accent-warning/10 border border-accent-warning/30 text-accent-warning">
-                          Kaşe
-                        </span>
+                        @if (d.kase; as k) {
+                          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[10px] bg-accent-warning/15 border border-accent-warning/40 text-accent-warning">
+                            ✓ Kaşe · {{ k.basanAdSoyad }} · {{ formatDate(k.tarih) }}
+                            @if (k.basanKullaniciId === (user()?.id) || (user()?.rol) === 'Sistem') {
+                              <button type="button" (click)="removeStamp(r, d)"
+                                      class="text-accent-warning/70 hover:text-accent-danger leading-none" aria-label="Kaşeyi sil">×</button>
+                            }
+                          </span>
+                        } @else {
+                          <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-accent-warning/5 border border-dashed border-accent-warning/30 text-accent-warning/70">
+                            Kaşe bekliyor
+                          </span>
+                        }
                       }
                     </div>
                   }
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
+                <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                  @for (rol of d.imzaGerekenRoller; track rol) {
+                    @if (!hasSignature(d, rol) && canSignAs(rol)) {
+                      <button type="button" (click)="openSignModal(r.id, d, rol)"
+                              class="focus-ring text-xs font-medium px-2.5 py-1.5 rounded-sm border border-accent-info/40 text-accent-info hover:bg-accent-info/10 transition-colors">
+                        İmzala: {{ rolEtiketi(rol) }}
+                      </button>
+                    }
+                  }
+                  @if (canStamp(d)) {
+                    <button type="button" (click)="stamp(r, d)"
+                            class="focus-ring text-xs font-medium px-2.5 py-1.5 rounded-sm border border-accent-warning/40 text-accent-warning hover:bg-accent-warning/10 transition-colors">
+                      Kaşe bas
+                    </button>
+                  }
+                  @if (d.imzalar.length > 0 || d.kase) {
+                    @if (isPdf(d)) {
+                      <button type="button" (click)="downloadSigned(r, d)"
+                              [disabled]="signedDownloadId() === d.id"
+                              class="focus-ring text-xs font-medium px-2.5 py-1.5 rounded-sm bg-accent-info text-white hover:bg-accent-info/90 transition-colors disabled:opacity-50">
+                        {{ signedDownloadId() === d.id ? 'Hazırlanıyor...' : 'İmzalı PDF indir' }}
+                      </button>
+                    } @else {
+                      <span class="text-[10px] text-ink-muted italic px-1">İmzalı çıktı sadece PDF için</span>
+                    }
+                  }
                   <button type="button" (click)="download(r, d)"
                           [disabled]="downloadingId() === d.id"
                           class="pill-btn pill-btn-accent">
@@ -234,4 +281,38 @@
       </button>
     </div>
   </form>
+</app-modal>
+
+<app-modal
+  [open]="signModalOpen()"
+  [title]="signTarget() ? 'İmza at — ' + rolEtiketi(signTarget()!.rol) : 'İmza at'"
+  size="md"
+  (closed)="closeSignModal()"
+>
+  @if (signTarget(); as t) {
+    <div class="space-y-3">
+      <p class="text-xs text-text-secondary">
+        <strong class="text-text-primary">{{ t.dosya.ad }}</strong> belgesine <strong>{{ rolEtiketi(t.rol) }}</strong>
+        rolü için imza atılacak. Aşağıdaki alana fareyle imzanızı çizin.
+      </p>
+      <app-signature-pad (changed)="onPadChanged($event)"></app-signature-pad>
+      <p class="text-[11px] text-ink-muted italic">
+        Bu bir UX prototipidir — gerçek e-imza değildir. İmzanız PDF'in son sayfasının altına bindirilir.
+      </p>
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
+        <button type="button" (click)="clearPad()" [disabled]="signSaving() || signPadEmpty()"
+                class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors disabled:opacity-40">
+          Temizle
+        </button>
+        <button type="button" (click)="closeSignModal()" [disabled]="signSaving()"
+                class="focus-ring text-xs px-3 py-1.5 rounded-sm border border-border text-text-secondary hover:bg-surface-elevated transition-colors disabled:opacity-40">
+          Vazgeç
+        </button>
+        <button type="button" (click)="saveSignature()" [disabled]="signSaving() || signPadEmpty()"
+                class="pill-btn pill-btn-accent">
+          {{ signSaving() ? 'Kaydediliyor...' : 'İmzayı kaydet' }}
+        </button>
+      </div>
+    </div>
+  }
 </app-modal>

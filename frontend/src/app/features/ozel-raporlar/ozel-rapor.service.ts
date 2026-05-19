@@ -39,19 +39,55 @@ export class OzelRaporService {
   }
 
   async download(raporId: string, fileId: string, filename: string): Promise<void> {
+    return this.fetchDownload(`${this.base}/${raporId}/files/${fileId}/download`, filename);
+  }
+
+  /** İmza + kaşe bindirilmiş PDF'i indirir. Sadece PDF dosyalar için çalışır. */
+  async downloadSigned(raporId: string, fileId: string, filename: string): Promise<void> {
+    return this.fetchDownload(`${this.base}/${raporId}/files/${fileId}/signed`, filename);
+  }
+
+  private async fetchDownload(url: string, filename: string): Promise<void> {
     const token = this.auth.accessToken();
     if (!token) throw new Error('Oturum yok');
-    const res = await fetch(`${this.base}/${raporId}/files/${fileId}/download`, {
+    const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
       credentials: 'include',
     });
-    if (!res.ok) throw new Error('İndirme başarısız');
+    if (!res.ok) {
+      // Backend 422 verirse JSON body içinde "message" döner
+      let msg = 'İndirme başarısız';
+      try {
+        const body = await res.json();
+        if (body?.message) msg = body.message;
+      } catch { /* JSON değil, ignore */ }
+      throw new Error(msg);
+    }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+    const link = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
+    a.href = link;
     a.download = filename;
     a.click();
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(link);
+  }
+
+  imzaAt(raporId: string, fileId: string, rol: string, dataUri: string): Observable<unknown> {
+    return this.http.post(`${this.base}/${raporId}/files/${fileId}/imza`, {
+      rol,
+      imzaGorseliDataUri: dataUri,
+    });
+  }
+
+  imzaSil(raporId: string, fileId: string, imzaId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${raporId}/files/${fileId}/imza/${imzaId}`);
+  }
+
+  kaseBas(raporId: string, fileId: string): Observable<unknown> {
+    return this.http.post(`${this.base}/${raporId}/files/${fileId}/kase`, {});
+  }
+
+  kaseSil(raporId: string, fileId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${raporId}/files/${fileId}/kase`);
   }
 }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
@@ -12,6 +12,7 @@ import { OzelRaporService } from './ozel-rapor.service';
 import { OzelRapor, OzelRaporDosya } from './ozel-rapor.models';
 import { BelgeTipiService } from '../belge-tipleri/belge-tipi.service';
 import { BelgeTipi, IMZA_ROL_OPTIONS } from '../belge-tipleri/belge-tipi.models';
+import { SignaturePadComponent } from './signature-pad.component';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_EXT = ['.xlsx', '.xls', '.pdf'];
@@ -19,7 +20,7 @@ const ALLOWED_EXT = ['.xlsx', '.xls', '.pdf'];
 @Component({
   selector: 'app-ozel-raporlar',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, ModalComponent, PageHeaderComponent],
+  imports: [ReactiveFormsModule, RouterLink, ModalComponent, PageHeaderComponent, SignaturePadComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ozel-raporlar.component.html',
 })
@@ -181,6 +182,155 @@ export class OzelRaporlarComponent implements OnInit {
     return roller
       .map((r) => IMZA_ROL_OPTIONS.find((o) => o.value === r)?.label ?? r)
       .join(', ');
+  }
+
+  rolEtiketi(rol: string): string {
+    return IMZA_ROL_OPTIONS.find((o) => o.value === rol)?.label ?? rol;
+  }
+
+  // ─── İmza / Kaşe akışı ──────────────────────────────────────────────────
+  @ViewChild(SignaturePadComponent) private signaturePad?: SignaturePadComponent;
+  readonly signModalOpen = signal(false);
+  readonly signTarget = signal<{ raporId: string; dosya: OzelRaporDosya; rol: string } | null>(null);
+  readonly signSaving = signal(false);
+  readonly signPadEmpty = signal(true);
+  readonly signedDownloadId = signal<string | null>(null);
+
+  /** Bu rolün imzasını bu kullanıcı atabilir mi? */
+  canSignAs(rol: string): boolean {
+    const u = this.user();
+    if (!u) return false;
+    if (u.rol === 'Sistem') return true;
+    if (rol === 'SayimBaskani') return u.rol === 'SayimBaskani';
+    if (rol === 'MagazaYetkilisi') return u.rol === 'Kullanici';
+    return false;
+  }
+
+  /** Bu kullanıcı bu dosyada kaşe basabilir mi? (Mağaza yetkilisi veya Sistem) */
+  canStamp(d: OzelRaporDosya): boolean {
+    if (!d.kaseGerekli) return false;
+    if (d.kase) return false;
+    const u = this.user();
+    if (!u) return false;
+    return u.rol === 'Sistem' || u.rol === 'Kullanici';
+  }
+
+  /** Belirli rolün imzası bu dosyada mevcut mu? */
+  hasSignature(d: OzelRaporDosya, rol: string): boolean {
+    return d.imzalar.some((i) => i.rol === rol);
+  }
+
+  getSignature(d: OzelRaporDosya, rol: string) {
+    return d.imzalar.find((i) => i.rol === rol);
+  }
+
+  isPdf(d: OzelRaporDosya): boolean {
+    return d.ad.toLowerCase().endsWith('.pdf');
+  }
+
+  openSignModal(raporId: string, dosya: OzelRaporDosya, rol: string): void {
+    this.signTarget.set({ raporId, dosya, rol });
+    this.signPadEmpty.set(true);
+    this.signModalOpen.set(true);
+    setTimeout(() => this.signaturePad?.clear(), 0);
+  }
+
+  closeSignModal(): void {
+    this.signModalOpen.set(false);
+    this.signTarget.set(null);
+  }
+
+  clearPad(): void {
+    this.signaturePad?.clear();
+    this.signPadEmpty.set(true);
+  }
+
+  onPadChanged(hasInk: boolean): void { this.signPadEmpty.set(!hasInk); }
+
+  saveSignature(): void {
+    const target = this.signTarget();
+    if (!target || this.signSaving()) return;
+    const dataUri = this.signaturePad?.toDataUri();
+    if (!dataUri) {
+      this.toast.error('İmza boş.');
+      return;
+    }
+    this.signSaving.set(true);
+    this.svc.imzaAt(target.raporId, target.dosya.id, target.rol, dataUri).subscribe({
+      next: (saved) => {
+        this.signSaving.set(false);
+        this.toast.success('İmza atıldı.');
+        this.replaceRapor(saved as OzelRapor);
+        this.closeSignModal();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.signSaving.set(false);
+        this.toast.error(err.error?.message ?? 'İmza başarısız.');
+      },
+    });
+  }
+
+  removeSignature(r: OzelRapor, d: OzelRaporDosya, imzaId: string): void {
+    this.svc.imzaSil(r.id, d.id, imzaId).subscribe({
+      next: () => {
+        this.toast.success('İmza silindi.');
+        // Yerel state'i güncelle — backend full rapor dönmüyor (NoContent).
+        this.raporlar.set(this.raporlar().map((x) =>
+          x.id !== r.id ? x : {
+            ...x,
+            dosyalar: x.dosyalar.map((f) =>
+              f.id !== d.id ? f : { ...f, imzalar: f.imzalar.filter((i) => i.id !== imzaId) }),
+          },
+        ));
+      },
+      error: (err: HttpErrorResponse) =>
+        this.toast.error(err.error?.message ?? 'İmza silinemedi.'),
+    });
+  }
+
+  stamp(r: OzelRapor, d: OzelRaporDosya): void {
+    this.svc.kaseBas(r.id, d.id).subscribe({
+      next: (saved) => {
+        this.toast.success('Kaşe basıldı.');
+        this.replaceRapor(saved as OzelRapor);
+      },
+      error: (err: HttpErrorResponse) =>
+        this.toast.error(err.error?.message ?? 'Kaşe başarısız.'),
+    });
+  }
+
+  removeStamp(r: OzelRapor, d: OzelRaporDosya): void {
+    this.svc.kaseSil(r.id, d.id).subscribe({
+      next: () => {
+        this.toast.success('Kaşe silindi.');
+        this.raporlar.set(this.raporlar().map((x) =>
+          x.id !== r.id ? x : {
+            ...x,
+            dosyalar: x.dosyalar.map((f) =>
+              f.id !== d.id ? f : { ...f, kase: null }),
+          },
+        ));
+      },
+      error: (err: HttpErrorResponse) =>
+        this.toast.error(err.error?.message ?? 'Kaşe silinemedi.'),
+    });
+  }
+
+  async downloadSigned(r: OzelRapor, d: OzelRaporDosya): Promise<void> {
+    this.signedDownloadId.set(d.id);
+    try {
+      const stem = d.ad.replace(/\.[^.]+$/, '');
+      await this.svc.downloadSigned(r.id, d.id, `${stem} (imzalı).pdf`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'İndirme başarısız';
+      this.toast.error(msg);
+    } finally {
+      this.signedDownloadId.set(null);
+    }
+  }
+
+  private replaceRapor(saved: OzelRapor): void {
+    this.raporlar.set(this.raporlar().map((x) => (x.id === saved.id ? saved : x)));
   }
 
   refresh(): void {

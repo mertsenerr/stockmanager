@@ -11,6 +11,33 @@ public sealed class OzelRaporDosyaDto
     public string? BelgeTipiAdi { get; set; }
     public IReadOnlyList<string> ImzaGerekenRoller { get; set; } = [];
     public bool KaseGerekli { get; set; }
+    public IReadOnlyList<DosyaImzaDto> Imzalar { get; set; } = [];
+    public KaseDamgaDto? Kase { get; set; }
+}
+
+public sealed class DosyaImzaDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Rol { get; set; } = string.Empty;
+    public string KullaniciId { get; set; } = string.Empty;
+    public string KullaniciAdSoyad { get; set; } = string.Empty;
+    public DateTime ImzalanmaTarihi { get; set; }
+    // Görsel data URI'yi DTO'ya koymuyoruz — listede önemli değil, sadece /signed
+    // çıktısında lazım. Liste payload'ını şişirmeyelim.
+}
+
+public sealed class KaseDamgaDto
+{
+    public string BasanKullaniciId { get; set; } = string.Empty;
+    public string BasanAdSoyad { get; set; } = string.Empty;
+    public DateTime Tarih { get; set; }
+}
+
+public sealed class ImzaEkleRequest
+{
+    public string Rol { get; set; } = string.Empty;
+    /// <summary>data:image/png;base64,... formatında PNG görseli.</summary>
+    public string ImzaGorseliDataUri { get; set; } = string.Empty;
 }
 
 public sealed class OzelRaporListDto

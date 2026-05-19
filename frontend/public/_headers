@@ -24,8 +24,27 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-site
   Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://stockmanager-d6nm.onrender.com wss://stockmanager-d6nm.onrender.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
-
-# index.html stays no-cache so deploys are picked up immediately; hashed bundle
-# assets keep CF Pages' default long-cache behaviour.
-/index.html
+  # Default: don't cache HTML (any path that returns the SPA shell via the
+  # /index.html fallback — /ozel-raporlar/belge-tipleri, /login, /…). Without
+  # this, browsers/CDN keep serving an old index.html that points at chunk
+  # filenames the new deployment no longer has, breaking the SPA after every
+  # deploy until users clear cache.
   Cache-Control: no-cache, no-store, must-revalidate
+
+# Hashed bundle assets are immutable — Angular changes the filename whenever
+# content changes — so long-cache is safe and keeps deploys fast. These rules
+# come after /* so they win for matching paths.
+/*.js
+  Cache-Control: public, max-age=31536000, immutable
+/*.css
+  Cache-Control: public, max-age=31536000, immutable
+/*.woff
+  Cache-Control: public, max-age=31536000, immutable
+/*.woff2
+  Cache-Control: public, max-age=31536000, immutable
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Favicon — moderate cache, in case it changes
+/favicon.ico
+  Cache-Control: public, max-age=86400

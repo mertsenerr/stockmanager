@@ -158,7 +158,7 @@ import { ImageCropComponent } from './image-crop.component';
       width: 72px; height: 72px;
       padding: 0;
       border: none;
-      border-radius: 18px;
+      border-radius: 50%;
       overflow: hidden;
       background: transparent;
       cursor: pointer;
@@ -168,13 +168,13 @@ import { ImageCropComponent } from './image-crop.component';
     .profil-avatar {
       width: 72px; height: 72px;
       font-size: 22px;
-      border-radius: 18px;
+      border-radius: 50%;
     }
     .profil-avatar-img {
       width: 100%; height: 100%;
       object-fit: cover;
       display: block;
-      border-radius: 18px;
+      border-radius: 50%;
     }
     .profil-avatar-overlay {
       position: absolute;

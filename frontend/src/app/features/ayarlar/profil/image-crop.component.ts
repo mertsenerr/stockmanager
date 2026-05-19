@@ -5,6 +5,7 @@ import {
   ElementRef,
   Input,
   ViewChild,
+  computed,
   signal,
 } from '@angular/core';
 
@@ -42,8 +43,8 @@ import {
         <span class="ic-zoom-label">Zoom</span>
         <input
           type="range"
-          [min]="minScale"
-          [max]="maxScale"
+          [min]="effectiveMinScale()"
+          [max]="effectiveMaxScale()"
           step="0.01"
           [value]="scale()"
           (input)="onScaleSlider($any($event.target).value)"
@@ -122,13 +123,21 @@ export class ImageCropComponent implements AfterViewInit {
 
   @Input() viewport = 320;
   @Input() outputSize = 240;
-  @Input() minScale = 0.5;
-  @Input() maxScale = 4;
+  /** Maximum zoom relative to the "cover" baseline (e.g. 3 = 3× the fitted size). */
+  @Input() maxZoomFactor = 3;
 
   @ViewChild('cnv', { static: true })
   private readonly canvasRef!: ElementRef<HTMLCanvasElement>;
 
   readonly scale = signal(1);
+  /**
+   * Resmin viewport'u tam dolduran "cover" ölçeği. Slider'ın sol ucu burası
+   * (daha aşağı inince viewport içinde boş alan kalır, kullanmamız anlamsız).
+   */
+  readonly fitScale = signal(1);
+  /** Slider'a verdiğimiz dinamik aralık. */
+  readonly effectiveMinScale = computed(() => this.fitScale());
+  readonly effectiveMaxScale = computed(() => this.fitScale() * this.maxZoomFactor);
   private _src = '';
   private ctx!: CanvasRenderingContext2D;
   private img: HTMLImageElement | null = null;
@@ -166,6 +175,7 @@ export class ImageCropComponent implements AfterViewInit {
   private fitAndCenter(): void {
     if (!this.img) return;
     const fit = Math.max(this.viewport / this.imgNaturalW, this.viewport / this.imgNaturalH);
+    this.fitScale.set(fit);
     this.scale.set(fit);
     this.cx = this.viewport / 2;
     this.cy = this.viewport / 2;
@@ -225,7 +235,7 @@ export class ImageCropComponent implements AfterViewInit {
   }
 
   private applyScale(next: number): void {
-    const clamped = Math.max(this.minScale, Math.min(this.maxScale, next));
+    const clamped = Math.max(this.effectiveMinScale(), Math.min(this.effectiveMaxScale(), next));
     this.scale.set(clamped);
     this.render();
   }

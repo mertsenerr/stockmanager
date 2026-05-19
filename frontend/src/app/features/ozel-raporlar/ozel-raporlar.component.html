@@ -65,7 +65,7 @@
           </div>
           @if (r.duzenleyebilir) {
             <div class="flex items-center gap-1 shrink-0">
-              <input #fileInput type="file" multiple accept=".xlsx,.xls,.pdf" class="hidden"
+              <input #fileInput type="file" multiple accept=".xlsx,.xls,.pdf,.csv" class="hidden"
                      (change)="onFilesChosen(r, $event)" />
               @if (belgeTipleri().length > 0) {
                 <select

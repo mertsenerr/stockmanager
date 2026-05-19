@@ -7,5 +7,5 @@ public sealed class OzelRaporSettings
     /// <summary>Tek dosya için maksimum boyut (byte). Varsayılan 50 MB.</summary>
     public long MaxFileSizeBytes { get; set; } = 50L * 1024 * 1024;
 
-    public string[] AllowedExtensions { get; set; } = [".xlsx", ".xls", ".pdf"];
+    public string[] AllowedExtensions { get; set; } = [".xlsx", ".xls", ".pdf", ".csv"];
 }

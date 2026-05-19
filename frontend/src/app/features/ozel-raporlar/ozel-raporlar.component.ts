@@ -15,7 +15,16 @@ import { BelgeTipi, IMZA_ROL_OPTIONS } from '../belge-tipleri/belge-tipi.models'
 import { SignaturePadComponent } from './signature-pad.component';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const ALLOWED_EXT = ['.xlsx', '.xls', '.pdf'];
+const ALLOWED_EXT = ['.xlsx', '.xls', '.pdf', '.csv'];
+
+/** İlk önce extension'ı kes, sonra lowercase et. `name.toLowerCase().slice(lastIndexOf('.'))`
+ *  yanlış çünkü JS'nin default toLowerCase'i Türkçe "İ"yi `i̇` (i + birleşim noktası)
+ *  olarak iki karaktere açar; index orijinal string'e göre alındığından slice yanlış
+ *  pozisyondan keser. Önce slice yapınca extension'da Türkçe büyük harf olmaz, sorun çözülür. */
+function fileExtension(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return dot < 0 ? '' : name.slice(dot).toLowerCase();
+}
 
 @Component({
   selector: 'app-ozel-raporlar',
@@ -225,7 +234,7 @@ export class OzelRaporlarComponent implements OnInit {
   }
 
   isPdf(d: OzelRaporDosya): boolean {
-    return d.ad.toLowerCase().endsWith('.pdf');
+    return fileExtension(d.ad) === '.pdf';
   }
 
   openSignModal(raporId: string, dosya: OzelRaporDosya, rol: string): void {
@@ -440,7 +449,7 @@ export class OzelRaporlarComponent implements OnInit {
     for (let i = 0; i < list.length; i++) {
       const f = list.item(i);
       if (!f) continue;
-      const ext = f.name.toLowerCase().slice(f.name.lastIndexOf('.'));
+      const ext = fileExtension(f.name);
       if (!ALLOWED_EXT.includes(ext)) {
         this.toast.error(`${f.name}: sadece ${ALLOWED_EXT.join(', ')} yüklenebilir.`);
         return;

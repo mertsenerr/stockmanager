@@ -1,11 +1,14 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { AuthService } from '../../core/auth/auth.service';
+import { UserRole } from '../../core/auth/auth.models';
 
 interface AyarKategori {
   path: string;
   label: string;
   description: string;
   iconImg: string;
+  roles?: UserRole[];
 }
 
 @Component({
@@ -21,7 +24,7 @@ interface AyarKategori {
           <h1 class="ayarlar-side-title">Ayarlar</h1>
         </div>
         <nav class="ayarlar-side-nav">
-          @for (k of kategoriler; track k.path) {
+          @for (k of visibleKategoriler(); track k.path) {
             <a
               [routerLink]="k.path"
               routerLinkActive="active"
@@ -174,10 +177,19 @@ interface AyarKategori {
   `],
 })
 export class AyarlarShellComponent {
-  protected readonly kategoriler: AyarKategori[] = [
+  private readonly auth = inject(AuthService);
+  private readonly kategoriler: AyarKategori[] = [
     { path: 'profil',     label: 'Profilim',           description: 'Ad, e-posta, avatar',     iconImg: '/assets/images/avatar-design.png' },
     { path: 'genel',      label: 'Genel ayarlar',      description: 'Dil, bölge, görünüm',     iconImg: '/assets/images/gear.png' },
     { path: 'guvenlik',   label: 'Gizlilik & güvenlik', description: 'Şifre, oturumlar, 2FA',  iconImg: '/assets/images/shield.png' },
     { path: 'bildirimler', label: 'Bildirimler',       description: 'E-posta & in-app',        iconImg: '/assets/images/notification.png' },
+    { path: 'belge-tipleri', label: 'Belge tipleri',   description: 'İmza/kaşe gereksinimleri', iconImg: '/assets/images/document.png',
+      roles: ['Sistem', 'SayimBaskani'] },
   ];
+
+  protected readonly visibleKategoriler = computed<AyarKategori[]>(() => {
+    const rol = this.auth.currentUser()?.rol;
+    if (!rol) return [];
+    return this.kategoriler.filter((k) => !k.roles || k.roles.includes(rol));
+  });
 }

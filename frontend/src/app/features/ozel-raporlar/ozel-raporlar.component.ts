@@ -10,6 +10,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ArkadasService, Friend } from '../arkadaslar/arkadas.service';
 import { OzelRaporService } from './ozel-rapor.service';
 import { OzelRapor, OzelRaporDosya } from './ozel-rapor.models';
+import { BelgeTipiService } from '../belge-tipleri/belge-tipi.service';
+import { BelgeTipi, IMZA_ROL_OPTIONS } from '../belge-tipleri/belge-tipi.models';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_EXT = ['.xlsx', '.xls', '.pdf'];
@@ -25,6 +27,7 @@ export class OzelRaporlarComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly svc = inject(OzelRaporService);
   private readonly arkadasSvc = inject(ArkadasService);
+  private readonly belgeTipiSvc = inject(BelgeTipiService);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
@@ -45,6 +48,11 @@ export class OzelRaporlarComponent implements OnInit {
   readonly serverError = signal<string | null>(null);
   readonly uploading = signal<string | null>(null);
   readonly downloadingId = signal<string | null>(null);
+
+  /** Aktif belge tipleri — yükleme dropdown'unda gösterilir. */
+  readonly belgeTipleri = signal<BelgeTipi[]>([]);
+  /** Her rapor için seçilmiş belge tipi id'si (rapor-id → belge-tipi-id). */
+  readonly selectedBelgeTipi = signal<Record<string, string>>({});
 
   /** Mevcut arkadaşlar (erişim verilebilecek havuz). */
   readonly friends = signal<Friend[]>([]);
@@ -153,7 +161,26 @@ export class OzelRaporlarComponent implements OnInit {
         next: (r) => this.friends.set(r.arkadaslar),
         error: () => undefined,
       });
+      this.belgeTipiSvc.list().subscribe({
+        next: (list) => this.belgeTipleri.set(list.filter((t) => !t.arsivlendi)),
+        error: () => undefined,
+      });
     }
+  }
+
+  setBelgeTipi(raporId: string, value: string): void {
+    this.selectedBelgeTipi.update((m) => ({ ...m, [raporId]: value }));
+  }
+
+  getBelgeTipi(raporId: string): string {
+    return this.selectedBelgeTipi()[raporId] ?? '';
+  }
+
+  imzaLabel(roller: string[]): string {
+    if (!roller || roller.length === 0) return '';
+    return roller
+      .map((r) => IMZA_ROL_OPTIONS.find((o) => o.value === r)?.label ?? r)
+      .join(', ');
   }
 
   refresh(): void {
@@ -277,7 +304,8 @@ export class OzelRaporlarComponent implements OnInit {
     if (files.length === 0) return;
 
     this.uploading.set(r.id);
-    this.svc.uploadFiles(r.id, files).subscribe({
+    const belgeTipiId = this.getBelgeTipi(r.id) || null;
+    this.svc.uploadFiles(r.id, files, belgeTipiId).subscribe({
       next: (saved) => {
         this.uploading.set(null);
         this.toast.success(`${files.length} dosya yüklendi.`);

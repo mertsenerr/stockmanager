@@ -45,6 +45,11 @@ public static class AuditAksiyonlari
     public const string OzelRaporFileAdd = "ozel-rapor.file.add";
     public const string OzelRaporFileDelete = "ozel-rapor.file.delete";
     public const string OzelRaporDownload = "ozel-rapor.download";
+
+    public const string BelgeTipiCreate = "belge-tipi.create";
+    public const string BelgeTipiUpdate = "belge-tipi.update";
+    public const string BelgeTipiArchive = "belge-tipi.archive";
+    public const string BelgeTipiRestore = "belge-tipi.restore";
 }
 
 public sealed class AuditLog

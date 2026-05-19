@@ -4,6 +4,10 @@ export interface OzelRaporDosya {
   mimeType: string;
   boyut: number;
   yuklemeTarihi: string;
+  belgeTipiId?: string | null;
+  belgeTipiAdi?: string | null;
+  imzaGerekenRoller: string[];
+  kaseGerekli: boolean;
 }
 
 export interface OzelRapor {

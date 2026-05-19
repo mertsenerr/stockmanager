@@ -27,9 +27,10 @@ export class OzelRaporService {
     return this.http.delete<void>(`${this.base}/${id}`);
   }
 
-  uploadFiles(id: string, files: File[]): Observable<OzelRapor> {
+  uploadFiles(id: string, files: File[], belgeTipiId?: string | null): Observable<OzelRapor> {
     const fd = new FormData();
     for (const f of files) fd.append('files', f, f.name);
+    if (belgeTipiId) fd.append('belgeTipiId', belgeTipiId);
     return this.http.post<OzelRapor>(`${this.base}/${id}/files`, fd);
   }
 

@@ -19,6 +19,22 @@ public sealed class OzelRaporDosya
     public string StorageName { get; set; } = string.Empty;
 
     public DateTime YuklemeTarihi { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Bağlı olduğu BelgeTipi (firma katalogundan). Null = sınıflandırılmamış.
+    /// </summary>
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string? BelgeTipiId { get; set; }
+
+    /// <summary>
+    /// Yükleme anındaki imza gerekleri (BelgeTipi'nden snapshot). Katalog
+    /// sonradan değişirse mevcut dosyalar etkilenmesin diye snapshot kullanıyoruz.
+    /// Boş liste = imza gerekmiyor.
+    /// </summary>
+    public List<string> ImzaGerekenRoller { get; set; } = [];
+
+    /// <summary>Yükleme anındaki kaşe gereksinimi snapshot'ı.</summary>
+    public bool KaseGerekli { get; set; }
 }
 
 public sealed class OzelRapor

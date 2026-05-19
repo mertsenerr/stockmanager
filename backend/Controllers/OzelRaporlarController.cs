@@ -18,6 +18,7 @@ public sealed class OzelRaporlarController : ControllerBase
     private readonly IOzelRaporRepository _repo;
     private readonly IUserRepository _users;
     private readonly IOzelRaporStorage _storage;
+    private readonly IBelgeTipiRepository _belgeTipleri;
     private readonly IAuditService _audit;
     private readonly IValidator<OzelRaporUpsertRequest> _validator;
     private readonly ILogger<OzelRaporlarController> _logger;
@@ -26,6 +27,7 @@ public sealed class OzelRaporlarController : ControllerBase
         IOzelRaporRepository repo,
         IUserRepository users,
         IOzelRaporStorage storage,
+        IBelgeTipiRepository belgeTipleri,
         IAuditService audit,
         IValidator<OzelRaporUpsertRequest> validator,
         ILogger<OzelRaporlarController> logger)
@@ -33,6 +35,7 @@ public sealed class OzelRaporlarController : ControllerBase
         _repo = repo;
         _users = users;
         _storage = storage;
+        _belgeTipleri = belgeTipleri;
         _audit = audit;
         _validator = validator;
         _logger = logger;
@@ -70,7 +73,21 @@ public sealed class OzelRaporlarController : ControllerBase
                 .ToDictionary(g => g.Key, g => g.First());
 
         var isSistem = User.IsSistem();
-        return Ok(raporlar.Select(r => ToListDto(r, uid, isSistem, olusturanlar)).ToList());
+        // List endpoint birden fazla rapor döner — referans verilen tüm belge
+        // tiplerini tek seferde topla, sonra in-memory map'le çöz.
+        var belgeTipiIds = raporlar
+            .SelectMany(r => r.Dosyalar)
+            .Where(d => !string.IsNullOrEmpty(d.BelgeTipiId))
+            .Select(d => d.BelgeTipiId!)
+            .Distinct()
+            .ToList();
+        var belgeTipiMap = new Dictionary<string, string>();
+        foreach (var btId in belgeTipiIds)
+        {
+            var bt = await _belgeTipleri.FindByIdAsync(btId, ct);
+            if (bt is not null) belgeTipiMap[bt.Id] = bt.Ad;
+        }
+        return Ok(raporlar.Select(r => ToListDto(r, uid, isSistem, olusturanlar, belgeTipiMap)).ToList());
     }
 
     [HttpGet("{id}")]
@@ -85,7 +102,7 @@ public sealed class OzelRaporlarController : ControllerBase
 
         var olusturanlar = (await _users.ListByIdsAsync([rapor.OlusturanKullaniciId], ct))
             .ToDictionary(u => u.Id);
-        return Ok(ToListDto(rapor, uid, User.IsSistem(), olusturanlar));
+        return Ok(await ToListDtoAsync(rapor, uid, User.IsSistem(), olusturanlar, ct));
     }
 
     [HttpPost]
@@ -114,7 +131,7 @@ public sealed class OzelRaporlarController : ControllerBase
         var olusturanlar = (await _users.ListByIdsAsync([rapor.OlusturanKullaniciId], ct))
             .ToDictionary(u => u.Id);
         return CreatedAtAction(nameof(Get), new { id = rapor.Id },
-            ToListDto(rapor, uid, User.IsSistem(), olusturanlar));
+            await ToListDtoAsync(rapor, uid, User.IsSistem(), olusturanlar, ct));
     }
 
     [HttpPut("{id}")]
@@ -140,7 +157,7 @@ public sealed class OzelRaporlarController : ControllerBase
 
         var olusturanlar = (await _users.ListByIdsAsync([rapor.OlusturanKullaniciId], ct))
             .ToDictionary(u => u.Id);
-        return Ok(ToListDto(rapor, uid, User.IsSistem(), olusturanlar));
+        return Ok(await ToListDtoAsync(rapor, uid, User.IsSistem(), olusturanlar, ct));
     }
 
     [HttpDelete("{id}")]
@@ -167,6 +184,7 @@ public sealed class OzelRaporlarController : ControllerBase
     public async Task<IActionResult> UploadFiles(
         string id,
         [FromForm] IFormFileCollection files,
+        [FromForm] string? belgeTipiId,
         CancellationToken ct)
     {
         var rapor = await _repo.FindByIdAsync(id, ct);
@@ -177,6 +195,17 @@ public sealed class OzelRaporlarController : ControllerBase
 
         if (files is null || files.Count == 0)
             return BadRequest(new { message = "Dosya seçilmedi." });
+
+        // Bu request'te yüklenen tüm dosyalar aynı belge tipine bağlanır. Farklı
+        // tipler için frontend ayrı çağrı yapar. Snapshot — sonradan katalog
+        // değişirse mevcut dosyalar etkilenmez.
+        BelgeTipi? belgeTipi = null;
+        if (!string.IsNullOrEmpty(belgeTipiId))
+        {
+            belgeTipi = await _belgeTipleri.FindByIdAsync(belgeTipiId, ct);
+            if (belgeTipi is null || belgeTipi.Arsivlendi)
+                return BadRequest(new { message = "Belge tipi bulunamadı veya arşivlenmiş." });
+        }
 
         var added = new List<OzelRaporDosya>();
         foreach (var file in files)
@@ -199,6 +228,9 @@ public sealed class OzelRaporlarController : ControllerBase
                     ? "application/octet-stream" : file.ContentType,
                 Boyut = file.Length,
                 StorageName = storageName,
+                BelgeTipiId = belgeTipi?.Id,
+                ImzaGerekenRoller = belgeTipi is null ? [] : [..belgeTipi.GerekenImzaRolleri],
+                KaseGerekli = belgeTipi?.KaseGerekli ?? false,
             };
             rapor.Dosyalar.Add(dosya);
             added.Add(dosya);
@@ -213,7 +245,7 @@ public sealed class OzelRaporlarController : ControllerBase
 
         var olusturanlar = (await _users.ListByIdsAsync([rapor.OlusturanKullaniciId], ct))
             .ToDictionary(u => u.Id);
-        return Ok(ToListDto(rapor, uid, User.IsSistem(), olusturanlar));
+        return Ok(await ToListDtoAsync(rapor, uid, User.IsSistem(), olusturanlar, ct));
     }
 
     [HttpDelete("{id}/files/{fileId}")]
@@ -292,8 +324,28 @@ public sealed class OzelRaporlarController : ControllerBase
         return users.Where(u => u.AktifMi).Select(u => u.Id).ToList();
     }
 
+    private async Task<OzelRaporListDto> ToListDtoAsync(
+        OzelRapor r, string callerUid, bool callerIsSistem,
+        IDictionary<string, User> olusturanlar, CancellationToken ct)
+    {
+        var belgeTipiIds = r.Dosyalar
+            .Where(d => !string.IsNullOrEmpty(d.BelgeTipiId))
+            .Select(d => d.BelgeTipiId!)
+            .Distinct()
+            .ToList();
+        var belgeTipiMap = new Dictionary<string, string>();
+        foreach (var btId in belgeTipiIds)
+        {
+            var bt = await _belgeTipleri.FindByIdAsync(btId, ct);
+            if (bt is not null) belgeTipiMap[bt.Id] = bt.Ad;
+        }
+        return ToListDto(r, callerUid, callerIsSistem, olusturanlar, belgeTipiMap);
+    }
+
     private static OzelRaporListDto ToListDto(
-        OzelRapor r, string callerUid, bool callerIsSistem, IDictionary<string, User> olusturanlar)
+        OzelRapor r, string callerUid, bool callerIsSistem,
+        IDictionary<string, User> olusturanlar,
+        IReadOnlyDictionary<string, string> belgeTipiMap)
     {
         olusturanlar.TryGetValue(r.OlusturanKullaniciId, out var olusturan);
         return new OzelRaporListDto
@@ -311,6 +363,10 @@ public sealed class OzelRaporlarController : ControllerBase
                 MimeType = d.MimeType,
                 Boyut = d.Boyut,
                 YuklemeTarihi = d.YuklemeTarihi,
+                BelgeTipiId = d.BelgeTipiId,
+                BelgeTipiAdi = d.BelgeTipiId is not null && belgeTipiMap.TryGetValue(d.BelgeTipiId, out var btAd) ? btAd : null,
+                ImzaGerekenRoller = d.ImzaGerekenRoller,
+                KaseGerekli = d.KaseGerekli,
             }).ToList(),
             OlusturmaTarihi = r.OlusturmaTarihi,
             GuncellenmeTarihi = r.GuncellenmeTarihi,

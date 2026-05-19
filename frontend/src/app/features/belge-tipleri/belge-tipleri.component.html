@@ -1,0 +1,142 @@
+<article class="ayarlar-page">
+  <header class="ayarlar-page-head">
+    <h2 class="ayarlar-page-title">Belge tipleri</h2>
+    <p class="ayarlar-page-desc">
+      Özel raporlara yüklenen belgelerin sınıflandırması. Her belge tipi için imzacı rolleri
+      ve kaşe gereksinimini belirleyin; dosya yüklenirken bu varsayılanlar uygulanır.
+    </p>
+  </header>
+
+  <section class="bt-card">
+    <div class="bt-toolbar">
+      <div class="bt-toolbar-left">
+        <input
+          type="search"
+          class="field-input"
+          placeholder="Ara: belge adı, firma…"
+          [value]="query()"
+          (input)="setQuery($any($event.target).value)"
+        />
+        <label class="bt-toggle">
+          <input type="checkbox" [checked]="showArchived()" (change)="toggleArchived()" />
+          <span>Arşivlenenleri göster</span>
+        </label>
+      </div>
+      <button type="button" class="btn btn-primary" (click)="openCreate()">Yeni belge tipi</button>
+    </div>
+
+    @if (loading()) {
+      <p class="bt-empty">Yükleniyor…</p>
+    } @else if (filtered().length === 0) {
+      <p class="bt-empty">Henüz belge tipi yok. "Yeni belge tipi" ile ilk kaydı ekleyin.</p>
+    } @else {
+      <ul class="bt-list">
+        @for (t of filtered(); track t.id) {
+          <li class="bt-row" [class.is-archived]="t.arsivlendi">
+            <button type="button" class="bt-row-main" (click)="openEdit(t)">
+              <span class="bt-row-head">
+                <span class="bt-row-name">{{ t.ad }}</span>
+                @if (t.arsivlendi) {
+                  <span class="bt-chip bt-chip-archived">Arşiv</span>
+                }
+                @if (isSistem() && t.firmaAdi) {
+                  <span class="bt-chip">{{ t.firmaAdi }}</span>
+                }
+              </span>
+              <span class="bt-row-meta">
+                <span>{{ rolEtiketleri(t) }}</span>
+                @if (t.kaseGerekli) {
+                  <span class="bt-chip bt-chip-kase">Kaşe</span>
+                }
+              </span>
+              @if (t.aciklama) {
+                <span class="bt-row-desc">{{ t.aciklama }}</span>
+              }
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="archiveToggle(t)">
+              {{ t.arsivlendi ? 'Geri yükle' : 'Arşivle' }}
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+</article>
+
+<app-modal
+  [open]="modalOpen()"
+  [title]="editing() ? 'Belge tipini düzenle' : 'Yeni belge tipi'"
+  size="md"
+  (closed)="closeModal()"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" class="bt-form" novalidate>
+    @if (isSistem()) {
+      <div class="bt-form-row">
+        <label class="bt-label" for="bt-firma">Firma</label>
+        <select id="bt-firma" formControlName="firmaId" class="field-input" [disabled]="!!editing()">
+          <option value="">Seçiniz…</option>
+          @for (f of firmalar(); track f.id) {
+            <option [value]="f.id">{{ f.ad }}</option>
+          }
+        </select>
+        @if (editing()) {
+          <p class="bt-help">Firma değiştirme: arşivleyip yeni firma altında yeniden oluşturun.</p>
+        }
+      </div>
+    }
+
+    <div class="bt-form-row">
+      <label class="bt-label" for="bt-ad">Belge adı <span class="bt-required">*</span></label>
+      <input id="bt-ad" type="text" formControlName="ad" class="field-input" maxlength="120" placeholder="Sayım Kabul Tutanağı" />
+      @if (form.controls.ad.touched && form.controls.ad.errors?.['required']) {
+        <p class="bt-error">Belge adı zorunlu.</p>
+      }
+    </div>
+
+    <div class="bt-form-row">
+      <label class="bt-label" for="bt-aciklama">Açıklama</label>
+      <textarea id="bt-aciklama" formControlName="aciklama" class="field-input" rows="2" maxlength="1000" placeholder="Opsiyonel — bu belgenin ne için kullanıldığı"></textarea>
+    </div>
+
+    <fieldset class="bt-form-row bt-fieldset">
+      <legend class="bt-label">İmzacı rolleri</legend>
+      <label class="bt-check">
+        <input type="checkbox" formControlName="sayimBaskaniImza" />
+        <span>Sayım Başkanı imzalayacak</span>
+      </label>
+      <label class="bt-check">
+        <input type="checkbox" formControlName="magazaYetkilisiImza" />
+        <span>Mağaza Yetkilisi imzalayacak</span>
+      </label>
+      <p class="bt-help">Hiçbiri seçilmezse imza gerekmez.</p>
+    </fieldset>
+
+    <div class="bt-form-row">
+      <label class="bt-check">
+        <input type="checkbox" formControlName="kaseGerekli" />
+        <span>Kaşe gerekli</span>
+      </label>
+    </div>
+
+    @if (editing()) {
+      <div class="bt-form-row">
+        <label class="bt-check">
+          <input type="checkbox" formControlName="arsivlendi" />
+          <span>Arşivlendi</span>
+        </label>
+        <p class="bt-help">Arşivlenen belge tipi yeni yüklemelerde seçenek olarak çıkmaz; eski dosyaların snapshot'ı bozulmaz.</p>
+      </div>
+    }
+
+    @if (serverError(); as err) {
+      <p class="bt-error">{{ err }}</p>
+    }
+
+    <div class="bt-form-actions">
+      <button type="button" class="btn btn-ghost" (click)="closeModal()" [disabled]="saving()">Vazgeç</button>
+      <button type="submit" class="btn btn-primary" [disabled]="saving() || form.invalid">
+        {{ saving() ? 'Kaydediliyor…' : (editing() ? 'Kaydet' : 'Ekle') }}
+      </button>
+    </div>
+  </form>
+</app-modal>

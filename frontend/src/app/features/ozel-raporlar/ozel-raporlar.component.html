@@ -67,6 +67,20 @@
             <div class="flex items-center gap-1 shrink-0">
               <input #fileInput type="file" multiple accept=".xlsx,.xls,.pdf" class="hidden"
                      (change)="onFilesChosen(r, $event)" />
+              @if (belgeTipleri().length > 0) {
+                <select
+                  [value]="getBelgeTipi(r.id)"
+                  (change)="setBelgeTipi(r.id, $any($event.target).value)"
+                  [disabled]="uploading() === r.id"
+                  class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm max-w-[180px]"
+                  [attr.aria-label]="'Belge tipi'"
+                >
+                  <option value="">Sınıflandırılmamış</option>
+                  @for (t of belgeTipleri(); track t.id) {
+                    <option [value]="t.id">{{ t.ad }}</option>
+                  }
+                </select>
+              }
               <button type="button" (click)="triggerUpload(r, fileInput)"
                       [disabled]="uploading() === r.id"
                       class="focus-ring text-xs font-medium px-2.5 py-1.5 rounded-sm border border-border text-text-primary hover:bg-surface-elevated transition-colors disabled:opacity-50">
@@ -98,6 +112,25 @@
                   <p class="text-[11px] text-ink-muted font-mono">
                     {{ formatSize(d.boyut) }} · {{ formatDate(d.yuklemeTarihi) }}
                   </p>
+                  @if (d.belgeTipiAdi || d.imzaGerekenRoller.length > 0 || d.kaseGerekli) {
+                    <div class="mt-1.5 flex flex-wrap gap-1">
+                      @if (d.belgeTipiAdi) {
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-surface border border-border text-text-secondary">
+                          {{ d.belgeTipiAdi }}
+                        </span>
+                      }
+                      @if (d.imzaGerekenRoller.length > 0) {
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-accent-info/10 border border-accent-info/30 text-accent-info">
+                          İmza: {{ imzaLabel(d.imzaGerekenRoller) }}
+                        </span>
+                      }
+                      @if (d.kaseGerekli) {
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[10px] bg-accent-warning/10 border border-accent-warning/30 text-accent-warning">
+                          Kaşe
+                        </span>
+                      }
+                    </div>
+                  }
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
                   <button type="button" (click)="download(r, d)"

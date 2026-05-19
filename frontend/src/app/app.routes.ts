@@ -144,6 +144,12 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/ayarlar/bildirimler/bildirimler.component').then((m) => m.BildirimlerComponent),
           },
+          {
+            path: 'belge-tipleri',
+            canActivate: [roleGuard('Sistem', 'SayimBaskani')],
+            loadComponent: () =>
+              import('./features/belge-tipleri/belge-tipleri.component').then((m) => m.BelgeTipleriComponent),
+          },
         ],
       },
     ],

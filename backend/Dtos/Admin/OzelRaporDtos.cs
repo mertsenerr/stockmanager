@@ -7,6 +7,10 @@ public sealed class OzelRaporDosyaDto
     public string MimeType { get; set; } = string.Empty;
     public long Boyut { get; set; }
     public DateTime YuklemeTarihi { get; set; }
+    public string? BelgeTipiId { get; set; }
+    public string? BelgeTipiAdi { get; set; }
+    public IReadOnlyList<string> ImzaGerekenRoller { get; set; } = [];
+    public bool KaseGerekli { get; set; }
 }
 
 public sealed class OzelRaporListDto

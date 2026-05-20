@@ -57,7 +57,11 @@ public sealed class ExcelImportRequestValidator : AbstractValidator<ExcelImportR
         RuleForEach(x => x.Urunler).ChildRules(u =>
         {
             u.RuleFor(r => r.Barkod).NotEmpty().WithMessage("Barkod zorunludur.")
-                .MaximumLength(80).WithMessage("Barkod 80 karakteri geçemez.");
+                // Bazı ürünlerin Excel'de tek hücrede virgülle ayrılmış birden çok
+                // EAN/UPC kodu bulunabiliyor (eski sistemlerden gelen ürün master'lar).
+                // 13 hane + virgül × 35 barkod ≈ 500 char yeter. Daha yüksek limit
+                // Mongo doc boyutunu zorlar (50K satır × Barkod) — bu 500 sıkı bir tampon.
+                .MaximumLength(500).WithMessage("Barkod 500 karakteri geçemez.");
             u.RuleFor(r => r.UrunAdi).MaximumLength(200);
             u.RuleFor(r => r.StokKodu!).MaximumLength(80).When(r => r.StokKodu is not null);
             u.RuleFor(r => r.Kategori!).MaximumLength(100).When(r => r.Kategori is not null);

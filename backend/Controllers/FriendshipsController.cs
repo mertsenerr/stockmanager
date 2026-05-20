@@ -75,7 +75,11 @@ public sealed class FriendshipsController : ControllerBase
         if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
             return Ok(Array.Empty<UserSearchDto>());
 
-        var needle = q.Trim().ToLowerInvariant();
+        // Türkçe karakterleri ASCII'ye düşürerek aramayı tolerant yap.
+        // Aksi takdirde "ATILGAN" (İngilizce I) → "atilgan" oluyor ama DB'deki
+        // "Atılgan" (noktasız ı) → "atılgan" → eşleşmiyor. Aynı şekilde İ/ş/ğ/
+        // ü/ö/ç hepsinin İngilizce karşılıkları kullanıldığında da hit ver.
+        var needle = NormalizeForSearch(q);
         var all = await _users.ListAsync(includeInactive: false, ct);
 
         // Mevcut arkadaşlık ilişkilerini bir kez çek — N+1 önlemek için.
@@ -124,8 +128,8 @@ public sealed class FriendshipsController : ControllerBase
         var matches = all
             .Where(u => u.Id != uid)
             .Where(u =>
-                u.AdSoyad.ToLowerInvariant().Contains(needle) ||
-                u.Email.ToLowerInvariant().Contains(needle))
+                NormalizeForSearch(u.AdSoyad).Contains(needle) ||
+                NormalizeForSearch(u.Email).Contains(needle))
             .Where(InCallerScope)
             .Take(20)
             .ToList();
@@ -228,6 +232,32 @@ public sealed class FriendshipsController : ControllerBase
         if (f is null) return NotFound();
         await _friends.DeleteAsync(f.Id, ct);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Türkçe karakterleri ASCII'ye düşürerek arama için normalize eder. Hem
+    /// büyük/küçük harf, hem ı/i/İ/I karışıklığı, hem ş/ğ/ü/ö/ç → s/g/u/o/c
+    /// tolere edilir. Sonuç: "ATILGAN" ve "Atılgan" ikisi de "atilgan" olur.
+    /// </summary>
+    private static string NormalizeForSearch(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return string.Empty;
+        var sb = new System.Text.StringBuilder(s.Length);
+        foreach (var ch in s.Trim())
+        {
+            var c = ch switch
+            {
+                'I' or 'İ' or 'ı' or 'i' => 'i',
+                'Ş' or 'ş' => 's',
+                'Ğ' or 'ğ' => 'g',
+                'Ü' or 'ü' => 'u',
+                'Ö' or 'ö' => 'o',
+                'Ç' or 'ç' => 'c',
+                _ => char.ToLowerInvariant(ch),
+            };
+            sb.Append(c);
+        }
+        return sb.ToString();
     }
 }
 

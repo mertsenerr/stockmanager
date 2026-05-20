@@ -4,6 +4,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 using SayimLink.Api.Common;
 using SayimLink.Api.Dtos.Sayim;
 using SayimLink.Api.Models;
@@ -469,26 +470,26 @@ public sealed class OturumlarController : ControllerBase
         var ub = Builders<SayimOturumu>.Update;
         var ops = new List<UpdateDefinition<SayimOturumu>>
         {
-            ub.Set(o => o.Urunler[-1].SonGuncelleyenId, urun.SonGuncelleyenId),
-            ub.Set(o => o.Urunler[-1].GuncellenmeTarihi, urun.GuncellenmeTarihi),
+            ub.Set(o => o.Urunler.FirstMatchingElement().SonGuncelleyenId, urun.SonGuncelleyenId),
+            ub.Set(o => o.Urunler.FirstMatchingElement().GuncellenmeTarihi, urun.GuncellenmeTarihi),
             ub.Set(o => o.Ozetler, oturum.Ozetler),
         };
         foreach (var c in changes)
         {
             switch (c.Alan)
             {
-                case "barkod":         ops.Add(ub.Set(o => o.Urunler[-1].Barkod,         urun.Barkod));         break;
-                case "urunAdi":        ops.Add(ub.Set(o => o.Urunler[-1].UrunAdi,        urun.UrunAdi));        break;
-                case "sistemStok":     ops.Add(ub.Set(o => o.Urunler[-1].SistemStok,     urun.SistemStok));     break;
-                case "sayilanStok":    ops.Add(ub.Set(o => o.Urunler[-1].SayilanStok,    urun.SayilanStok));    break;
-                case "durum":          ops.Add(ub.Set(o => o.Urunler[-1].Durum,          urun.Durum));          break;
-                case "atananSayman":   ops.Add(ub.Set(o => o.Urunler[-1].AtananSaymanId, urun.AtananSaymanId)); break;
+                case "barkod":         ops.Add(ub.Set(o => o.Urunler.FirstMatchingElement().Barkod,         urun.Barkod));         break;
+                case "urunAdi":        ops.Add(ub.Set(o => o.Urunler.FirstMatchingElement().UrunAdi,        urun.UrunAdi));        break;
+                case "sistemStok":     ops.Add(ub.Set(o => o.Urunler.FirstMatchingElement().SistemStok,     urun.SistemStok));     break;
+                case "sayilanStok":    ops.Add(ub.Set(o => o.Urunler.FirstMatchingElement().SayilanStok,    urun.SayilanStok));    break;
+                case "durum":          ops.Add(ub.Set(o => o.Urunler.FirstMatchingElement().Durum,          urun.Durum));          break;
+                case "atananSayman":   ops.Add(ub.Set(o => o.Urunler.FirstMatchingElement().AtananSaymanId, urun.AtananSaymanId)); break;
             }
         }
         if (changes.Count > 0)
-            ops.Add(ub.PushEach(o => o.Urunler[-1].DegisiklikGecmisi, changes));
+            ops.Add(ub.PushEach(o => o.Urunler.FirstMatchingElement().DegisiklikGecmisi, changes));
         if (!string.IsNullOrWhiteSpace(request.YorumEkle))
-            ops.Add(ub.Push(o => o.Urunler[-1].Yorumlar, urun.Yorumlar[^1]));
+            ops.Add(ub.Push(o => o.Urunler.FirstMatchingElement().Yorumlar, urun.Yorumlar[^1]));
 
         await _oturumlar.UpdateUrunAsync(oturumId, urunId, ub.Combine(ops), ct);
         Audit(AuditAksiyonlari.UrunUpdate, $"{oturumId}/{urunId}",

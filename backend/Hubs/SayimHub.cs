@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using MongoDB.Driver;
+using MongoDB.Driver.Linq;
 using SayimLink.Api.Controllers;
 using SayimLink.Api.Dtos.Sayim;
 using SayimLink.Api.Models;
@@ -187,20 +188,20 @@ public sealed class SayimHub : Hub<ISayimHubClient>
         var ub = Builders<SayimOturumu>.Update;
         var ops = new List<UpdateDefinition<SayimOturumu>>
         {
-            ub.Set(o => o.Urunler[-1].SonGuncelleyenId, urun.SonGuncelleyenId),
-            ub.Set(o => o.Urunler[-1].GuncellenmeTarihi, urun.GuncellenmeTarihi),
+            ub.Set(o => o.Urunler.FirstMatchingElement().SonGuncelleyenId, urun.SonGuncelleyenId),
+            ub.Set(o => o.Urunler.FirstMatchingElement().GuncellenmeTarihi, urun.GuncellenmeTarihi),
             ub.Set(o => o.Ozetler, oturum.Ozetler),
         };
         if (sayilanStok.HasValue)
-            ops.Add(ub.Set(o => o.Urunler[-1].SayilanStok, urun.SayilanStok));
+            ops.Add(ub.Set(o => o.Urunler.FirstMatchingElement().SayilanStok, urun.SayilanStok));
         if (!string.IsNullOrEmpty(durum))
-            ops.Add(ub.Set(o => o.Urunler[-1].Durum, urun.Durum));
+            ops.Add(ub.Set(o => o.Urunler.FirstMatchingElement().Durum, urun.Durum));
         if (atananSaymanId is not null)
-            ops.Add(ub.Set(o => o.Urunler[-1].AtananSaymanId, urun.AtananSaymanId));
+            ops.Add(ub.Set(o => o.Urunler.FirstMatchingElement().AtananSaymanId, urun.AtananSaymanId));
         if (changes.Count > 0)
-            ops.Add(ub.PushEach(o => o.Urunler[-1].DegisiklikGecmisi, changes));
+            ops.Add(ub.PushEach(o => o.Urunler.FirstMatchingElement().DegisiklikGecmisi, changes));
         if (yorumEklenen is not null)
-            ops.Add(ub.Push(o => o.Urunler[-1].Yorumlar, yorumEklenen));
+            ops.Add(ub.Push(o => o.Urunler.FirstMatchingElement().Yorumlar, yorumEklenen));
 
         await _oturumlar.UpdateUrunAsync(oturumId, urunId, ub.Combine(ops), Context.ConnectionAborted);
 
@@ -272,7 +273,7 @@ public sealed class SayimHub : Hub<ISayimHubClient>
 
         // H-6: positional Push instead of ReplaceAsync — append the new request without
         // rewriting the whole oturum document.
-        var pushTalep = Builders<SayimOturumu>.Update.Push(o => o.Urunler[-1].Talepler, talep);
+        var pushTalep = Builders<SayimOturumu>.Update.Push(o => o.Urunler.FirstMatchingElement().Talepler, talep);
         await _oturumlar.UpdateUrunAsync(oturumId, urunId, pushTalep, Context.ConnectionAborted);
         urun.Talepler.Add(talep);
 

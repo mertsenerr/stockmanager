@@ -174,7 +174,16 @@ public sealed class KullanicilarController : AdminControllerBase
             MagazaIds = magazaIds,
             AktifMi = request.AktifMi,
         };
-        await _users.InsertAsync(user, ct);
+        try
+        {
+            await _users.InsertAsync(user, ct);
+        }
+        catch (DuplicateEmailException)
+        {
+            // Pre-check passed but the unique index rejected the insert — concurrent create
+            // for the same email landed first. Translate to the same 409 the pre-check uses.
+            return Conflict(new { message = "Bu email ile bir kullanıcı zaten var." });
+        }
         _audit.Log(User, AuditAksiyonlari.KullaniciCreate, "kullanici", user.Id, yeni: $"{user.Email} · {user.Rol}");
         return CreatedAtAction(nameof(Get), new { id = user.Id }, ToListDto(user));
     }

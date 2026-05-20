@@ -289,7 +289,17 @@ public sealed class AuthService : IAuthService
 
         firma.OlusturanKullaniciId = user.Id;
         await _firmalar.ReplaceAsync(firma, ct);
-        await _users.InsertAsync(user, ct);
+        try
+        {
+            await _users.InsertAsync(user, ct);
+        }
+        catch (DuplicateEmailException)
+        {
+            // Race with a concurrent registration on the same email; behave like the
+            // FindByEmail pre-check did and don't leak existence to the caller.
+            _logger.LogInformation("Register race lost for existing email {Email} — silently swallowed", email);
+            return new RegisterResult(true, null, null);
+        }
 
         await SendVerificationEmailSafelyAsync(user, rawToken, ct);
 
@@ -323,7 +333,15 @@ public sealed class AuthService : IAuthService
             EmailVerificationTokenHash = _jwt.HashRefreshToken(rawToken),
             EmailVerificationTokenExpiresAt = DateTime.UtcNow.Add(EmailVerificationTtl),
         };
-        await _users.InsertAsync(user, ct);
+        try
+        {
+            await _users.InsertAsync(user, ct);
+        }
+        catch (DuplicateEmailException)
+        {
+            _logger.LogInformation("Register race lost for existing email {Email} — silently swallowed", email);
+            return new RegisterResult(true, null, null);
+        }
 
         await SendVerificationEmailSafelyAsync(user, rawToken, ct);
 

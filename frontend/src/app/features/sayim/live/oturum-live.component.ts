@@ -505,6 +505,12 @@ export class OturumLiveComponent implements OnInit, OnDestroy {
       if (!cur || cur.id !== e.oturumId) return;
       const u = cur.urunler.find((x) => x.id === e.patch.urunId);
       if (!u) return;
+
+      const oldSayilanStok = u.sayilanStok;
+      const oldDurum = u.durum;
+      const oldAtananSaymanId = u.atananSaymanId;
+      const oldAtananSaymanAdi = u.atananSaymanAdi;
+
       if (e.patch.sayilanStok !== null && e.patch.sayilanStok !== undefined) u.sayilanStok = e.patch.sayilanStok;
       if (e.patch.durum) u.durum = e.patch.durum as UrunDurum;
       if (e.patch.atananSaymanId !== null && e.patch.atananSaymanId !== undefined)
@@ -525,8 +531,19 @@ export class OturumLiveComponent implements OnInit, OnDestroy {
       cur.ozetler.toplamFarkPozitif = e.ozet.toplamFarkPozitif;
       cur.ozetler.toplamFarkNegatif = e.ozet.toplamFarkNegatif;
       this.oturum.set({ ...cur });
-      this.pushActivity('update',
-        `${e.patch.kullaniciAdi}: ${u.barkod}${e.patch.durum ? ' → ' + this.urunDurumLabel(e.patch.durum as UrunDurum) : ''}`);
+
+      const parts: string[] = [];
+      if (e.patch.sayilanStok !== null && e.patch.sayilanStok !== undefined && e.patch.sayilanStok !== oldSayilanStok) {
+        parts.push(`Fiili ${oldSayilanStok} → ${e.patch.sayilanStok}`);
+      }
+      if (e.patch.durum && e.patch.durum !== oldDurum) {
+        parts.push(`Durum ${this.urunDurumLabel(oldDurum)} → ${this.urunDurumLabel(e.patch.durum as UrunDurum)}`);
+      }
+      if (e.patch.atananSaymanId !== null && e.patch.atananSaymanId !== undefined && e.patch.atananSaymanId !== oldAtananSaymanId) {
+        parts.push(`Sayman ${oldAtananSaymanAdi ?? '—'} → değiştirildi`);
+      }
+      const detail = parts.length ? ` · ${parts.join(', ')}` : '';
+      this.pushActivity('update', `${e.patch.kullaniciAdi}: ${u.barkod}${detail}`);
     });
 
     this.hub.yorumEklendi$.pipe(takeUntil(this.destroy$)).subscribe((e) => {

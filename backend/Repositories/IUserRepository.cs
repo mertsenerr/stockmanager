@@ -4,6 +4,17 @@ using SayimLink.Api.Services;
 
 namespace SayimLink.Api.Repositories;
 
+/// <summary>
+/// Sentinel for the email-uniqueness race: pre-check + InsertOne is not atomic, so two
+/// concurrent registrations can both pass FindByEmail before either insert lands. Mongo
+/// rejects the second insert via the partial unique index (E11000) and we surface that
+/// to callers as this exception instead of leaking a raw 500.
+/// </summary>
+public sealed class DuplicateEmailException(string email) : Exception($"Email already in use: {email}")
+{
+    public string Email { get; } = email;
+}
+
 public interface IUserRepository
 {
     Task<User?> FindByEmailAsync(string email, CancellationToken ct = default);
@@ -48,16 +59,20 @@ public interface IUserRepository
 public sealed class UserRepository : IUserRepository
 {
     private readonly IMongoCollection<User> _users;
+    private readonly ILogger<UserRepository>? _logger;
 
-    public UserRepository(IMongoDbService mongo)
+    public UserRepository(IMongoDbService mongo, ILogger<UserRepository>? logger = null)
     {
         _users = mongo.Database.GetCollection<User>("users");
+        _logger = logger;
 
         // Eski hard unique email index'i drop et — pasif kayıtlar yeni kayıtla çakışmasın.
         try { _users.Indexes.DropOne("ix_users_email_unique"); }
         catch { /* yoksa yoksay */ }
 
         // Yeni partial unique email index — sadece aktif kullanıcılar arasında benzersizlik.
+        // Eğer veride zaten çakışan AktifMi=true kayıtlar varsa Mongo bu index'i kuramaz
+        // ve hata sessizce kaybolup koruma devre dışı kalırdı — şimdi en azından log'a düşüyor.
         try
         {
             _users.Indexes.CreateOne(new CreateIndexModel<User>(
@@ -69,7 +84,11 @@ public sealed class UserRepository : IUserRepository
                     PartialFilterExpression = Builders<User>.Filter.Eq(u => u.AktifMi, true),
                 }));
         }
-        catch { /* mevcut index uyumsuzluğunda servis hâlâ ayağa kalksın */ }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex,
+                "users.email partial unique index could not be created — duplicate active emails likely exist; deduplicate the collection to restore uniqueness enforcement.");
+        }
     }
 
     public Task<User?> FindByEmailAsync(string email, CancellationToken ct = default) =>
@@ -107,10 +126,17 @@ public sealed class UserRepository : IUserRepository
             .ToListAsync(ct);
     }
 
-    public Task InsertAsync(User user, CancellationToken ct = default)
+    public async Task InsertAsync(User user, CancellationToken ct = default)
     {
         user.Email = user.Email.ToLowerInvariant();
-        return _users.InsertOneAsync(user, cancellationToken: ct);
+        try
+        {
+            await _users.InsertOneAsync(user, cancellationToken: ct);
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            throw new DuplicateEmailException(user.Email);
+        }
     }
 
     public Task ReplaceAsync(User user, CancellationToken ct = default)

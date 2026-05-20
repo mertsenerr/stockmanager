@@ -104,7 +104,11 @@ public sealed class SayimHub : Hub<ISayimHubClient>
         var urun = oturum.Urunler.FirstOrDefault(u => u.Id == urunId)
             ?? throw new HubException("Ürün bulunamadı.");
 
-        var canEditDurum = UserRol == Roles.Admin;
+        // SayımBaşkanı + Sistem urun durumunu değiştirebilir (REST PatchUrun ile aynı
+        // kural: Roles.IsAdminLevel). Daha önce sadece Roles.Admin (=Sistem) izinli
+        // olduğu için SayımBaşkanı'nın hub üzerinden yaptığı her güncelleme,
+        // frontend durum alanını da gönderdiğinde "yetkin yok" ile reddediliyordu.
+        var canEditDurum = UserRol == Roles.Admin || UserRol == Roles.SayimYoneticisi;
         var canAtaSayman = UserRol == Roles.Admin || UserRol == Roles.SayimYoneticisi;
         // Sayman gate: "Sayman" rol stringi aslında "Kullanici"nin alias'ı, gerçek sayım
         // yetkisi atama'nın SaymanKullaniciIds listesinden geliyor. REST PatchUrun ile

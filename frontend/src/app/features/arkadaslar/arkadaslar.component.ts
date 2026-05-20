@@ -35,7 +35,7 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
         <input type="search"
                [value]="searchQuery()"
                (input)="onSearchInput(($any($event.target)).value)"
-               placeholder="Ad veya e-posta ile ara (en az 2 karakter)..."
+               placeholder="Ad veya e-posta ile ara (en az 3 karakter)..."
                class="field-input mb-3" />
 
         @if (searching()) {
@@ -70,7 +70,7 @@ import { ToastService as _ } from '../../shared/ui/toast/toast.service';
               </li>
             }
           </ul>
-        } @else if (searchQuery().trim().length >= 2) {
+        } @else if (searchQuery().trim().length >= 3) {
           <p class="text-xs text-ink-muted text-center py-4">Eşleşen kullanıcı yok.</p>
         } @else {
           <p class="text-xs text-ink-muted text-center py-4">Aramaya başla...</p>
@@ -182,7 +182,7 @@ export class ArkadaslarComponent implements OnInit {
     this.searchQuery.set(v);
     if (this.searchTimer) clearTimeout(this.searchTimer);
     const q = v.trim();
-    if (q.length < 2) {
+    if (q.length < 3) {
       this.searchResults.set([]);
       this.searching.set(false);
       return;

@@ -72,7 +72,10 @@ public sealed class FriendshipsController : ControllerBase
     {
         var uid = Uid;
         if (uid is null) return Unauthorized();
-        if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
+        // Min 3 char — tek karakterle alfabe taraması yaparak tüm directory'yi
+        // çıkarmanın önüne geçiyoruz. Email tam eşleşmesi bu kısıtın altında da
+        // çalışıyor (aşağıdaki bypass'ta), bilinen bir adrese istek atmak için.
+        if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 3)
             return Ok(Array.Empty<UserSearchDto>());
 
         // Türkçe karakterleri ASCII'ye düşürerek aramayı tolerant yap.
@@ -100,37 +103,19 @@ public sealed class FriendshipsController : ControllerBase
             return "yok";
         }
 
-        // Substring search used to expose every active user (email + ad + rol) to any
-        // authenticated caller — a free directory dump. We now scope to the caller's
-        // own social graph: shared firma, existing friendship rows, or platform admin.
-        // An exact-email match still resolves so a known address can be friend-requested.
-        var callerIsSistem = User.IsSistem();
-        var caller = await _users.FindByIdAsync(uid, ct);
-        var callerFirmaIds = new HashSet<string>(StringComparer.Ordinal);
-        if (caller is not null)
-        {
-            if (!string.IsNullOrEmpty(caller.FirmaId)) callerFirmaIds.Add(caller.FirmaId);
-            foreach (var fid in caller.FirmaIds) callerFirmaIds.Add(fid);
-        }
-        var relatedUserIds = new HashSet<string>(
-            allFriendships.SelectMany(f => new[] { f.FromUserId, f.ToUserId }),
-            StringComparer.Ordinal);
-
-        bool InCallerScope(User u)
-        {
-            if (callerIsSistem) return true;
-            if (!string.IsNullOrEmpty(u.FirmaId) && callerFirmaIds.Contains(u.FirmaId)) return true;
-            if (u.FirmaIds.Any(callerFirmaIds.Contains)) return true;
-            if (relatedUserIds.Contains(u.Id)) return true;
-            return false;
-        }
-
+        // Pentest W04: substring search'in tüm dizini açık etmesini engellemek
+        // için scope filtresi eklenmişti — fakat aynı firmadan olmayan tanıdığı
+        // (örn. başka firmada bir SayımBaşkanı arkadaşı) arayan kullanıcılar
+        // sadece email tam eşleşmesi ile bulabiliyordu, UX karmaşıktı. Şimdi
+        // scope'u kaldırıyoruz; enumerate riski şu üçlüyle kontrol altında:
+        //   1. Min 3 karakterlik sorgu (alfabe taraması daha zor)
+        //   2. En fazla 20 sonuç
+        //   3. Endpoint zaten genel auth rate-limit'inde
         var matches = all
             .Where(u => u.Id != uid)
             .Where(u =>
                 NormalizeForSearch(u.AdSoyad).Contains(needle) ||
                 NormalizeForSearch(u.Email).Contains(needle))
-            .Where(InCallerScope)
             .Take(20)
             .ToList();
 

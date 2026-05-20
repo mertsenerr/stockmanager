@@ -13,6 +13,7 @@ import { OzelRapor, OzelRaporDosya } from './ozel-rapor.models';
 import { BelgeTipiService } from '../belge-tipleri/belge-tipi.service';
 import { BelgeTipi, IMZA_ROL_OPTIONS } from '../belge-tipleri/belge-tipi.models';
 import { SignaturePadComponent } from './signature-pad.component';
+import { SelectComponent, SelectOption } from '../../shared/ui/select/select.component';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_EXT = ['.xlsx', '.xls', '.pdf', '.csv'];
@@ -29,7 +30,7 @@ function fileExtension(name: string): string {
 @Component({
   selector: 'app-ozel-raporlar',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, ModalComponent, PageHeaderComponent, SignaturePadComponent],
+  imports: [ReactiveFormsModule, RouterLink, ModalComponent, PageHeaderComponent, SignaturePadComponent, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './ozel-raporlar.component.html',
 })
@@ -185,6 +186,12 @@ export class OzelRaporlarComponent implements OnInit {
   getBelgeTipi(raporId: string): string {
     return this.selectedBelgeTipi()[raporId] ?? '';
   }
+
+  /** Aktif belge tipi listesi + "Sınıflandırılmamış" opsiyonu (app-select için). */
+  readonly belgeTipiOptions = computed<SelectOption[]>(() => [
+    { value: '', label: 'Sınıflandırılmamış' },
+    ...this.belgeTipleri().map((t) => ({ value: t.id, label: t.ad })),
+  ]);
 
   imzaLabel(roller: string[]): string {
     if (!roller || roller.length === 0) return '';

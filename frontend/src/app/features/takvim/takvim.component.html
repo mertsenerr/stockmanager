@@ -1,10 +1,7 @@
 <app-page-header title="Takvim" description="Sayım atamalarını planla, takip et, sürükle-bırak ile gün taşı.">
   <div actions class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-    <select [value]="firmaFilter()" (change)="setFirmaFilter(($any($event.target)).value)"
-            class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm">
-      <option value="">Tüm firmalar</option>
-      @for (f of firmalar(); track f.id) { <option [value]="f.id">{{ f.ad }}</option> }
-    </select>
+    <app-select size="sm" [value]="firmaFilter()" (selectionChange)="setFirmaFilter($event)" [options]="firmaFilterOptions()" class="min-w-[140px]" />
+
     <label class="flex items-center gap-1.5 text-xs text-text-muted cursor-pointer">
       <input type="checkbox" [checked]="onlyMine()" (change)="toggleMine()"
              class="w-3.5 h-3.5 bg-surface-elevated border border-border accent-text-primary" />
@@ -88,13 +85,8 @@
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label class="block text-xs text-text-secondary mb-1.5">Mağaza</label>
-        <select formControlName="magazaId"
-                class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm">
-          <option value="">— Seçin —</option>
-          @for (m of magazalar(); track m.id) {
-            <option [value]="m.id">{{ m.firmaAdi }} · {{ m.ad }}</option>
-          }
-        </select>
+        <app-select formControlName="magazaId" [options]="magazaSelectOptions()" placeholder="— Seçin —" />
+
         @if (form.controls.magazaId.touched && form.controls.magazaId.errors?.['required']) {
           <p class="text-xs text-accent-danger mt-1.5">Mağaza zorunludur.</p>
         }
@@ -122,24 +114,15 @@
       </div>
       <div>
         <label class="block text-xs text-text-secondary mb-1.5">Durum</label>
-        <select formControlName="durum"
-                class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm">
-          @for (opt of durumOptions; track opt.value) {
-            <option [value]="opt.value">{{ opt.label }}</option>
-          }
-        </select>
+        <app-select formControlName="durum" [options]="durumSelectOptions" />
+
       </div>
     </div>
 
     <div>
       <label class="block text-xs text-text-secondary mb-1.5">Sayım Yöneticisi</label>
-      <select formControlName="yoneticiKullaniciId"
-              class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm">
-        <option value="">— Seçin —</option>
-        @for (u of yoneticiAdaylari(); track u.id) {
-          <option [value]="u.id">{{ u.adSoyad }} ({{ u.email }})</option>
-        }
-      </select>
+      <app-select formControlName="yoneticiKullaniciId" [options]="yoneticiSelectOptions()" placeholder="— Seçin —" />
+
       @if (form.controls.yoneticiKullaniciId.touched && form.controls.yoneticiKullaniciId.errors?.['required']) {
         <p class="text-xs text-accent-danger mt-1.5">Yönetici zorunludur.</p>
       }

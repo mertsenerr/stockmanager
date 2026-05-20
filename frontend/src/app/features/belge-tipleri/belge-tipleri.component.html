@@ -74,12 +74,7 @@
     @if (isSistem()) {
       <div class="bt-form-row">
         <label class="bt-label" for="bt-firma">Firma</label>
-        <select id="bt-firma" formControlName="firmaId" class="bt-input" [disabled]="!!editing()">
-          <option value="">Seçiniz…</option>
-          @for (f of firmalar(); track f.id) {
-            <option [value]="f.id">{{ f.ad }}</option>
-          }
-        </select>
+        <app-select formControlName="firmaId" [options]="firmaSelectOptions()" [disabled]="!!editing()" placeholder="Seçiniz…" />
         @if (editing()) {
           <p class="bt-help">Firma değiştirme: arşivleyip yeni firma altında yeniden oluşturun.</p>
         }
@@ -111,11 +106,7 @@
           <span>Sayım Başkanı imzalayacak</span>
         </label>
         @if (form.controls.sayimBaskaniImza.value) {
-          <select formControlName="sayimBaskaniKonum" class="bt-input bt-konum-select">
-            @for (k of imzaKonumOptions; track k.value) {
-              <option [value]="k.value">{{ k.label }}</option>
-            }
-          </select>
+          <app-select formControlName="sayimBaskaniKonum" [options]="konumSelectOptions" size="sm" class="bt-konum-select-wrap" />
         }
       </div>
 
@@ -125,11 +116,7 @@
           <span>Mağaza Yetkilisi imzalayacak</span>
         </label>
         @if (form.controls.magazaYetkilisiImza.value) {
-          <select formControlName="magazaYetkilisiKonum" class="bt-input bt-konum-select">
-            @for (k of imzaKonumOptions; track k.value) {
-              <option [value]="k.value">{{ k.label }}</option>
-            }
-          </select>
+          <app-select formControlName="magazaYetkilisiKonum" [options]="konumSelectOptions" size="sm" class="bt-konum-select-wrap" />
         }
       </div>
 
@@ -144,11 +131,7 @@
           <span>Kaşe gerekli</span>
         </label>
         @if (form.controls.kaseGerekli.value) {
-          <select formControlName="kaseKonum" class="bt-input bt-konum-select">
-            @for (k of imzaKonumOptions; track k.value) {
-              <option [value]="k.value">{{ k.label }}</option>
-            }
-          </select>
+          <app-select formControlName="kaseKonum" [options]="konumSelectOptions" size="sm" class="bt-konum-select-wrap" />
         }
       </div>
     </fieldset>

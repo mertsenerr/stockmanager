@@ -90,12 +90,8 @@
     <div class="grid grid-cols-2 gap-3">
       <div>
         <label class="block text-xs text-text-secondary mb-1.5">Rol</label>
-        <select formControlName="rol"
-                class="focus-ring w-full px-3 py-2 bg-surface-elevated border border-border rounded-sm text-sm">
-          @for (opt of roleOptions; track opt.value) {
-            <option [value]="opt.value">{{ opt.label }}</option>
-          }
-        </select>
+        <app-select formControlName="rol" [options]="roleSelectOptions" />
+
       </div>
 
       <div class="flex items-end">

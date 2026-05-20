@@ -5,12 +5,8 @@
     <span class="text-text-muted text-xs">→</span>
     <input type="date" [(ngModel)]="filterTo"
            class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm font-mono" />
-    <select [(ngModel)]="filterAksiyon"
-            class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm">
-      @for (a of aksiyonOptions; track a.value) {
-        <option [value]="a.value">{{ a.label }}</option>
-      }
-    </select>
+    <app-select size="sm" [(ngModel)]="filterAksiyon" [options]="aksiyonOptions" class="audit-aksiyon-filter" />
+
     <button (click)="applyFilters()"
             class="focus-ring text-xs font-medium px-3 py-1.5 rounded-sm bg-text-primary text-bg active:scale-[0.98] transition-all duration-150">
       Filtrele

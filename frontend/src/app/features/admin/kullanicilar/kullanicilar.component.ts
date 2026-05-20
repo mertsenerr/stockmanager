@@ -17,11 +17,12 @@ import { FirmaService } from '../firma.service';
 import { MagazaService } from '../magaza.service';
 import { Firma, KullaniciList, Magaza } from '../admin.models';
 import { ROLE_LABELS, UserRole } from '../../../core/auth/auth.models';
+import { SelectComponent, SelectOption } from '../../../shared/ui/select/select.component';
 
 @Component({
   selector: 'app-kullanicilar',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent, PageHeaderComponent],
+  imports: [ReactiveFormsModule, ModalComponent, PageHeaderComponent, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './kullanicilar.component.html',
 })
@@ -49,6 +50,7 @@ export class KullanicilarComponent implements OnInit {
     { value: 'SayimBaskani', label: 'Sayım Başkanı' },
     { value: 'Kullanici', label: 'Kullanıcı' },
   ];
+  readonly roleSelectOptions: SelectOption[] = this.roleOptions.map((o) => ({ value: o.value, label: o.label }));
 
   readonly roleLabel = (r: UserRole) => ROLE_LABELS[r];
 

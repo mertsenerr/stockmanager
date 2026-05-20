@@ -34,11 +34,12 @@ import { Firma, KullaniciList, Magaza } from '../admin/admin.models';
 import { FirmaService } from '../admin/firma.service';
 import { MagazaService } from '../admin/magaza.service';
 import { KullaniciService } from '../admin/kullanici.service';
+import { SelectComponent, SelectOption } from '../../shared/ui/select/select.component';
 
 @Component({
   selector: 'app-takvim',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent, PageHeaderComponent],
+  imports: [ReactiveFormsModule, ModalComponent, PageHeaderComponent, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './takvim.component.html',
 })
@@ -81,6 +82,19 @@ export class TakvimComponent implements OnInit, AfterViewInit, OnDestroy {
     { value: 'tamamlandi', label: 'Tamamlandı' },
     { value: 'iptal', label: 'İptal' },
   ];
+  readonly durumSelectOptions: SelectOption[] = this.durumOptions.map((d) => ({ value: d.value, label: d.label }));
+  readonly firmaFilterOptions = computed<SelectOption[]>(() => [
+    { value: '', label: 'Tüm firmalar' },
+    ...this.firmalar().map((f) => ({ value: f.id, label: f.ad })),
+  ]);
+  readonly magazaSelectOptions = computed<SelectOption[]>(() => [
+    { value: '', label: '— Seçin —' },
+    ...this.magazalar().map((m) => ({ value: m.id, label: `${m.firmaAdi} · ${m.ad}` })),
+  ]);
+  readonly yoneticiSelectOptions = computed<SelectOption[]>(() => [
+    { value: '', label: '— Seçin —' },
+    ...this.yoneticiAdaylari().map((u) => ({ value: u.id, label: `${u.adSoyad} (${u.email})` })),
+  ]);
   readonly durumLabel = (d: AtamaDurum) => ATAMA_DURUM_LABELS[d];
 
   readonly form = this.fb.nonNullable.group({

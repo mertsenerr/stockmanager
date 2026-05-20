@@ -7,11 +7,12 @@ import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ArkadasService, Friend } from '../../arkadaslar/arkadas.service';
 import { RouterLink } from '@angular/router';
+import { SelectComponent, SelectOption } from '../../../shared/ui/select/select.component';
 
 @Component({
   selector: 'app-call-panel',
   standalone: true,
-  imports: [SrcObjectDirective, RouterLink],
+  imports: [SrcObjectDirective, RouterLink, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .call-panel-host {
@@ -159,24 +160,16 @@ import { RouterLink } from '@angular/router';
         @if (call.devices().cameras.length + call.devices().mics.length > 0) {
           <div class="flex items-center gap-2 flex-wrap mt-3">
             @if (call.mode() === 'video' && call.devices().cameras.length > 1) {
-              <select class="field-input" style="padding: 6px 8px; font-size: 11.5px; max-width: 220px;"
-                      [value]="call.selectedCameraId() ?? ''"
-                      (change)="onCameraChange(($any($event.target)).value)">
-                <option value="">Kamera (otomatik)</option>
-                @for (c of call.devices().cameras; track c.deviceId) {
-                  <option [value]="c.deviceId">{{ c.label || 'Kamera ' + ($index + 1) }}</option>
-                }
-              </select>
+              <app-select size="sm" style="max-width: 220px;"
+                          [value]="call.selectedCameraId() ?? ''"
+                          (selectionChange)="onCameraChange($event)"
+                          [options]="cameraOptions()" />
             }
             @if (call.devices().mics.length > 1) {
-              <select class="field-input" style="padding: 6px 8px; font-size: 11.5px; max-width: 220px;"
-                      [value]="call.selectedMicId() ?? ''"
-                      (change)="onMicChange(($any($event.target)).value)">
-                <option value="">Mikrofon (otomatik)</option>
-                @for (m of call.devices().mics; track m.deviceId) {
-                  <option [value]="m.deviceId">{{ m.label || 'Mikrofon ' + ($index + 1) }}</option>
-                }
-              </select>
+              <app-select size="sm" style="max-width: 220px;"
+                          [value]="call.selectedMicId() ?? ''"
+                          (selectionChange)="onMicChange($event)"
+                          [options]="micOptions()" />
             }
           </div>
         }
@@ -571,6 +564,15 @@ export class CallPanelComponent implements AfterViewInit, OnDestroy {
     if (total <= 4) return 'repeat(2, 1fr)';
     return 'repeat(3, 1fr)';
   });
+
+  protected readonly cameraOptions = computed<SelectOption[]>(() => [
+    { value: '', label: 'Kamera (otomatik)' },
+    ...this.call.devices().cameras.map((c, i) => ({ value: c.deviceId, label: c.label || `Kamera ${i + 1}` })),
+  ]);
+  protected readonly micOptions = computed<SelectOption[]>(() => [
+    { value: '', label: 'Mikrofon (otomatik)' },
+    ...this.call.devices().mics.map((m, i) => ({ value: m.deviceId, label: m.label || `Mikrofon ${i + 1}` })),
+  ]);
 
   /** Compact ↔ büyütülmüş ↔ floating ↔ ekran paylaşımı kombinasyonlarına göre grid genişliği. */
   protected readonly gridMaxWidth = computed(() => {

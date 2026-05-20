@@ -129,19 +129,13 @@
             {{ sabitLabel(a) }}
             @if (a === 'barkod') { <span class="text-coral">*</span> }
           </label>
-          <select [(ngModel)]="manual[a]" class="field-input">
-            <option value="">— Seçin —</option>
-            @for (h of parsed()!.headers; track h) { <option [value]="h">{{ h }}</option> }
-          </select>
+          <app-select [(ngModel)]="manual[a]" [options]="headerOptions()" placeholder="— Seçin —" />
         </div>
       }
       @for (k of profil(); track k.key) {
         <div>
           <label class="field-label">{{ k.label }}</label>
-          <select [(ngModel)]="manual[k.key]" class="field-input">
-            <option value="">— Seçin —</option>
-            @for (h of parsed()!.headers; track h) { <option [value]="h">{{ h }}</option> }
-          </select>
+          <app-select [(ngModel)]="manual[k.key]" [options]="headerOptions()" placeholder="— Seçin —" />
         </div>
       }
     </div>

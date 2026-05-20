@@ -11,6 +11,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
+import { SelectComponent, SelectOption } from '../../../shared/ui/select/select.component';
 import {
   ExcelImportPayload,
   ExcelImportRow,
@@ -89,7 +90,7 @@ interface PreviewRow {
 @Component({
   selector: 'app-excel-upload',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './excel-upload.component.html',
   styleUrl: './excel-upload.component.css',
@@ -123,6 +124,16 @@ export class ExcelUploadComponent {
 
   readonly sabitAlanlar: SabitAlan[] = ['barkod', 'urunAdi', 'sistemStok', 'sayilanStok', 'fiyat'];
   readonly sabitLabel = (a: SabitAlan) => SABIT_LABELS[a];
+
+  /** "— Seçin —" + parsed headers, app-select için option listesi. */
+  readonly headerOptions = computed<SelectOption[]>(() => {
+    const p = this.parsed();
+    if (!p) return [{ value: '', label: '— Seçin —' }];
+    return [
+      { value: '', label: '— Seçin —' },
+      ...p.headers.map((h) => ({ value: h, label: h })),
+    ];
+  });
 
   sourceLabel(s: string): string {
     return s === 'header' ? 'BAŞLIK' : s === 'content' ? 'İÇERİK' : s === 'manual' ? 'EL İLE' : '—';

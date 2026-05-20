@@ -31,6 +31,7 @@ import { ConfirmService } from '../../../shared/ui/confirm/confirm.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { OturumService } from '../oturum.service';
 import { ExcelUploadComponent } from '../oturum-detail/excel-upload.component';
+import { SelectComponent, SelectOption } from '../../../shared/ui/select/select.component';
 import { CallPanelComponent } from './call-panel.component';
 import { CallService } from './call.service';
 import { ExcelImportPayload } from '../sayim.models';
@@ -73,7 +74,7 @@ interface ActivityEntry {
 @Component({
   selector: 'app-oturum-live',
   standalone: true,
-  imports: [PageHeaderComponent, ModalComponent, AgGridAngular, RouterLink, FormsModule, ExcelUploadComponent, CallPanelComponent],
+  imports: [PageHeaderComponent, ModalComponent, AgGridAngular, RouterLink, FormsModule, ExcelUploadComponent, CallPanelComponent, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './oturum-live.component.html',
   styleUrl: './oturum-live.component.css',
@@ -149,6 +150,15 @@ export class OturumLiveComponent implements OnInit, OnDestroy {
   readonly urunDurumOptions: UrunDurum[] = [
     'beklemede', 'tekrar_sayiliyor', 'onaylandi', 'iptal', 'incele',
   ];
+  readonly urunDurumSelectOptions: SelectOption[] = this.urunDurumOptions.map((d) => ({ value: d, label: URUN_DURUM_LABELS[d] }));
+  readonly talepKategoriOptions = computed<SelectOption[]>(() => [
+    { value: '', label: 'Tüm kategoriler' },
+    ...this.availableTalepKategoriler().map((k) => ({ value: k, label: k })),
+  ]);
+  readonly talepAltKategoriOptions = computed<SelectOption[]>(() => [
+    { value: '', label: 'Tüm alt kategoriler' },
+    ...this.availableTalepAltKategoriler().map((ak) => ({ value: ak, label: ak })),
+  ]);
 
   private readonly tlFormatter = (v: unknown): string => {
     if (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))) return '—';

@@ -23,13 +23,14 @@ import { FirmaService } from '../firma.service';
 import { MagazaService } from '../magaza.service';
 import { Firma, Magaza } from '../admin.models';
 import { ThemeService } from '../../../core/theme/theme.service';
+import { SelectComponent, SelectOption } from '../../../shared/ui/select/select.component';
 
 type ViewMode = 'list' | 'map';
 
 @Component({
   selector: 'app-magazalar',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent, PageHeaderComponent],
+  imports: [ReactiveFormsModule, ModalComponent, PageHeaderComponent, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './magazalar.component.html',
   styleUrl: './magazalar.component.css',
@@ -50,6 +51,14 @@ export class MagazalarComponent implements OnInit, AfterViewInit, OnDestroy {
 
   readonly magazalar = signal<Magaza[]>([]);
   readonly firmalar = signal<Firma[]>([]);
+  readonly firmaFilterOptions = computed<SelectOption[]>(() => [
+    { value: '', label: 'Tüm firmalar' },
+    ...this.firmalar().map((f) => ({ value: f.id, label: f.ad })),
+  ]);
+  readonly firmaPickerOptions = computed<SelectOption[]>(() => [
+    { value: '', label: '— Seçin —' },
+    ...this.firmalar().map((f) => ({ value: f.id, label: f.ad })),
+  ]);
   readonly loading = signal(false);
   readonly query = signal('');
   readonly firmaFilter = signal<string>('');

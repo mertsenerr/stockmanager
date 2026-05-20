@@ -4,11 +4,12 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header/page-header.
 import { ToastService } from '../../../shared/ui/toast/toast.service';
 import { RaporService } from '../rapor.service';
 import { AKSIYON_LABELS, AuditLogItem } from '../rapor.models';
+import { SelectComponent } from '../../../shared/ui/select/select.component';
 
 @Component({
   selector: 'app-audit',
   standalone: true,
-  imports: [PageHeaderComponent, FormsModule],
+  imports: [PageHeaderComponent, FormsModule, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './audit.component.html',
 })

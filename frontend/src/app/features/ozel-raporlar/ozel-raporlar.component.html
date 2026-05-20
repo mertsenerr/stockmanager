@@ -72,18 +72,15 @@
               <input #fileInput type="file" multiple accept=".xlsx,.xls,.pdf,.csv" class="hidden"
                      (change)="onFilesChosen(r, $event)" />
               @if (belgeTipleri().length > 0) {
-                <select
+                <app-select
+                  [options]="belgeTipiOptions()"
                   [value]="getBelgeTipi(r.id)"
-                  (change)="setBelgeTipi(r.id, $any($event.target).value)"
+                  (selectionChange)="setBelgeTipi(r.id, $event)"
                   [disabled]="uploading() === r.id"
-                  class="focus-ring text-xs px-2 py-1.5 bg-surface-elevated border border-border rounded-sm max-w-[180px]"
-                  [attr.aria-label]="'Belge tipi'"
-                >
-                  <option value="">Sınıflandırılmamış</option>
-                  @for (t of belgeTipleri(); track t.id) {
-                    <option [value]="t.id">{{ t.ad }}</option>
-                  }
-                </select>
+                  placeholder="Sınıflandırılmamış"
+                  size="sm"
+                  class="ozr-belge-tipi-select"
+                />
               }
               <button type="button" (click)="triggerUpload(r, fileInput)"
                       [disabled]="uploading() === r.id"

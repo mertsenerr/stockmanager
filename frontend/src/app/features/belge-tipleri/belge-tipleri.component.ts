@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { ModalComponent } from '../../shared/ui/modal/modal.component';
+import { SelectComponent, SelectOption } from '../../shared/ui/select/select.component';
 import { ToastService } from '../../shared/ui/toast/toast.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { Firma } from '../admin/admin.models';
@@ -13,7 +14,7 @@ import { BelgeTipi, BelgeTipiUpsert, IMZA_KONUM_OPTIONS, IMZA_ROL_OPTIONS, ImzaK
 @Component({
   selector: 'app-belge-tipleri',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, ModalComponent],
+  imports: [ReactiveFormsModule, RouterLink, ModalComponent, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './belge-tipleri.component.html',
   styleUrls: ['./belge-tipleri.component.css'],
@@ -41,6 +42,13 @@ export class BelgeTipleriComponent implements OnInit {
 
   protected readonly imzaRolOptions = IMZA_ROL_OPTIONS;
   protected readonly imzaKonumOptions = IMZA_KONUM_OPTIONS;
+  /** SelectComponent için konum option listesi. */
+  protected readonly konumSelectOptions: SelectOption[] = IMZA_KONUM_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
+  /** Sistem rolü için firma seçeneği listesi (computed — firmalar yüklendiğinde değişir). */
+  readonly firmaSelectOptions = computed<SelectOption[]>(() => [
+    { value: '', label: 'Seçiniz…' },
+    ...this.firmalar().map((f) => ({ value: f.id, label: f.ad })),
+  ]);
 
   readonly form = this.fb.nonNullable.group({
     firmaId: [''],

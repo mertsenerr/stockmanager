@@ -190,6 +190,12 @@ textarea.bt-input { min-height: 64px !important; resize: vertical; }
   padding: 4px 10px !important;
   font-size: 12px !important;
 }
+/* app-select konum: kompakt + dar */
+.bt-konum-select-wrap {
+  flex: 0 0 auto;
+  min-width: 130px;
+  max-width: 150px;
+}
 .bt-form-actions {
   display: flex; gap: 8px; justify-content: flex-end;
   padding-top: 4px;

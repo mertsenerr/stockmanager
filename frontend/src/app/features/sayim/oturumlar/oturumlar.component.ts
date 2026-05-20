@@ -13,11 +13,12 @@ import { Firma, Magaza } from '../../admin/admin.models';
 import { ArkadasService, Friend } from '../../arkadaslar/arkadas.service';
 import { OturumService } from '../oturum.service';
 import { OTURUM_DURUM_COLOR, OTURUM_DURUM_LABELS, OturumDurum, OturumList } from '../sayim.models';
+import { SelectComponent, SelectOption } from '../../../shared/ui/select/select.component';
 
 @Component({
   selector: 'app-oturumlar',
   standalone: true,
-  imports: [ReactiveFormsModule, ModalComponent, PageHeaderComponent],
+  imports: [ReactiveFormsModule, ModalComponent, PageHeaderComponent, SelectComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './oturumlar.component.html',
 })
@@ -92,6 +93,15 @@ export class OturumlarComponent implements OnInit {
     { value: 'tamamlandi', label: 'Tamamlandı' },
     { value: 'iptal', label: 'İptal' },
   ];
+  readonly durumSelectOptions: SelectOption[] = this.durumOptions.map((d) => ({ value: d.value, label: d.label }));
+  readonly firmaFilterOptions = computed<SelectOption[]>(() => [
+    { value: '', label: 'Tüm firmalar' },
+    ...this.firmalar().map((f) => ({ value: f.id, label: f.ad })),
+  ]);
+  readonly magazaSelectOptions = computed<SelectOption[]>(() => [
+    { value: '', label: '— Seçin —' },
+    ...this.magazalar().map((m) => ({ value: m.id, label: `${m.firmaAdi} · ${m.ad}` })),
+  ]);
 
   readonly form = this.fb.nonNullable.group({
     magazaId: ['', [Validators.required]],

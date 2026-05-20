@@ -138,22 +138,12 @@
         @if (embedded) {
           <!-- Embedded: kategori filtreleri + 2-kolonlu talep grid + diğer log -->
           <div class="px-3 py-2 border-b-[1.5px] border-ink/30 flex gap-2 shrink-0">
-            <select class="field-input flex-1" style="padding: 6px 8px; font-size: 11.5px;"
-                    [value]="talepKategoriFilter()"
-                    (change)="setTalepKategori(($any($event.target)).value)">
-              <option value="">Tüm kategoriler</option>
-              @for (k of availableTalepKategoriler(); track k) {
-                <option [value]="k">{{ k }}</option>
-              }
-            </select>
-            <select class="field-input flex-1" style="padding: 6px 8px; font-size: 11.5px;"
-                    [value]="talepAltKategoriFilter()"
-                    (change)="setTalepAltKategori(($any($event.target)).value)">
-              <option value="">Tüm alt kategoriler</option>
-              @for (ak of availableTalepAltKategoriler(); track ak) {
-                <option [value]="ak">{{ ak }}</option>
-              }
-            </select>
+            <app-select size="sm" class="flex-1" [value]="talepKategoriFilter()"
+                        (selectionChange)="setTalepKategori($event)"
+                        [options]="talepKategoriOptions()" />
+            <app-select size="sm" class="flex-1" [value]="talepAltKategoriFilter()"
+                        (selectionChange)="setTalepAltKategori($event)"
+                        [options]="talepAltKategoriOptions()" />
           </div>
 
           <div class="flex-1 overflow-y-auto px-3 py-2">
@@ -326,12 +316,10 @@
           </div>
           <div class="col-span-2">
             <label class="field-label">Durum</label>
-            <select class="field-input" [ngModel]="editForm().durum"
-                    (ngModelChange)="updateEditForm('durum', $event)">
-              @for (d of urunDurumOptions; track d) {
-                <option [value]="d">{{ urunDurumLabel(d) }}</option>
-              }
-            </select>
+            <app-select [value]="editForm().durum"
+                        (selectionChange)="updateEditForm('durum', $event)"
+                        [options]="urunDurumSelectOptions" />
+
           </div>
         </div>
 

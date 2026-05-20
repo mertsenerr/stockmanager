@@ -1,1 +1,3 @@
 @import 'leaflet/dist/leaflet.css';
+
+.mgz-firma-filter { min-width: 160px; display: inline-block; }

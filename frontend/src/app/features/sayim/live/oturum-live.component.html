@@ -149,8 +149,7 @@
           <div class="flex-1 overflow-y-auto px-3 py-2">
             <div class="grid grid-cols-2 gap-2">
               @for (a of filteredTalepActivities(); track a.id) {
-                <div class="rounded-lg border-[1.5px] border-ink p-2 text-xs leading-snug"
-                     style="background: var(--color-butter);">
+                <div class="talep-card rounded-lg border-[1.5px] p-2 text-xs leading-snug">
                   <div class="flex items-baseline gap-2 mb-1">
                     <span class="font-mono text-[10px] uppercase tracking-wider font-bold">Talep</span>
                     <span class="font-mono text-[10px] text-ink-muted">{{ formatTime(a.time) }}</span>
@@ -201,8 +200,7 @@
           <div class="flex-1 overflow-y-auto px-3 py-2 space-y-2">
             @for (a of activity().slice().reverse(); track a.id) {
               @if (a.kind === 'talep') {
-                <div class="rounded-lg border-[1.5px] border-ink p-2.5 text-xs leading-snug"
-                     style="background: var(--color-butter);">
+                <div class="talep-card rounded-lg border-[1.5px] p-2.5 text-xs leading-snug">
                   <div class="flex items-baseline gap-2 mb-1">
                     <span class="font-mono text-[10px] uppercase tracking-wider font-bold">Talep</span>
                     <span class="font-mono text-[10px] text-ink-muted">{{ formatTime(a.time) }}</span>

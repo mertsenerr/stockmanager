@@ -286,6 +286,18 @@ export class SayimHubService {
 
     this.connection.onclose(() => this.disconnected$.next());
 
+    // withAutomaticReconnect() reopens the WebSocket but server-side group
+    // membership (oturum:<id>) is wiped on each reconnect, so all subsequent
+    // broadcasts (TalepOlusturuldu / UrunGuncellendi / KullaniciKatildi / ...)
+    // silently bypass this client until a full F5. Re-join the group here so
+    // realtime stays live across transient drops.
+    this.connection.onreconnected(async () => {
+      if (this.joinedOturumId) {
+        try { await this.connection?.invoke('OturumaKatil', this.joinedOturumId); }
+        catch { /* server tarafı oturumu sildiyse re-join hata verebilir; sessiz geç */ }
+      }
+    });
+
     await this.connection.start();
   }
 }

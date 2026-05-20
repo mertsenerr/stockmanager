@@ -1,6 +1,20 @@
 @import 'ag-grid-community/styles/ag-grid.css';
 @import 'ag-grid-community/styles/ag-theme-quartz.css';
 
+/* ─── Talep card — soft amber tint, theme-aware ────────────────────────────
+   Eski versiyonu solid butter (#ffd66e) idi; karanlık temada parlak bir sarı
+   bloka dönüşüyor ve gözü yoruyordu. Şimdi tip-banner ile aynı amber paletini
+   düşük opasitede kullanıyoruz — kart yine dikkat çekiyor ama "cırtlak" değil. */
+.talep-card {
+  background: rgba(245, 158, 11, 0.10);
+  border-color: rgba(245, 158, 11, 0.45);
+}
+[data-theme="dark"] .talep-card {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.32);
+  color: #fcd34d;
+}
+
 /* ─── Tip banner — soft amber, theme-aware ────────────────────────────────── */
 .tip-banner {
   padding: 10px 16px;

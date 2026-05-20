@@ -895,7 +895,9 @@ export class OturumLiveComponent implements OnInit, OnDestroy {
       },
       error: (err: HttpErrorResponse) => {
         this.excelUploading.set(false);
-        this.toast.error(err.error?.message ?? 'Excel yüklenemedi.');
+        const errs = err.error?.errors as Record<string, string[]> | undefined;
+        const first = errs ? Object.values(errs).flat()[0] : undefined;
+        this.toast.error(first ?? err.error?.message ?? 'Excel yüklenemedi.');
       },
     });
   }

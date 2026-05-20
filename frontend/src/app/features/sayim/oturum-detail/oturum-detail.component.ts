@@ -139,9 +139,20 @@ export class OturumDetailComponent implements OnInit {
       },
       error: (err: HttpErrorResponse) => {
         this.uploading.set(false);
-        this.toast.error(err.error?.message ?? 'Excel yükleme başarısız.');
+        this.toast.error(this.formatBackendError(err, 'Excel yükleme başarısız.'));
       },
     });
+  }
+
+  /** ValidationProblem (400) → errors dict'ten ilk mesajı çıkart. Diğer durumda
+   *  err.error.message veya generic fallback. */
+  private formatBackendError(err: HttpErrorResponse, fallback: string): string {
+    const errs = err.error?.errors as Record<string, string[]> | undefined;
+    if (errs) {
+      const first = Object.values(errs).flat()[0];
+      if (first) return first;
+    }
+    return err.error?.message ?? fallback;
   }
 
   async lock(): Promise<void> {

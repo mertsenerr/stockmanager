@@ -270,6 +270,16 @@ public sealed class OturumlarController : ControllerBase
     public async Task<IActionResult> ImportExcel(
         string id, [FromBody] ExcelImportRequest request, CancellationToken ct)
     {
+        // Excel ihracatlarında sıkça header tekrarı, ara satır, toplam satırı gibi
+        // barkod hücresi boş olan satırlar oluyor. Bunlar yüzünden tüm yüklemenin
+        // 400'le reddedilmesi pratik değil — sessizce eliyoruz, sayıyı audit'e
+        // koyuyoruz ki kullanıcıdan da gizli kalmasın.
+        var rawCount = request.Urunler.Count;
+        request.Urunler = request.Urunler
+            .Where(r => !string.IsNullOrWhiteSpace(r.Barkod))
+            .ToList();
+        var skippedEmptyBarkod = rawCount - request.Urunler.Count;
+
         var validation = await _excelValidator.ValidateAsync(request, ct);
         if (!validation.IsValid) return ValidationFailure(validation);
 
@@ -316,7 +326,10 @@ public sealed class OturumlarController : ControllerBase
 
         var updated = await _oturumlar.ReplaceUrunlerAndOzetAsync(id, mapping, urunler, ozet, ct);
         if (updated is null) return StatusCode(500);
-        Audit(AuditAksiyonlari.OturumExcelImport, id, yeni: $"{urunler.Count} ürün");
+        var auditDetail = skippedEmptyBarkod > 0
+            ? $"{urunler.Count} ürün (boş barkodlu {skippedEmptyBarkod} satır atlandı)"
+            : $"{urunler.Count} ürün";
+        Audit(AuditAksiyonlari.OturumExcelImport, id, yeni: auditDetail);
         return Ok(await EnrichDetailAsync(updated, ct));
     }
 
